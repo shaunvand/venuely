@@ -65,7 +65,9 @@ export async function verifyWebhook(headers: Headers, rawBody: string): Promise<
     ["sign"]
   );
   const sig = await crypto.subtle.sign("HMAC", key, enc.encode(signedContent));
-  const expected = btoa(String.fromCharCode(...new Uint8Array(sig)));
+  const expected = Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 
   // Header may contain multiple `v1,signature` pairs space-separated.
   return sigHeader.split(" ").some((p) => p.split(",")[1] === expected);

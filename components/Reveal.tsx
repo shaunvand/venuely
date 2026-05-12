@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function Reveal({
   children,
@@ -12,8 +12,12 @@ export function Reveal({
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Start visible on SSR/first render so content never hides if JS fails.
+  // Once mounted, opt into the reveal class, then let IntersectionObserver toggle in-view.
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    setHydrated(true);
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver(
@@ -32,7 +36,7 @@ export function Reveal({
   }, [delay]);
 
   return (
-    <div ref={ref} className={`reveal ${className}`}>
+    <div ref={ref} className={`${hydrated ? "reveal" : ""} ${className}`}>
       {children}
     </div>
   );

@@ -3,6 +3,13 @@ import { notFound } from "next/navigation";
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
 
+type SelectionRow = {
+  id: string;
+  quantity: number;
+  rental: { name: string; price: number } | null;
+  catalogue: { name: string } | null;
+};
+
 export default async function WeddingDetail({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const venue = await getCurrentVenue();
@@ -16,7 +23,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     .single();
   if (!wedding) notFound();
 
-  const [{ count: guestCount }, { count: supplierCount }, { count: paymentsPending }, { data: selections }] = await Promise.all([
+  const [{ count: guestCount }, { count: supplierCount }, { count: paymentsPending }, { data: selectionsRaw }] = await Promise.all([
     supabase.from("guests").select("*", { count: "exact", head: true }).eq("wedding_id", wedding.id),
     supabase.from("suppliers").select("*", { count: "exact", head: true }).eq("wedding_id", wedding.id),
     supabase.from("payments").select("*", { count: "exact", head: true }).eq("wedding_id", wedding.id).eq("status", "pending"),
@@ -25,6 +32,8 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
       .select("id, quantity, rental:rental_items(name, price), catalogue:catalogue_items(name)")
       .eq("wedding_id", wedding.id),
   ]);
+
+  const selections = (selectionsRaw ?? []) as unknown as SelectionRow[];
 
   return (
     <div className="space-y-6">
@@ -43,13 +52,12 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
       </div>
 
       <section>
-        <h2 className="text-lg font-semibold mb-2">Couple's rental selections</h2>
+        <h2 className="text-lg font-semibold mb-2">Couple&apos;s rental selections</h2>
         <ul className="text-sm space-y-1">
-          {selections?.map((s) => (
-            // @ts-expect-error joined row
+          {selections.map((s) => (
             <li key={s.id}>{s.quantity}× {s.rental?.name || s.catalogue?.name}</li>
           ))}
-          {!selections?.length && <li className="text-gray-500">No selections yet.</li>}
+          {!selections.length && <li className="text-gray-500">No selections yet.</li>}
         </ul>
       </section>
 

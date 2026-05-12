@@ -1,17 +1,38 @@
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
 
+type PaymentRow = {
+  id: string;
+  amount: number;
+  due_date: string | null;
+  paid_date: string | null;
+  status: string;
+  description: string | null;
+  wedding: { couple_names: string; slug: string } | null;
+};
+
 export default async function VenuePayments() {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
-  const { data: payments } = await supabase
-    .from("payments")
-    .select("id, amount, due_date, paid_date, status, description, wedding:weddings(couple_names, slug)")
-    .eq("weddings.venue_id", venue.id)
-    .order("due_date");
 
-  const total = (payments ?? []).reduce((s, p) => s + Number(p.amount), 0);
-  const paid = (payments ?? []).filter((p) => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
+  const { data: weddings } = await supabase
+    .from("weddings")
+    .select("id")
+    .eq("venue_id", venue.id);
+  const ids = (weddings ?? []).map((w) => w.id);
+
+  const { data: paymentsRaw } = ids.length
+    ? await supabase
+        .from("payments")
+        .select("id, amount, due_date, paid_date, status, description, wedding:weddings(couple_names, slug)")
+        .in("wedding_id", ids)
+        .order("due_date")
+    : { data: [] as PaymentRow[] };
+
+  const payments = (paymentsRaw ?? []) as unknown as PaymentRow[];
+
+  const total = payments.reduce((s, p) => s + Number(p.amount), 0);
+  const paid = payments.filter((p) => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
 
   return (
     <div className="space-y-6">
@@ -28,9 +49,8 @@ export default async function VenuePayments() {
           <tr><th>Wedding</th><th>Amount</th><th>Due</th><th>Paid</th><th>Status</th><th>Description</th></tr>
         </thead>
         <tbody>
-          {payments?.map((p) => (
+          {payments.map((p) => (
             <tr key={p.id} className="border-t">
-              {/* @ts-expect-error joined row */}
               <td className="py-2">{p.wedding?.couple_names}</td>
               <td>R{Number(p.amount).toLocaleString()}</td>
               <td>{p.due_date}</td>
@@ -39,7 +59,7 @@ export default async function VenuePayments() {
               <td>{p.description}</td>
             </tr>
           ))}
-          {!payments?.length && <tr><td colSpan={6} className="py-4 text-gray-500">No payments yet.</td></tr>}
+          {!payments.length && <tr><td colSpan={6} className="py-4 text-gray-500">No payments yet.</td></tr>}
         </tbody>
       </table>
     </div>
