@@ -29,10 +29,15 @@ export default async function Home() {
             <p className="text-sm text-gray-500">
               Signed in as <span className="font-mono">{user.email}</span> · role: <b>{role || "unknown"}</b>
             </p>
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 justify-center flex-wrap">
               {role === "owner" && <Link href="/owner" className="px-4 py-2 bg-black text-white rounded">Owner</Link>}
               {(role === "owner" || role === "venue_admin") && <Link href="/venue" className="px-4 py-2 border rounded">Venue</Link>}
+              {role === "couple" && <Link href="/portal/pat-busch/demo-wedding" className="px-4 py-2 border rounded">Demo portal</Link>}
+              {role !== "owner" && <Link href="/onboarding/become-owner" className="px-4 py-2 border rounded text-sm">Claim owner</Link>}
             </div>
+            <form action="/auth/signout" method="post" className="pt-2">
+              <button className="text-xs text-gray-500 hover:underline">Sign out</button>
+            </form>
           </div>
         )}
       </div>
