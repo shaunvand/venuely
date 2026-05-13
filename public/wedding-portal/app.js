@@ -66,7 +66,7 @@ const CATALOGUE_ITEM_IMAGES = {
   'F161': 'assets/img/7cee3c281671.png'
 };
 
-const CATALOGUE_ITEMS = [
+let CATALOGUE_ITEMS = [
   { code: 'F1', imgKey: 'F4', cat: 'Glassware & Serveware', name: 'Champagne Flutes, Wine & Beer Glasses', desc: '200× Champagne Flutes, Universal Wine glasses (red & white), Willy Beer glasses & Zombie glasses. Sufficient for all areas for up to 120 guests.', qty: '200', type: 'included' },
   { code: 'F7', imgKey: 'F9', cat: 'Glassware & Serveware', name: 'White Dinner Plates, Side Plates & Soup Bowls', desc: '120× Marola broad-rim white catering crockery — formal wedding stock, all matching. Farmhouse Erika has its own informal crockery which does not match.', qty: '120', type: 'included' },
   { code: 'F10', imgKey: 'F10', cat: 'Glassware & Serveware', name: 'White Coffee / Tea Mugs', desc: '70–100× Straight-sided catering mugs, no saucer. For Farewell Breakfast, late-night tea/coffee & hot chocolate station.', qty: '70–100', type: 'included' },
@@ -114,10 +114,10 @@ const CATALOGUE_ITEMS = [
   { code: 'F161', imgKey: 'F161', cat: 'Signage & Chalkboards', name: 'Signage Stand Sets', desc: '2× signage stands — one rustic trellis poles with chalkboard signs, one with neat printed signs on a wood stand. Directional & fun, to show guests where to go.', qty: '2', type: 'included' },
 ];
 
-const CATALOGUE_CATS = ['Glassware & Serveware','Kitchen & Braai','Rustic Vessels','Tables & Seating','Barrels & Crates','Soft Décor & Fabric','Signage & Chalkboards','Frames, Easels & Mirrors','Baskets & Rustic Décor','Décor & Display'];
+let CATALOGUE_CATS = ['Glassware & Serveware','Kitchen & Braai','Rustic Vessels','Tables & Seating','Barrels & Crates','Soft Décor & Fabric','Signage & Chalkboards','Frames, Easels & Mirrors','Baskets & Rustic Décor','Décor & Display'];
 
 // ── Accommodation Data ─────────────────────────────────────────────────────
-const ACCOMMODATION = [
+let ACCOMMODATION = [
   // ── STANDARD COTTAGES (Family Lodge Units) ──────────────────────────────
   { id: 'oak', name: 'Oak Cottage', sleeps: 2, bedrooms: 1, type: 'Bridal Suite', description: 'Open-plan cottage with double bed, slipper bath, air con, walk-in shower, fireplace, stoep & braai. Situated right next to the Barn Venue and Wedding Meadow — the natural choice as a Bridal Suite.', amenities: ['Double bed','Slipper bath','Walk-in shower','Air con','Fireplace','Stoep & braai','Next to Barn Venue'] },
   { id: 'fig', name: 'Fig Cottage', sleeps: 3, bedrooms: 1, type: 'Standard', description: 'Open-plan cottage with double bed, shower, and a single bed in an alcove off the lounge. Fireplace & braai. Suits a couple and a single, or two singles sharing.', amenities: ['Double bed','Single bed alcove','Shower','Fireplace','Braai'] },
@@ -213,7 +213,7 @@ const RENTAL_ITEM_IMAGES = {
   'R77': 'assets/img/00c97b8fcfb1.jpg',
   'R78': 'assets/img/83a2ffdbd561.jpg'
 };
-const RENTAL_ITEMS = [
+let RENTAL_ITEMS = [
   // ☕ Catering & Beverages
   { code:'R1',  cat:'Catering & Beverages', maxQty:1,   name:'Basic DIY Coffee & Tea Station', desc:'Urn, mugs, instant coffee, Ceylon & Rooibos, hot chocolate, milk, sweeteners, sugar', rate:850,  rateType:'flat',       repl:2500 },
   { code:'R2',  cat:'Catering & Beverages', maxQty:1,   name:'Gourmet DIY Coffee & Tea', desc:'Percolator rental R400 + R600/brew (~50 cups) incl. Tea Station setup', rate:1000, rateType:'flat',       repl:8000 },
@@ -312,8 +312,25 @@ const RENTAL_ITEMS = [
   { code:'R77', cat:'Extras & Add-ons',    maxQty:2,   name:'Gorilla Carts (×2)', desc:'For service providers or guests', rate:200,  rateType:'perUnit',    repl:3000 },
 ];
 
-const RENTAL_CATS = ['Catering & Beverages','Outdoor & Décor','Bar Setup','Lighting','Chairs & Seating','Hay Bales & Rustic','Comfort & Furnishings','Fire & Heating','Kitchen & Utilities','Audio / Visual','Games & Entertainment','Décor & Structures','Extra Areas','Extras & Add-ons'];
+let RENTAL_CATS = ['Catering & Beverages','Outdoor & Décor','Bar Setup','Lighting','Chairs & Seating','Hay Bales & Rustic','Comfort & Furnishings','Fire & Heating','Kitchen & Utilities','Audio / Visual','Games & Entertainment','Décor & Structures','Extra Areas','Extras & Add-ons'];
 const RENTAL_CAT_ICONS = {'Catering & Beverages':'☕','Outdoor & Décor':'🏕️','Bar Setup':'🍺','Lighting':'✨','Chairs & Seating':'🪑','Hay Bales & Rustic':'🌾','Comfort & Furnishings':'🛋️','Fire & Heating':'🔥','Kitchen & Utilities':'🍳','Audio / Visual':'🎤','Games & Entertainment':'🎯','Décor & Structures':'🏛️','Extra Areas':'🗺️','Extras & Add-ons':'➕'};
+
+// ── Venue-injected inventory (Pass 2b) ────────────────────────────────────
+// When the [wedding] route is rendered, the server inlines the live venue
+// catalogue/rentals/accommodation as window globals BEFORE this file loads.
+// Override the hardcoded defaults so the couple sees whatever the venue
+// admin has currently configured.
+if (typeof window !== 'undefined' && Array.isArray(window.VENUE_CATALOGUE_ITEMS) && window.VENUE_CATALOGUE_ITEMS.length) {
+  CATALOGUE_ITEMS = window.VENUE_CATALOGUE_ITEMS;
+  if (Array.isArray(window.VENUE_CATALOGUE_CATS) && window.VENUE_CATALOGUE_CATS.length) CATALOGUE_CATS = window.VENUE_CATALOGUE_CATS;
+}
+if (typeof window !== 'undefined' && Array.isArray(window.VENUE_RENTAL_ITEMS) && window.VENUE_RENTAL_ITEMS.length) {
+  RENTAL_ITEMS = window.VENUE_RENTAL_ITEMS;
+  if (Array.isArray(window.VENUE_RENTAL_CATS) && window.VENUE_RENTAL_CATS.length) RENTAL_CATS = window.VENUE_RENTAL_CATS;
+}
+if (typeof window !== 'undefined' && Array.isArray(window.VENUE_ACCOMMODATION) && window.VENUE_ACCOMMODATION.length) {
+  ACCOMMODATION = window.VENUE_ACCOMMODATION;
+}
 
 // ── Default Suppliers ─────────────────────────────────────────────────────
 const DEFAULT_SUPPLIERS = [
@@ -596,6 +613,21 @@ let _saveWarnShown = false;
 function _storageKey() {
   return 'venuePortal_v1__' + (window.WEDDING_SLUG || 'default');
 }
+// Debounced server sync — every save() schedules a PUT 600ms later.
+let _serverSaveTimer = null;
+let _serverSavePending = false;
+function _serverSave() {
+  if (!window.WEDDING_USE_SERVER || !window.WEDDING_SLUG) return;
+  if (_serverSavePending) return;
+  _serverSavePending = true;
+  fetch('/api/wedding/' + encodeURIComponent(window.WEDDING_SLUG) + '/state', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify(state),
+  }).catch(function(e) { console.warn('Server save failed:', e); })
+    .finally(function() { _serverSavePending = false; });
+}
 function save() {
   try {
     localStorage.setItem(_storageKey(), JSON.stringify(state));
@@ -608,12 +640,22 @@ function save() {
       console.warn('Venue Portal: localStorage save failed —', e.message);
     }
   }
+  // Mirror to server (debounced).
+  if (window.WEDDING_USE_SERVER) {
+    clearTimeout(_serverSaveTimer);
+    _serverSaveTimer = setTimeout(_serverSave, 600);
+  }
 }
 function load() {
-  try {
-    const raw = localStorage.getItem(_storageKey());
-    if (raw) { const loaded = JSON.parse(raw); state = { ...state, ...loaded }; }
-  } catch(e) {}
+  // Server-injected initial state takes priority over localStorage.
+  if (window.WEDDING_USE_SERVER && window.WEDDING_INITIAL_STATE && Object.keys(window.WEDDING_INITIAL_STATE).length) {
+    state = { ...state, ...window.WEDDING_INITIAL_STATE };
+  } else {
+    try {
+      const raw = localStorage.getItem(_storageKey());
+      if (raw) { const loaded = JSON.parse(raw); state = { ...state, ...loaded }; }
+    } catch(e) {}
+  }
 
   // Seed default suppliers if none saved, or merge in any new defaults not yet in state
   if (!state.suppliers || !state.suppliers.length) {
@@ -2050,6 +2092,56 @@ function openSubmitModal(type) {
 
 function copySubmitText() {
   navigator.clipboard.writeText(_submitModalText).then(() => showToast('Copied to clipboard ✦'));
+}
+
+// Server-backed submit: posts the current state to the venue. Pass 2b.
+let _submitKind = 'catalogue';
+function openSubmitModalWithKind(type) {
+  _submitKind = type;
+  openSubmitModal(type);
+}
+async function sendSubmissionToVenue() {
+  if (!window.WEDDING_SLUG) { showToast('Cannot submit — no wedding linked'); return; }
+  const btn = document.getElementById('submitToVenueBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const totals = _computeSubmissionTotals(_submitKind);
+    const res = await fetch('/api/wedding/' + encodeURIComponent(window.WEDDING_SLUG) + '/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ kind: _submitKind, state: state, totals: totals, message: null }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j.error || ('HTTP ' + res.status));
+    }
+    showToast('Sent to your venue ✦');
+    document.getElementById('submitModal').classList.remove('open');
+  } catch(e) {
+    showToast('Could not send: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send to venue'; }
+  }
+}
+function _computeSubmissionTotals(kind) {
+  if (kind === 'rentals') {
+    const selected = Object.entries(state.rentalSelections || {}).filter(([,s]) => s.sel);
+    let total = 0; let count = 0;
+    selected.forEach(([code, s]) => {
+      const item = RENTAL_ITEMS.find(r => r.code === code);
+      if (!item) return;
+      const days = [s.mg, s.wed, s.fb].filter(Boolean).length || 1;
+      total += (Number(item.rate) || 0) * days * (s.qty || 1);
+      count++;
+    });
+    return { count: count, totalZAR: total };
+  }
+  if (kind === 'catalogue') {
+    const selected = Object.entries(state.catalogueSelections || {}).filter(([,s]) => s.sel || s.mg || s.wed || s.fb);
+    return { count: selected.length };
+  }
+  return {};
 }
 
 // ── Patch renderDashboard to also render new panels ───────────────

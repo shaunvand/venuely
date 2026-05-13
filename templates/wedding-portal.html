@@ -709,10 +709,11 @@
     <div style="padding:4px 0 12px;font-size:0.82rem;color:var(--text-light)">Review your selections below, then send directly to your Pat Busch coordinator.</div>
     <div class="submit-modal-body" id="submitModalBody"></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <a id="submitMailtoBtn" href="#" class="btn btn-primary" style="flex:1;text-align:center;text-decoration:none">📧 Open in Email</a>
-      <button onclick="copySubmitText()" class="btn btn-secondary" style="flex:1">📋 Copy to Clipboard</button>
+      <button id="submitToVenueBtn" onclick="sendSubmissionToVenue()" class="btn btn-primary" style="flex:2">✉️ Send to venue</button>
+      <a id="submitMailtoBtn" href="#" class="btn btn-secondary" style="flex:1;text-align:center;text-decoration:none">Open in Email</a>
+      <button onclick="copySubmitText()" class="btn btn-secondary" style="flex:1">Copy</button>
     </div>
-    <div style="font-size:0.72rem;color:var(--text-light);margin-top:10px;text-align:center">Sends to info@patbusch.co.za · Your coordinator will confirm receipt within 2 business days</div>
+    <div style="font-size:0.72rem;color:var(--text-light);margin-top:10px;text-align:center">Sends directly to your venue&apos;s Venuely dashboard · A copy goes to their email</div>
   </div>
 </div>
 
