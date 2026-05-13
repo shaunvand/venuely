@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useTransition } from "react";
-import { bulkDelete, bulkSetActive, bulkSetPrice, updateItem, bulkInsert } from "@/app/venue/_inventory/actions";
+import { bulkDelete, bulkSetActive, bulkSetPrice, updateItem, bulkInsert, addItem } from "@/app/venue/_inventory/actions";
 import type { InventoryType } from "@/lib/inventory/schemas";
 
 type Field = { key: string; label: string; type: "string" | "number" | "select"; options: string[] | null };
@@ -29,9 +29,12 @@ export function InventoryManager({
 }) {
   const [importOpen, setImportOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [editMode, setEditMode] = useState<"add" | "edit">("add");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Record<string, unknown>>({});
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const [zoomUrl, setZoomUrl] = useState<string | null>(null);
   const [bulkPrice, setBulkPrice] = useState("");
   const [isPending, startTransition] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -54,25 +57,55 @@ export function InventoryManager({
   }
 
   function startEdit(item: Item) {
+    setEditMode("edit");
     setEditingId(item.id);
     const draft: Record<string, unknown> = {};
     for (const f of fields) draft[f.key] = item[f.key] ?? "";
     setEditDraft(draft);
     setEditOpen(true);
   }
+  function startAdd() {
+    setEditMode("add");
+    setEditingId(null);
+    const draft: Record<string, unknown> = {};
+    for (const f of fields) draft[f.key] = "";
+    if (fields.some((f) => f.key === "price_unit")) draft.price_unit = "fixed";
+    if (fields.some((f) => f.key === "stock_total")) draft.stock_total = 1;
+    if (fields.some((f) => f.key === "sleeps")) draft.sleeps = 2;
+    setEditDraft(draft);
+    setEditOpen(true);
+  }
   function saveEdit() {
-    if (!editingId) return;
-    const id = editingId;
     const patch: Record<string, unknown> = {};
     for (const f of fields) {
       const v = editDraft[f.key];
       if (f.type === "number") patch[f.key] = v === "" || v == null ? null : Number(v);
       else patch[f.key] = v === "" ? null : v;
     }
+    if (!patch.name) return;
     startTransition(async () => {
-      await updateItem(type, id, patch);
+      if (editMode === "edit" && editingId) {
+        await updateItem(type, editingId, patch);
+      } else {
+        await addItem(type, venueId, patch);
+      }
       setEditOpen(false); setEditingId(null);
     });
+  }
+
+  async function uploadImage(f: File) {
+    setUploadingImg(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      fd.append("venue_id", venueId);
+      const res = await fetch("/api/venue/inventory/image", { method: "POST", body: fd });
+      const j = await res.json();
+      if (res.ok && j.ok) setEditDraft((d) => ({ ...d, image_url: j.url }));
+      else alert(`Upload failed: ${j.error ?? "unknown"}`);
+    } catch (e) {
+      alert(`Upload error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally { setUploadingImg(false); }
   }
 
   function doBulkDelete() {
@@ -152,6 +185,9 @@ export function InventoryManager({
           {items.length} item{items.length === 1 ? "" : "s"}
         </div>
         <div className="flex gap-2 flex-wrap">
+          <button type="button" onClick={startAdd} className={BUBBLE_PRIMARY}>
+            + Add item
+          </button>
           <button type="button" onClick={() => setImportOpen(true)} className={BUBBLE_SECONDARY}>
             ⬆ Smart import (Excel)
           </button>
@@ -206,8 +242,12 @@ export function InventoryManager({
                     <td className="py-2"><input type="checkbox" checked={selected.has(i.id)} onChange={(e) => toggle(i.id, e.target.checked)} /></td>
                     <td className="py-2">
                       {img ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={img} alt="" className="h-10 w-10 rounded border border-stone-200 object-cover" />
+                        <button type="button" onClick={() => setZoomUrl(img)} className="group relative block h-10 w-10">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={img} alt="" className="h-10 w-10 rounded border border-stone-200 object-cover transition group-hover:scale-110 group-hover:shadow-md" />
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={img} alt="" className="hidden group-hover:block absolute left-12 top-1/2 -translate-y-1/2 h-40 w-40 rounded-lg border border-stone-200 object-cover shadow-xl z-20 bg-white" />
+                        </button>
                       ) : (
                         <div className="h-10 w-10 rounded border border-dashed border-stone-300 bg-stone-50" />
                       )}
@@ -235,33 +275,72 @@ export function InventoryManager({
         </div>
       )}
 
-      {/* Single-item edit lightbox */}
-      {editOpen && editingId && (
-        <Lightbox onClose={() => { setEditOpen(false); setEditingId(null); }} title="Edit item">
-          <div className="grid grid-cols-2 gap-3">
-            {fields.map((f) => (
-              <div key={f.key} className={f.key === "description" ? "col-span-2 space-y-1" : "space-y-1"}>
-                <label className="text-xs text-stone-600 font-medium">{f.label}</label>
-                {f.type === "select" ? (
-                  <select className="w-full border rounded-full px-3 py-2 text-sm"
-                    value={String(editDraft[f.key] ?? "")}
-                    onChange={(e) => setEditDraft({ ...editDraft, [f.key]: e.target.value })}>
-                    {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                ) : (
-                  <input className="w-full border rounded-full px-3 py-2 text-sm"
-                    type={f.type === "number" ? "number" : "text"}
-                    value={String(editDraft[f.key] ?? "")}
-                    onChange={(e) => setEditDraft({ ...editDraft, [f.key]: e.target.value })} />
-                )}
+      {/* Add / edit lightbox */}
+      {editOpen && (
+        <Lightbox onClose={() => { setEditOpen(false); setEditingId(null); }} title={editMode === "add" ? "Add new item" : "Edit item"}>
+          <div className="space-y-4">
+            <div className="flex flex-col items-center gap-2 pb-4 border-b border-stone-200">
+              {editDraft.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={String(editDraft.image_url)} alt="" className="h-32 w-32 rounded-lg border border-stone-200 object-cover" />
+              ) : (
+                <div className="h-32 w-32 rounded-lg border-2 border-dashed border-stone-300 bg-stone-50 flex items-center justify-center text-stone-400 text-xs">No image</div>
+              )}
+              <div className="flex gap-2">
+                <label className={BUBBLE_SECONDARY + " cursor-pointer"}>
+                  {uploadingImg ? "Uploading…" : "Upload image"}
+                  <input type="file" accept="image/*" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadImage(f); }} />
+                </label>
+                {editDraft.image_url ? (
+                  <button type="button" onClick={() => setEditDraft({ ...editDraft, image_url: "" })} className={BUBBLE_GHOST}>Remove</button>
+                ) : null}
               </div>
-            ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {fields.filter((f) => f.key !== "image_url").map((f) => (
+                <div key={f.key} className={f.key === "description" ? "col-span-2 space-y-1" : "space-y-1"}>
+                  <label className="text-xs text-stone-600 font-medium">{f.label}</label>
+                  {f.type === "select" ? (
+                    <select className="w-full border rounded-full px-3 py-2 text-sm"
+                      value={String(editDraft[f.key] ?? "")}
+                      onChange={(e) => setEditDraft({ ...editDraft, [f.key]: e.target.value })}>
+                      {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ) : (
+                    <input className="w-full border rounded-full px-3 py-2 text-sm"
+                      type={f.type === "number" ? "number" : "text"}
+                      value={String(editDraft[f.key] ?? "")}
+                      onChange={(e) => setEditDraft({ ...editDraft, [f.key]: e.target.value })} />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-stone-600 font-medium">Image URL (or upload above)</label>
+              <input className="w-full border rounded-full px-3 py-2 text-sm" type="url"
+                value={String(editDraft.image_url ?? "")}
+                onChange={(e) => setEditDraft({ ...editDraft, image_url: e.target.value })}
+                placeholder="https://…" />
+            </div>
           </div>
           <div className="flex gap-2 justify-end mt-4 pt-4 border-t border-stone-200">
             <button onClick={() => { setEditOpen(false); setEditingId(null); }} className={BUBBLE_GHOST}>Cancel</button>
-            <button disabled={isPending} onClick={saveEdit} className={BUBBLE_PRIMARY}>Save</button>
+            <button disabled={isPending || !editDraft.name} onClick={saveEdit} className={BUBBLE_PRIMARY}>
+              {editMode === "add" ? "Add item" : "Save"}
+            </button>
           </div>
         </Lightbox>
+      )}
+
+      {/* Image zoom modal */}
+      {zoomUrl && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-8" onClick={() => setZoomUrl(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={zoomUrl} alt="" className="max-h-full max-w-full rounded-lg shadow-2xl" />
+        </div>
       )}
 
       {/* Smart import lightbox */}

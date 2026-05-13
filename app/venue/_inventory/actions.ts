@@ -41,6 +41,15 @@ export async function updateItem(type: InventoryType, id: string, patch: Record<
   revalidatePath(INVENTORY_PATHS[type]);
 }
 
+export async function addItem(type: InventoryType, venueId: string, patch: Record<string, unknown>) {
+  const supabase = await client();
+  const defaults = defaultsFor(type);
+  const row = { ...defaults, ...patch, venue_id: venueId };
+  const { error } = await supabase.from(INVENTORY_TABLES[type]).insert(row);
+  if (error) throw new Error(error.message);
+  revalidatePath(INVENTORY_PATHS[type]);
+}
+
 export async function bulkInsert(type: InventoryType, venueId: string, rows: Array<Record<string, unknown>>) {
   if (!rows.length) return { inserted: 0 };
   const supabase = await client();
