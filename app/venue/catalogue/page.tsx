@@ -1,13 +1,15 @@
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
 import { addCatalogue, deleteCatalogue, toggleCatalogueActive } from "./actions";
+import { InventoryManager } from "@/components/InventoryManager";
+import { INVENTORY_FIELDS } from "@/lib/inventory/schemas";
 
 export default async function VenueCatalogue() {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
   const { data: items } = await supabase
     .from("catalogue_items")
-    .select("id, category, name, description, price, price_unit, active")
+    .select("id, category, name, description, price, price_unit, active, image_url")
     .eq("venue_id", venue.id)
     .order("category")
     .order("sort_order");
@@ -21,6 +23,14 @@ export default async function VenueCatalogue() {
           Items included with your booking. Couples tick which days they need each.
         </p>
       </header>
+
+      <InventoryManager
+        type="catalogue"
+        venueId={venue.id}
+        items={(items ?? []) as Array<Record<string, unknown> & { id: string }>}
+        fields={INVENTORY_FIELDS.catalogue.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options ?? null }))}
+        priceColumn="price"
+      />
 
       <form action={addCatalogue.bind(null, venue.id)} className="vy-card grid gap-3 md:grid-cols-6">
         <div className="md:col-span-2 space-y-1">

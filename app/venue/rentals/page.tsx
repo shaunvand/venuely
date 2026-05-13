@@ -1,13 +1,15 @@
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
 import { addRental, deleteRental, toggleRentalActive } from "./actions";
+import { InventoryManager } from "@/components/InventoryManager";
+import { INVENTORY_FIELDS } from "@/lib/inventory/schemas";
 
 export default async function VenueRentals() {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
   const { data: items } = await supabase
     .from("rental_items")
-    .select("id, category, name, description, price, stock_total, active")
+    .select("id, category, name, description, price, stock_total, active, image_url")
     .eq("venue_id", venue.id)
     .order("category")
     .order("sort_order");
@@ -21,6 +23,14 @@ export default async function VenueRentals() {
           Items couples pay extra for. Couples pick quantity + days; totals tally automatically.
         </p>
       </header>
+
+      <InventoryManager
+        type="rentals"
+        venueId={venue.id}
+        items={(items ?? []) as Array<Record<string, unknown> & { id: string }>}
+        fields={INVENTORY_FIELDS.rentals.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options ?? null }))}
+        priceColumn="price"
+      />
 
       <form action={addRental.bind(null, venue.id)} className="vy-card grid gap-3 md:grid-cols-6">
         <div className="md:col-span-2 space-y-1">
