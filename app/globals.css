@@ -1,8 +1,24 @@
 @import "tailwindcss";
 
+/* ────────────────────────────────────────────────────────────────────
+   Venuely design tokens — palette mirrors the original Pat Busch portal
+   (forest green / cream / gold) so admin + venue + couple surfaces all
+   feel like the same product family.
+   ──────────────────────────────────────────────────────────────────── */
 :root {
   --background: #fafaf9;
   --foreground: #1c1917;
+
+  --forest:      #2d4a3a;
+  --forest-deep: #1e3327;
+  --sage:        #5e7a6a;
+  --cream:       #f5efe6;
+  --gold:        #b8762a;
+  --gold-soft:   #c19a3b;
+  --bone:        #faf7f1;
+  --ink:         #1c1917;
+  --ink-2:       #57534e;
+  --line:        rgba(28, 25, 23, 0.10);
 }
 
 @theme inline {
@@ -29,24 +45,21 @@ body {
 /* ── Animations ─────────────────────────────────────────────────── */
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes drift {
   0%   { transform: translate(0, 0) scale(1); }
   50%  { transform: translate(20px, -10px) scale(1.05); }
   100% { transform: translate(0, 0) scale(1); }
 }
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
 }
 @keyframes draw-arch {
   from { stroke-dashoffset: 200; }
-  to { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: 0; }
 }
 
 .anim-fade-up { animation: fade-up 0.7s ease-out both; }
@@ -58,7 +71,6 @@ body {
 .delay-400 { animation-delay: 0.4s; }
 .delay-500 { animation-delay: 0.5s; }
 
-/* Scroll-reveal — uses IntersectionObserver-toggled class .in-view */
 .reveal {
   opacity: 0;
   transform: translateY(20px);
@@ -69,13 +81,11 @@ body {
   transform: translateY(0);
 }
 
-/* Logo arch path animation on first paint */
 .logo-arch {
   stroke-dasharray: 200;
   animation: draw-arch 1.4s ease-out forwards;
 }
 
-/* Gradient text shimmer (used for hero accent) */
 .text-shimmer {
   background: linear-gradient(90deg, #57534e 0%, #1c1917 50%, #57534e 100%);
   background-size: 200% 100%;
@@ -85,7 +95,6 @@ body {
   animation: shimmer 6s linear infinite;
 }
 
-/* Card hover lift */
 .lift {
   transition: transform 0.3s ease-out, box-shadow 0.3s ease-out, border-color 0.3s ease-out;
 }
@@ -95,7 +104,219 @@ body {
   border-color: rgba(28, 25, 23, 0.2);
 }
 
-/* Reduced motion respect */
+/* ── Admin/Venue dashboard primitives ─────────────────────────────────
+   Card / panel / button utility classes that match the couple-portal feel
+   without forking the entire static portal CSS.
+   ───────────────────────────────────────────────────────────────────── */
+.vy-eyebrow {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--ink-2);
+}
+.vy-h1 {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 500;
+  font-size: 2.25rem;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.vy-h2 {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 500;
+  font-size: 1.4rem;
+  color: var(--ink);
+}
+.vy-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 500;
+  font-size: 1.3rem;
+  color: var(--forest);
+  margin-bottom: 0.35rem;
+}
+.vy-section-sub {
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  margin-bottom: 1.25rem;
+}
+.vy-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 1.5rem 0;
+}
+.vy-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.1rem 1.3rem;
+}
+.vy-card-hero {
+  background: linear-gradient(180deg, var(--cream) 0%, #fff 100%);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1.5rem 1.5rem;
+}
+.vy-stat {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem 1.15rem;
+}
+.vy-stat-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ink-2);
+}
+.vy-stat-value {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 500;
+  font-size: 2.1rem;
+  color: var(--ink);
+  margin-top: 0.15rem;
+  line-height: 1;
+}
+.vy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.85rem;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  cursor: pointer;
+}
+.vy-btn-primary {
+  background: var(--forest);
+  color: #fff;
+  border: 1px solid var(--forest);
+}
+.vy-btn-primary:hover {
+  background: var(--forest-deep);
+  border-color: var(--forest-deep);
+}
+.vy-btn-secondary {
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.vy-btn-secondary:hover { background: var(--bone); }
+.vy-btn-ghost {
+  background: transparent;
+  color: var(--ink-2);
+  border: 1px solid transparent;
+}
+.vy-btn-ghost:hover { background: var(--bone); }
+.vy-btn-danger {
+  background: transparent;
+  color: #b03a2e;
+  border: 1px solid transparent;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+}
+.vy-btn-danger:hover { background: #fff1ef; border-color: #f3d2cd; }
+.vy-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--cream);
+  color: var(--gold);
+}
+.vy-tag-active   { background: #e7f1ea; color: #2f6b4b; }
+.vy-tag-paused   { background: #fff1ef; color: #b03a2e; }
+.vy-tag-trial    { background: var(--cream); color: var(--gold); }
+.vy-tag-soft     { background: var(--bone); color: var(--ink-2); }
+.vy-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.85rem;
+}
+.vy-table thead th {
+  text-align: left;
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  padding: 0 0.75rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+.vy-table tbody td {
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+.vy-table tbody tr:last-child td { border-bottom: none; }
+.vy-table tbody tr:hover { background: var(--bone); }
+.vy-input,
+.vy-select {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.88rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.vy-input:focus,
+.vy-select:focus {
+  border-color: var(--sage);
+  box-shadow: 0 0 0 3px rgba(94, 122, 106, 0.18);
+}
+.vy-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ink-2);
+  margin-bottom: 0.25rem;
+  display: block;
+}
+.vy-empty {
+  background: var(--bone);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--ink-2);
+  font-size: 0.85rem;
+}
+.vy-sidebar {
+  background: #fff;
+  border-right: 1px solid var(--line);
+}
+.vy-side-link {
+  display: block;
+  padding: 0.45rem 0.6rem;
+  border-radius: 7px;
+  font-size: 0.88rem;
+  color: var(--ink);
+  transition: background 0.12s;
+}
+.vy-side-link:hover { background: var(--bone); }
+.vy-side-link.active {
+  background: var(--cream);
+  color: var(--forest);
+  font-weight: 500;
+}
+.vy-side-section {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--ink-2);
+  margin: 1.1rem 0 0.4rem 0.6rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .anim-fade-up, .anim-fade-in, .anim-drift, .logo-arch, .text-shimmer, .reveal {
     animation: none !important;

@@ -7,48 +7,81 @@ export default async function VenueAccommodation() {
   const supabase = await createClient();
   const { data: rooms } = await supabase
     .from("accommodation_rooms")
-    .select("id, name, room_type, sleeps, price_per_night, active")
+    .select("id, name, room_type, sleeps, price_per_night, description, active")
     .eq("venue_id", venue.id)
     .order("sort_order");
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Accommodation · {venue.name}</h1>
+    <div className="space-y-8">
+      <header>
+        <div className="vy-eyebrow">On-site stays</div>
+        <h1 className="vy-h1 mt-1">Accommodation</h1>
+        <p className="text-stone-600 text-sm mt-1">
+          Cottages, suites, tents — anything on the property. Couples assign their guests to rooms.
+        </p>
+      </header>
 
-      <form action={addRoom.bind(null, venue.id)} className="flex flex-wrap gap-2 border rounded p-4">
-        <input name="name" required placeholder="Room name" className="border rounded px-3 py-2 flex-1 min-w-40" />
-        <input name="room_type" placeholder="Type (cottage / suite)" className="border rounded px-3 py-2" />
-        <input name="sleeps" type="number" min="1" defaultValue="2" className="border rounded px-3 py-2 w-20" />
-        <input name="price_per_night" type="number" step="0.01" required defaultValue="0" placeholder="R/night" className="border rounded px-3 py-2 w-28" />
-        <input name="description" placeholder="Description" className="border rounded px-3 py-2 w-full" />
-        <button className="px-4 py-2 bg-black text-white rounded">Add room</button>
+      <form action={addRoom.bind(null, venue.id)} className="vy-card grid gap-3 md:grid-cols-6">
+        <div className="md:col-span-3 space-y-1">
+          <label className="vy-label">Room name</label>
+          <input name="name" required placeholder="Oak Cottage" className="vy-input" />
+        </div>
+        <div className="md:col-span-2 space-y-1">
+          <label className="vy-label">Type</label>
+          <input name="room_type" placeholder="Cottage / Suite / Tent" className="vy-input" />
+        </div>
+        <div className="space-y-1">
+          <label className="vy-label">Sleeps</label>
+          <input name="sleeps" type="number" min="1" defaultValue="2" className="vy-input" />
+        </div>
+        <div className="md:col-span-4 space-y-1">
+          <label className="vy-label">Description</label>
+          <input name="description" placeholder="Open-plan cottage with double bed, slipper bath, fireplace…" className="vy-input" />
+        </div>
+        <div className="space-y-1">
+          <label className="vy-label">R / night</label>
+          <input name="price_per_night" type="number" step="0.01" required defaultValue="0" className="vy-input" />
+        </div>
+        <div className="space-y-1">
+          <label className="vy-label">&nbsp;</label>
+          <button className="vy-btn vy-btn-primary w-full">+ Add</button>
+        </div>
       </form>
 
-      <table className="w-full text-sm">
-        <thead className="text-left text-gray-500">
-          <tr><th>Name</th><th>Type</th><th>Sleeps</th><th>R/night</th><th>Active</th><th></th></tr>
-        </thead>
-        <tbody>
-          {rooms?.map((r) => (
-            <tr key={r.id} className="border-t">
-              <td className="py-2">{r.name}</td>
-              <td>{r.room_type}</td>
-              <td>{r.sleeps}</td>
-              <td>R{Number(r.price_per_night).toLocaleString()}</td>
-              <td>
+      {!rooms?.length ? (
+        <div className="vy-empty">No accommodation yet. Add your first room above.</div>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
+          {rooms.map((r) => (
+            <div key={r.id} className="vy-card flex flex-col">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-serif text-xl text-[color:var(--forest)]">{r.name}</h3>
+                  <div className="text-xs text-stone-500 mt-1 flex gap-3">
+                    {r.room_type && <span>{r.room_type}</span>}
+                    <span>Sleeps {r.sleeps}</span>
+                    <span>R{Number(r.price_per_night).toLocaleString()}/night</span>
+                  </div>
+                </div>
+                <span className={`vy-tag ${r.active ? "vy-tag-active" : "vy-tag-soft"}`}>
+                  {r.active ? "active" : "hidden"}
+                </span>
+              </div>
+              {r.description && (
+                <p className="text-sm text-stone-600 mt-3 whitespace-pre-line">{r.description}</p>
+              )}
+              <div className="flex gap-2 mt-4 pt-4 border-t border-[color:var(--line)]">
                 <form action={toggleRoomActive.bind(null, r.id, !r.active)}>
-                  <button className={r.active ? "text-green-600" : "text-gray-400"}>{r.active ? "✓" : "○"}</button>
+                  <button className="vy-btn vy-btn-ghost text-sm">{r.active ? "Hide" : "Show"}</button>
                 </form>
-              </td>
-              <td>
                 <form action={deleteRoom.bind(null, r.id)}>
-                  <button className="text-red-600 text-xs hover:underline">delete</button>
+                  <button className="vy-btn vy-btn-danger">Remove</button>
                 </form>
-              </td>
-            </tr>
+              </div>
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -116,55 +116,51 @@ export default async function VenueOverview() {
   const pct = Math.round((doneCount / totalCount) * 100);
 
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="space-y-10">
       <header>
-        <h1 className="text-2xl font-semibold">{venue.name}</h1>
+        <div className="vy-eyebrow">Welcome to Venuely</div>
+        <h1 className="vy-h1 mt-1">{venue.name}</h1>
         {(venue.address || venue.region) && (
           <p className="text-stone-600 text-sm mt-1">
             {venue.address ?? venue.region}
             {venue.google_maps_url && (
-              <a href={venue.google_maps_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-2">↗ Maps</a>
+              <a href={venue.google_maps_url} target="_blank" rel="noopener noreferrer" className="text-[color:var(--forest)] hover:underline ml-2">↗ Google Maps</a>
             )}
           </p>
         )}
       </header>
 
-      {/* Progress strip */}
-      <section className="border border-stone-200 rounded-lg p-5 bg-white">
+      <section className="vy-card-hero">
         <div className="flex items-baseline justify-between mb-3">
           <div>
-            <h2 className="font-semibold">Get your venue ready</h2>
-            <p className="text-sm text-stone-600">{doneCount} of {totalCount} steps complete</p>
+            <div className="vy-eyebrow">Setup progress</div>
+            <h2 className="vy-h2 mt-1">{doneCount} of {totalCount} steps complete</h2>
           </div>
-          <div className="text-2xl font-semibold tabular-nums">{pct}%</div>
+          <div className="font-serif text-4xl tabular-nums text-[color:var(--forest)]">{pct}%</div>
         </div>
         <div className="w-full h-2 rounded-full bg-stone-100 overflow-hidden">
-          <div className="h-full bg-emerald-600 transition-all" style={{ width: `${pct}%` }} />
+          <div className="h-full bg-[color:var(--forest)] transition-all" style={{ width: `${pct}%` }} />
         </div>
       </section>
 
-      {/* Step list */}
       <ol className="space-y-3">
         {steps.map((s, i) => (
-          <li key={s.key} className={`flex gap-4 border rounded-lg p-5 transition-colors ${s.done ? "border-emerald-200 bg-emerald-50/50" : "border-stone-200 bg-white"}`}>
-            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ${s.done ? "bg-emerald-600 text-white" : "bg-stone-100 text-stone-500"}`}>
+          <li key={s.key} className={`vy-card flex gap-4 ${s.done ? "border-[color:var(--sage)]/40 bg-[color:var(--cream)]/40" : ""}`}>
+            <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center font-medium text-sm ${s.done ? "bg-[color:var(--forest)] text-white" : "bg-stone-100 text-stone-500"}`}>
               {s.done ? "✓" : i + 1}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                <h3 className="font-semibold">{s.title}</h3>
+                <h3 className="font-semibold text-[15px]">{s.title}</h3>
                 {typeof s.count === "number" && (
-                  <span className="text-xs text-stone-500">{s.count} item{s.count === 1 ? "" : "s"}</span>
+                  <span className="vy-tag vy-tag-soft">{s.count} item{s.count === 1 ? "" : "s"}</span>
                 )}
               </div>
               <p className="text-sm text-stone-600 mt-1">{s.description}</p>
               {s.hint && <p className="text-xs text-stone-500 mt-1 italic">{s.hint}</p>}
             </div>
             <div className="flex-shrink-0 flex items-center">
-              <Link
-                href={s.href}
-                className={`text-sm px-3 py-1.5 rounded-md whitespace-nowrap ${s.done ? "border border-stone-300 hover:bg-white" : "bg-stone-900 text-white hover:bg-stone-800"}`}
-              >
+              <Link href={s.href} className={`vy-btn ${s.done ? "vy-btn-secondary" : "vy-btn-primary"} whitespace-nowrap`}>
                 {s.cta}
               </Link>
             </div>
@@ -172,11 +168,11 @@ export default async function VenueOverview() {
         ))}
       </ol>
 
-      <section className="text-sm text-stone-600 border-t pt-6">
-        <p>
-          Tip: a couple&apos;s portal at <code className="text-xs bg-stone-100 px-1.5 py-0.5 rounded">venuely.co.za/[wedding-slug]</code> automatically shows whatever inventory you&apos;ve added — no separate sync needed.
-        </p>
-      </section>
+      <p className="text-sm text-stone-600 pt-4 border-t border-[color:var(--line)]">
+        Tip — each couple sees their portal at{" "}
+        <code className="text-xs bg-stone-100 px-1.5 py-0.5 rounded">venuely.co.za/[wedding-slug]</code>
+        . Anything you add here appears there immediately.
+      </p>
     </div>
   );
 }

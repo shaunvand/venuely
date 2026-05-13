@@ -15,34 +15,70 @@ export default async function OwnerBilling() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Billing</h1>
-      <div className="text-sm text-gray-600">
-        Plan: R{MONTHLY_R}/mo per venue · Yoco {yoco.live ? "live" : <span className="text-amber-600">not configured (set YOCO_SECRET_KEY)</span>}
+      <header>
+        <div className="vy-eyebrow">Subscriptions</div>
+        <h1 className="vy-h1 mt-1">Billing</h1>
+      </header>
+
+      <div className="vy-card-hero flex items-center justify-between">
+        <div>
+          <div className="vy-eyebrow">Per venue</div>
+          <div className="flex items-baseline gap-2 mt-1">
+            <span className="font-serif text-4xl">R{MONTHLY_R}</span>
+            <span className="text-stone-500">/ month</span>
+          </div>
+          <div className="text-xs text-stone-500 mt-1">14-day free trial · cancel anytime</div>
+        </div>
+        <div>
+          <span className={`vy-tag ${yoco.live ? "vy-tag-active" : "vy-tag-paused"}`}>
+            Yoco {yoco.live ? "live" : "not configured"}
+          </span>
+          {!yoco.live && (
+            <div className="text-xs text-stone-500 mt-2 max-w-xs text-right">
+              Set <code className="bg-stone-100 px-1 rounded">YOCO_SECRET_KEY</code> on Render.
+            </div>
+          )}
+        </div>
       </div>
 
-      <table className="w-full text-sm">
-        <thead className="text-left text-gray-500">
-          <tr><th>Venue</th><th>Status</th><th>Trial ends</th><th>Yoco customer</th><th></th></tr>
-        </thead>
-        <tbody>
-          {venues?.map((v) => (
-            <tr key={v.id} className="border-t">
-              <td className="py-2">{v.name}</td>
-              <td>{v.subscription_status}</td>
-              <td>{v.trial_ends_at?.slice(0, 10) ?? "—"}</td>
-              <td className="font-mono text-xs">{v.yoco_customer_id ?? "—"}</td>
-              <td>
-                {v.subscription_status !== "active" && (
-                  <form action={startSubscription.bind(null, v.id, v.slug)}>
-                    <button className="text-blue-600 hover:underline text-xs">start subscription</button>
-                  </form>
-                )}
-              </td>
-            </tr>
-          ))}
-          {!venues?.length && <tr><td colSpan={5} className="py-4 text-gray-500">No venues yet.</td></tr>}
-        </tbody>
-      </table>
+      {!venues?.length ? (
+        <div className="vy-empty">No venues yet.</div>
+      ) : (
+        <div className="vy-card p-0 overflow-hidden">
+          <table className="vy-table">
+            <thead>
+              <tr>
+                <th>Venue</th>
+                <th>Status</th>
+                <th>Trial ends</th>
+                <th>Yoco customer</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {venues.map((v) => (
+                <tr key={v.id}>
+                  <td><div className="font-medium">{v.name}</div></td>
+                  <td>
+                    <span className={`vy-tag ${v.subscription_status === "active" ? "vy-tag-active" : v.subscription_status === "trialing" ? "vy-tag-trial" : "vy-tag-soft"}`}>
+                      {v.subscription_status}
+                    </span>
+                  </td>
+                  <td>{v.trial_ends_at?.slice(0, 10) ?? "—"}</td>
+                  <td className="font-mono text-xs">{v.yoco_customer_id ?? "—"}</td>
+                  <td className="text-right">
+                    {v.subscription_status !== "active" && (
+                      <form action={startSubscription.bind(null, v.id, v.slug)}>
+                        <button className="vy-btn vy-btn-secondary">Start subscription</button>
+                      </form>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

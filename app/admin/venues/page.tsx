@@ -5,47 +5,62 @@ export default async function OwnerVenues() {
   const supabase = await createClient();
   const { data: venues } = await supabase
     .from("venues")
-    .select("id, slug, name, region, subscription_status, trial_ends_at, created_at")
+    .select("id, slug, name, region, address, subscription_status, trial_ends_at, created_at")
     .order("created_at");
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-start">
-        <h1 className="text-2xl font-semibold">Venues</h1>
-        <Link href="/venue" className="text-sm text-blue-600 hover:underline">
-          Open admin →
-        </Link>
-      </div>
+      <header className="flex items-end justify-between">
+        <div>
+          <div className="vy-eyebrow">Customers</div>
+          <h1 className="vy-h1 mt-1">Venues</h1>
+        </div>
+        <Link href="/venue" className="vy-btn vy-btn-secondary">Open admin →</Link>
+      </header>
 
-      <table className="w-full text-sm">
-        <thead className="text-left text-gray-500">
-          <tr>
-            <th>Name</th>
-            <th>Slug</th>
-            <th>Region</th>
-            <th>Status</th>
-            <th>Trial ends</th>
-          </tr>
-        </thead>
-        <tbody>
-          {venues?.map((v) => (
-            <tr key={v.id} className="border-t">
-              <td className="py-2 font-medium">{v.name}</td>
-              <td className="font-mono text-xs">{v.slug}</td>
-              <td>{v.region}</td>
-              <td>{v.subscription_status}</td>
-              <td>{v.trial_ends_at?.slice(0, 10) ?? "—"}</td>
-            </tr>
-          ))}
-          {!venues?.length && (
-            <tr>
-              <td colSpan={5} className="py-4 text-gray-500">
-                No venues yet.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      {!venues?.length ? (
+        <div className="vy-empty">No venues signed up yet.</div>
+      ) : (
+        <div className="vy-card p-0 overflow-hidden">
+          <table className="vy-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Slug</th>
+                <th>Region</th>
+                <th>Status</th>
+                <th>Trial ends</th>
+              </tr>
+            </thead>
+            <tbody>
+              {venues.map((v) => (
+                <tr key={v.id}>
+                  <td>
+                    <div className="font-medium">{v.name}</div>
+                    {v.address && <div className="text-xs text-stone-500 mt-0.5">{v.address}</div>}
+                  </td>
+                  <td className="font-mono text-xs">{v.slug}</td>
+                  <td>{v.region ?? "—"}</td>
+                  <td><Tag status={v.subscription_status} /></td>
+                  <td>{v.trial_ends_at?.slice(0, 10) ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
+}
+
+function Tag({ status }: { status: string }) {
+  const cls =
+    status === "active"
+      ? "vy-tag vy-tag-active"
+      : status === "trialing"
+      ? "vy-tag vy-tag-trial"
+      : status === "past_due"
+      ? "vy-tag vy-tag-paused"
+      : "vy-tag vy-tag-soft";
+  return <span className={cls}>{status}</span>;
 }

@@ -13,43 +13,83 @@ export default async function VenueRentals() {
     .order("sort_order");
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Rentals · {venue.name}</h1>
+    <div className="space-y-8">
+      <header>
+        <div className="vy-eyebrow">Marketplace · paid extras</div>
+        <h1 className="vy-h1 mt-1">Rentals</h1>
+        <p className="text-stone-600 text-sm mt-1">
+          Items couples pay extra for. Couples pick quantity + days; totals tally automatically.
+        </p>
+      </header>
 
-      <form action={addRental.bind(null, venue.id)} className="flex flex-wrap gap-2 border rounded p-4">
-        <input name="category" required placeholder="Category" className="border rounded px-3 py-2" />
-        <input name="name" required placeholder="Name" className="border rounded px-3 py-2 flex-1 min-w-40" />
-        <input name="price" type="number" step="0.01" required placeholder="Price" className="border rounded px-3 py-2 w-28" />
-        <input name="stock_total" type="number" min="1" defaultValue="1" className="border rounded px-3 py-2 w-20" />
-        <input name="description" placeholder="Description" className="border rounded px-3 py-2 w-full" />
-        <button className="px-4 py-2 bg-black text-white rounded">Add item</button>
+      <form action={addRental.bind(null, venue.id)} className="vy-card grid gap-3 md:grid-cols-6">
+        <div className="md:col-span-2 space-y-1">
+          <label className="vy-label">Category</label>
+          <input name="category" required placeholder="Lighting" className="vy-input" />
+        </div>
+        <div className="md:col-span-3 space-y-1">
+          <label className="vy-label">Name</label>
+          <input name="name" required placeholder="Fairy light curtain" className="vy-input" />
+        </div>
+        <div className="space-y-1">
+          <label className="vy-label">Price (R)</label>
+          <input name="price" type="number" step="0.01" required className="vy-input" />
+        </div>
+        <div className="md:col-span-4 space-y-1">
+          <label className="vy-label">Description</label>
+          <input name="description" placeholder="Short description" className="vy-input" />
+        </div>
+        <div className="space-y-1">
+          <label className="vy-label">Stock total</label>
+          <input name="stock_total" type="number" min="1" defaultValue="1" className="vy-input" />
+        </div>
+        <div className="space-y-1 md:col-span-1">
+          <label className="vy-label">&nbsp;</label>
+          <button className="vy-btn vy-btn-primary w-full">+ Add</button>
+        </div>
       </form>
 
-      <table className="w-full text-sm">
-        <thead className="text-left text-gray-500">
-          <tr><th>Category</th><th>Name</th><th>Price</th><th>Stock</th><th>Active</th><th></th></tr>
-        </thead>
-        <tbody>
-          {items?.map((i) => (
-            <tr key={i.id} className="border-t">
-              <td className="py-2">{i.category}</td>
-              <td>{i.name}</td>
-              <td>R{Number(i.price).toLocaleString()}</td>
-              <td>{i.stock_total}</td>
-              <td>
-                <form action={toggleRentalActive.bind(null, i.id, !i.active)}>
-                  <button className={i.active ? "text-green-600" : "text-gray-400"}>{i.active ? "✓" : "○"}</button>
-                </form>
-              </td>
-              <td>
-                <form action={deleteRental.bind(null, i.id)}>
-                  <button className="text-red-600 text-xs hover:underline">delete</button>
-                </form>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {!items?.length ? (
+        <div className="vy-empty">No rentals yet. Add your first above.</div>
+      ) : (
+        <div className="vy-card p-0 overflow-hidden">
+          <table className="vy-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Name</th>
+                <th>Price</th>
+                <th>Stock</th>
+                <th>Active</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((i) => (
+                <tr key={i.id}>
+                  <td><span className="vy-tag vy-tag-soft">{i.category}</span></td>
+                  <td>
+                    <div className="font-medium">{i.name}</div>
+                    {i.description && <div className="text-xs text-stone-500 mt-0.5">{i.description}</div>}
+                  </td>
+                  <td>R{Number(i.price).toLocaleString()}</td>
+                  <td>{i.stock_total}</td>
+                  <td>
+                    <form action={toggleRentalActive.bind(null, i.id, !i.active)}>
+                      <button className={i.active ? "text-emerald-700" : "text-stone-400"}>{i.active ? "● Active" : "○ Hidden"}</button>
+                    </form>
+                  </td>
+                  <td className="text-right">
+                    <form action={deleteRental.bind(null, i.id)}>
+                      <button className="vy-btn-danger vy-btn">Remove</button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
