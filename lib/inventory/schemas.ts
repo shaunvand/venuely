@@ -68,6 +68,8 @@ const VENDOR_FIELDS: FieldSpec[] = [
   { key: "name", label: "Name", type: "string", required: true },
   { key: "description", label: "Description", type: "string" },
   { key: "price_from", label: "Price from (R)", type: "number" },
+  { key: "commission_type", label: "Commission type", type: "select", options: ["fixed", "percent"] },
+  { key: "commission_value", label: "Commission (R or %)", type: "number" },
   { key: "contact_email", label: "Contact email", type: "string" },
   { key: "contact_phone", label: "Contact phone", type: "string" },
   { key: "website_url", label: "Website", type: "string" },
@@ -81,6 +83,8 @@ export const INVENTORY_FIELDS: Record<InventoryType, FieldSpec[]> = {
     { key: "description", label: "Description", type: "string" },
     { key: "price", label: "Price (R)", type: "number" },
     { key: "price_unit", label: "Unit", type: "select", options: ["fixed", "per_person", "per_hour"] },
+    { key: "commission_type", label: "Commission type", type: "select", options: ["fixed", "percent"] },
+    { key: "commission_value", label: "Commission (R or %)", type: "number" },
     { key: "image_url", label: "Image URL", type: "string" },
   ],
   rentals: [
@@ -89,6 +93,8 @@ export const INVENTORY_FIELDS: Record<InventoryType, FieldSpec[]> = {
     { key: "description", label: "Description", type: "string" },
     { key: "price", label: "Price (R)", type: "number" },
     { key: "stock_total", label: "Stock", type: "number" },
+    { key: "commission_type", label: "Commission type", type: "select", options: ["fixed", "percent"] },
+    { key: "commission_value", label: "Commission (R or %)", type: "number" },
     { key: "image_url", label: "Image URL", type: "string" },
   ],
   accommodation: [
@@ -97,6 +103,8 @@ export const INVENTORY_FIELDS: Record<InventoryType, FieldSpec[]> = {
     { key: "sleeps", label: "Sleeps", type: "number" },
     { key: "price_per_night", label: "Price / night (R)", type: "number" },
     { key: "description", label: "Description", type: "string" },
+    { key: "commission_type", label: "Commission type", type: "select", options: ["fixed", "percent"] },
+    { key: "commission_value", label: "Commission (R or %)", type: "number" },
     { key: "image_url", label: "Image URL", type: "string" },
   ],
   caterers: VENDOR_FIELDS,
@@ -110,11 +118,11 @@ export const INVENTORY_FIELDS: Record<InventoryType, FieldSpec[]> = {
 
 export function defaultsFor(type: InventoryType): Record<string, unknown> {
   switch (type) {
-    case "catalogue": return { price_unit: "fixed", active: true };
-    case "rentals":   return { stock_total: 1, active: true };
-    case "accommodation": return { sleeps: 2, active: true };
+    case "catalogue": return { price_unit: "fixed", active: true, commission_type: "fixed", commission_value: 0 };
+    case "rentals":   return { stock_total: 1, active: true, commission_type: "fixed", commission_value: 0 };
+    case "accommodation": return { sleeps: 2, active: true, commission_type: "fixed", commission_value: 0 };
     default:
-      if (isVendorType(type)) return { active: true, vendor_type: VENDOR_DB_VALUE[type] };
+      if (isVendorType(type)) return { active: true, vendor_type: VENDOR_DB_VALUE[type], commission_type: "fixed", commission_value: 0 };
       return { active: true };
   }
 }

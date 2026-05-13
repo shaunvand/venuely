@@ -17,9 +17,17 @@ function readTemplate(): string {
   return _templateCache;
 }
 
+type Commish = { commission_value?: number | null; commission_type?: string | null };
 type Catalogue = { id: string; category: string; name: string; description: string | null; sort_order: number };
-type Rental    = { id: string; category: string; name: string; description: string | null; price: number; stock_total: number; sort_order: number };
-type Room      = { id: string; name: string; room_type: string | null; sleeps: number; description: string | null; sort_order: number; price_per_night: number };
+type Rental    = { id: string; category: string; name: string; description: string | null; price: number; stock_total: number; sort_order: number } & Commish;
+type Room      = { id: string; name: string; room_type: string | null; sleeps: number; description: string | null; sort_order: number; price_per_night: number } & Commish;
+
+function applyMarkup(price: number, value: number | null | undefined, type: string | null | undefined): number {
+  const v = Number(value ?? 0);
+  if (!v) return price;
+  if (type === "percent") return Math.round((price * (1 + v / 100)) * 100) / 100;
+  return Math.round((price + v) * 100) / 100;
+}
 
 // Translate venue inventory (Supabase rows) into the shape the static app.js expects.
 function shapeForApp(
@@ -34,7 +42,8 @@ function shapeForApp(
     CATALOGUE_CATS: [...new Set(catalogue.map((c) => c.category))],
     RENTAL_ITEMS: rentals.map((r) => ({
       code: r.id, name: r.name, desc: r.description ?? "", cat: r.category,
-      rate: Number(r.price), rateType: r.stock_total > 1 ? "perUnit" : "flat",
+      rate: applyMarkup(Number(r.price), r.commission_value, r.commission_type),
+      rateType: r.stock_total > 1 ? "perUnit" : "flat",
       maxQty: r.stock_total, repl: 0,
     })),
     RENTAL_CATS: [...new Set(rentals.map((r) => r.category))],
@@ -43,6 +52,7 @@ function shapeForApp(
       sleeps: r.sleeps, bedrooms: 1,
       description: r.description ?? "",
       amenities: [],
+      pricePerNight: applyMarkup(Number(r.price_per_night), r.commission_value, r.commission_type),
     })),
   };
 }
@@ -76,9 +86,9 @@ export async function GET(
   // Pull venue inventory in parallel.
   const [{ data: catRaw }, { data: rentRaw }, { data: roomRaw }, { data: vendorRaw }] = await Promise.all([
     supabase.from("catalogue_items").select("id, category, name, description, sort_order").eq("venue_id", venueId).eq("active", true).order("sort_order"),
-    supabase.from("rental_items").select("id, category, name, description, price, stock_total, sort_order").eq("venue_id", venueId).eq("active", true).order("sort_order"),
-    supabase.from("accommodation_rooms").select("id, name, room_type, sleeps, description, sort_order, price_per_night").eq("venue_id", venueId).eq("active", true).order("sort_order"),
-    supabase.from("vendor_partners").select("id, vendor_type, name, description, contact_email, contact_phone, website_url, price_from, image_url").eq("venue_id", venueId).eq("active", true).order("sort_order"),
+    supabase.from("rental_items").select("id, category, name, description, price, stock_total, sort_order, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
+    supabase.from("accommodation_rooms").select("id, name, room_type, sleeps, description, sort_order, price_per_night, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
+    supabase.from("vendor_partners").select("id, vendor_type, name, description, contact_email, contact_phone, website_url, price_from, image_url, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
   ]);
 
   const shaped = shapeForApp((catRaw ?? []) as Catalogue[], (rentRaw ?? []) as Rental[], (roomRaw ?? []) as Room[]);
@@ -96,7 +106,13 @@ export async function GET(
   window.VENUE_RENTAL_ITEMS    = ${JSON.stringify(shaped.RENTAL_ITEMS)};
   window.VENUE_RENTAL_CATS     = ${JSON.stringify(shaped.RENTAL_CATS)};
   window.VENUE_ACCOMMODATION   = ${JSON.stringify(shaped.ACCOMMODATION)};
-  window.VENUE_VENDORS         = ${JSON.stringify(vendorRaw ?? [])};
+  window.VENUE_VENDORS         = ${JSON.stringify((vendorRaw ?? []).map((v) => {
+    const vv = v as Record<string, unknown>;
+    return {
+      ...vv,
+      price_from: vv.price_from == null ? null : applyMarkup(Number(vv.price_from), vv.commission_value as number | null, vv.commission_type as string | null),
+    };
+  }))};
   window.WEDDING_INITIAL_STATE = ${JSON.stringify(wState)};
   window.WEDDING_USE_SERVER    = true;
 </script>
