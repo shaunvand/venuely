@@ -19,8 +19,17 @@ export default async function DashboardRouter() {
     .eq("id", user.id)
     .single();
 
-  if (profile?.role === "owner") redirect("/owner");
-  if (profile?.role === "venue_admin") redirect("/venue");
+  if (profile?.role === "owner") redirect("/admin");
+
+  if (profile?.role === "venue_admin") {
+    // Has a venue? straight to admin. Otherwise force setup-venue.
+    const { count } = await supabase
+      .from("venue_members")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id);
+    if (count && count > 0) redirect("/venue");
+    redirect("/onboarding/setup-venue");
+  }
 
   // Couples: look up their first wedding membership.
   const { data: membershipRaw } = await supabase
@@ -35,12 +44,5 @@ export default async function DashboardRouter() {
     redirect(`/portal/${membership.wedding.venue.slug}/${membership.wedding.slug}`);
   }
 
-  // No wedding yet. If no owner exists, route to claim-owner. Otherwise to a waiting page.
-  const { count: ownerCount } = await supabase
-    .from("profiles")
-    .select("*", { count: "exact", head: true })
-    .eq("role", "owner");
-
-  if (!ownerCount) redirect("/onboarding/become-owner");
   redirect("/onboarding/awaiting-invite");
 }

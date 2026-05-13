@@ -3,12 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { Logo } from "@/components/Logo";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -21,7 +23,7 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
         data: { full_name: fullName },
       },
     });
@@ -29,55 +31,78 @@ export default function SignupPage() {
     if (error) {
       setMsg(error.message);
     } else if (data.user) {
-      // Profile row is created by a DB trigger (see migration); default role = couple.
-      setMsg("Check your inbox to confirm your email.");
+      setOk(true);
+      setMsg("Check your inbox to confirm your email. Once confirmed you'll land in your new venue dashboard.");
     }
     setLoading(false);
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-6">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
-        <h1 className="text-2xl font-semibold">Create your Venuely account</h1>
+    <main className="min-h-screen flex items-center justify-center p-6 bg-stone-50">
+      <form onSubmit={handleSubmit} className="w-full max-w-md space-y-5">
+        <Link href="/" className="block"><Logo /></Link>
 
-        <input
-          type="text"
-          required
-          placeholder="Full name"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-        />
-        <input
-          type="email"
-          required
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-        />
-        <input
-          type="password"
-          required
-          minLength={8}
-          placeholder="Password (min 8 chars)"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-        />
+        <div>
+          <h1 className="font-serif text-3xl">List your venue on Venuely</h1>
+          <p className="text-stone-600 text-sm mt-2">
+            For wedding-venue owners and managers. 14-day free trial — no card. Couples get invited by you afterwards.
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Your full name</label>
+          <input
+            type="text"
+            required
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+            placeholder="Jane Smith"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Work email</label>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+            placeholder="you@yourvenue.co.za"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Password</label>
+          <input
+            type="password"
+            required
+            minLength={8}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+            placeholder="Min 8 characters"
+          />
+        </div>
 
         <button
           type="submit"
-          disabled={loading}
-          className="w-full bg-black text-white rounded py-2 disabled:opacity-50"
+          disabled={loading || ok}
+          className="w-full bg-stone-900 text-white rounded py-2.5 font-medium disabled:opacity-50"
         >
-          {loading ? "..." : "Create account"}
+          {loading ? "..." : ok ? "Check your email" : "Start free trial"}
         </button>
 
-        {msg && <p className="text-sm text-gray-600">{msg}</p>}
+        {msg && (
+          <p className={`text-sm ${ok ? "text-emerald-700" : "text-red-600"}`}>{msg}</p>
+        )}
 
-        <p className="text-sm text-gray-500">
-          Already have one? <Link href="/login" className="underline">Sign in</Link>
+        <p className="text-sm text-stone-500">
+          Already have a Venuely account? <Link href="/login" className="underline">Sign in</Link>
+        </p>
+        <p className="text-xs text-stone-400">
+          Couples: you don&apos;t sign up here. Your venue will email you an invitation with a private portal link.
         </p>
       </form>
     </main>

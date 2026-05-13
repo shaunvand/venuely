@@ -49,7 +49,7 @@ export default async function OwnerDashboard() {
             </div>
           </Link>
           <Link
-            href="/owner/billing"
+            href="/admin/billing"
             className="border rounded-lg p-4 hover:bg-gray-50 transition-colors block"
           >
             <div className="font-medium">Billing →</div>

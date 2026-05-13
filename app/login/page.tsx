@@ -44,6 +44,7 @@ function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
       <h1 className="text-2xl font-semibold">Sign in to Venuely</h1>
+      <p className="text-sm text-stone-500">Venues use a password. Couples should use the magic-link option after their venue invites them.</p>
 
       <div className="flex gap-2 text-sm">
         <button

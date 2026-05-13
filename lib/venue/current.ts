@@ -10,7 +10,7 @@ export async function getCurrentVenue() {
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (profile?.role === "owner") {
     const { data: anyVenue } = await supabase.from("venues").select("*").order("created_at").limit(1).single();
-    if (!anyVenue) redirect("/owner/venues");
+    if (!anyVenue) redirect("/admin/venues");
     return anyVenue;
   }
 
