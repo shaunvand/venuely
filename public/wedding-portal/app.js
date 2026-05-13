@@ -1148,7 +1148,62 @@ function setSupFilter(f, btn) {
   btn.classList.add('active');
   renderSuppliers();
 }
+const VENDOR_TYPE_LABELS = { caterer:'Catering', planner:'Planning', florist:'Florist', dj:'DJ / Music', photographer:'Photography', decor:'Decor', bar:'Bar' };
+
+function addRecommendedToMyList(vendorId) {
+  const v = (window.VENUE_VENDORS || []).find(x => x.id === vendorId);
+  if (!v) return;
+  if (state.suppliers.some(s => s.fromVendorId === vendorId)) { showToast('Already on your list'); return; }
+  const cat = VENDOR_TYPE_LABELS[v.vendor_type] || v.vendor_type;
+  state.suppliers.push({
+    id: Date.now(),
+    fromVendorId: vendorId,
+    name: v.name,
+    category: cat,
+    status: 'pending',
+    preferred: true,
+    contact: [v.contact_phone, v.contact_email].filter(Boolean).join(' · '),
+    price: v.price_from ? ('R' + Number(v.price_from).toLocaleString()) : '',
+    notes: v.description || '',
+  });
+  save(); renderSuppliers(); renderBudget(); showToast('Added to your suppliers');
+}
+
+function renderRecommendedVendors() {
+  const host = document.getElementById('recommendedVendors');
+  if (!host) return;
+  const vendors = window.VENUE_VENDORS || [];
+  if (!vendors.length) { host.innerHTML = ''; return; }
+  const groups = {};
+  vendors.forEach(v => { (groups[v.vendor_type] = groups[v.vendor_type] || []).push(v); });
+  const sections = Object.keys(groups).map(t => {
+    const label = VENDOR_TYPE_LABELS[t] || t;
+    const cards = groups[t].map(v => {
+      const onList = state.suppliers.some(s => s.fromVendorId === v.id);
+      return `<div class="sup-card" style="border-left:3px solid var(--gold,#b8762a)">
+        ${v.image_url ? `<img src="${escHtml(v.image_url)}" alt="" style="width:100%;height:90px;object-fit:cover;border-radius:6px;margin-bottom:8px">` : ''}
+        <div class="sup-cat">${escHtml(label)}</div>
+        <div class="sup-name">${escHtml(v.name)}</div>
+        <div class="sup-preferred">★ Recommended by ${escHtml(window.WEDDING_VENUE?.name || 'the venue')}</div>
+        ${v.description ? `<div class="sup-notes">${escHtml(v.description)}</div>` : ''}
+        ${v.price_from ? `<div class="sup-price">From R${Number(v.price_from).toLocaleString()}</div>` : ''}
+        ${v.contact_phone ? `<div class="sup-contact">📞 ${escHtml(v.contact_phone)}</div>` : ''}
+        ${v.contact_email ? `<div class="sup-contact">✉ ${escHtml(v.contact_email)}</div>` : ''}
+        ${v.website_url ? `<div class="sup-contact"><a href="${escHtml(v.website_url)}" target="_blank" rel="noopener noreferrer">↗ Website</a></div>` : ''}
+        <div class="sup-actions">
+          ${onList
+            ? `<button class="btn btn-booked btn-sm" disabled>✓ On your list</button>`
+            : `<button class="btn btn-book btn-sm" onclick="addRecommendedToMyList('${v.id}')">+ Add to my list</button>`}
+        </div>
+      </div>`;
+    }).join('');
+    return `<details open style="margin-bottom:14px"><summary style="cursor:pointer;font-weight:600;color:var(--text-dark);margin-bottom:10px">★ Recommended ${escHtml(label)} (${groups[t].length})</summary><div class="supplier-grid">${cards}</div></details>`;
+  }).join('');
+  host.innerHTML = `<div style="background:#fdfaf3;border:1px solid #e6dcc6;border-radius:10px;padding:16px 18px"><div style="font-size:13px;color:#7a6a4a;margin-bottom:12px">These vendors are hand-picked by your venue. Tap <b>+ Add to my list</b> to track and book them like any other supplier.</div>${sections}</div>`;
+}
+
 function renderSuppliers() {
+  renderRecommendedVendors();
   const list = supFilter === 'all' ? state.suppliers : state.suppliers.filter(s => s.category === supFilter);
   const grid = document.getElementById('supplierGrid');
   if (!list.length) { grid.innerHTML = `<div style="color:var(--text-light);font-style:italic;padding:20px 0;grid-column:1/-1">No suppliers in this category yet.</div>`; return; }

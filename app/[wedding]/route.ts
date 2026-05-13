@@ -74,10 +74,11 @@ export async function GET(
   const venueId = venue?.id;
 
   // Pull venue inventory in parallel.
-  const [{ data: catRaw }, { data: rentRaw }, { data: roomRaw }] = await Promise.all([
+  const [{ data: catRaw }, { data: rentRaw }, { data: roomRaw }, { data: vendorRaw }] = await Promise.all([
     supabase.from("catalogue_items").select("id, category, name, description, sort_order").eq("venue_id", venueId).eq("active", true).order("sort_order"),
     supabase.from("rental_items").select("id, category, name, description, price, stock_total, sort_order").eq("venue_id", venueId).eq("active", true).order("sort_order"),
     supabase.from("accommodation_rooms").select("id, name, room_type, sleeps, description, sort_order, price_per_night").eq("venue_id", venueId).eq("active", true).order("sort_order"),
+    supabase.from("vendor_partners").select("id, vendor_type, name, description, contact_email, contact_phone, website_url, price_from, image_url").eq("venue_id", venueId).eq("active", true).order("sort_order"),
   ]);
 
   const shaped = shapeForApp((catRaw ?? []) as Catalogue[], (rentRaw ?? []) as Rental[], (roomRaw ?? []) as Room[]);
@@ -95,6 +96,7 @@ export async function GET(
   window.VENUE_RENTAL_ITEMS    = ${JSON.stringify(shaped.RENTAL_ITEMS)};
   window.VENUE_RENTAL_CATS     = ${JSON.stringify(shaped.RENTAL_CATS)};
   window.VENUE_ACCOMMODATION   = ${JSON.stringify(shaped.ACCOMMODATION)};
+  window.VENUE_VENDORS         = ${JSON.stringify(vendorRaw ?? [])};
   window.WEDDING_INITIAL_STATE = ${JSON.stringify(wState)};
   window.WEDDING_USE_SERVER    = true;
 </script>
