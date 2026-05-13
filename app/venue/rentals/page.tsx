@@ -1,6 +1,6 @@
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
-import { addRental, deleteRental, toggleRentalActive } from "./actions";
+import { addRental } from "./actions";
 import { InventoryManager } from "@/components/InventoryManager";
 import { INVENTORY_FIELDS } from "@/lib/inventory/schemas";
 
@@ -23,14 +23,6 @@ export default async function VenueRentals() {
           Items couples pay extra for. Couples pick quantity + days; totals tally automatically.
         </p>
       </header>
-
-      <InventoryManager
-        type="rentals"
-        venueId={venue.id}
-        items={(items ?? []) as Array<Record<string, unknown> & { id: string }>}
-        fields={INVENTORY_FIELDS.rentals.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options ?? null }))}
-        priceColumn="price"
-      />
 
       <form action={addRental.bind(null, venue.id)} className="vy-card grid gap-3 md:grid-cols-6">
         <div className="md:col-span-2 space-y-1">
@@ -59,47 +51,13 @@ export default async function VenueRentals() {
         </div>
       </form>
 
-      {!items?.length ? (
-        <div className="vy-empty">No rentals yet. Add your first above.</div>
-      ) : (
-        <div className="vy-card p-0 overflow-hidden">
-          <table className="vy-table">
-            <thead>
-              <tr>
-                <th>Category</th>
-                <th>Name</th>
-                <th>Price</th>
-                <th>Stock</th>
-                <th>Active</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((i) => (
-                <tr key={i.id}>
-                  <td><span className="vy-tag vy-tag-soft">{i.category}</span></td>
-                  <td>
-                    <div className="font-medium">{i.name}</div>
-                    {i.description && <div className="text-xs text-stone-500 mt-0.5">{i.description}</div>}
-                  </td>
-                  <td>R{Number(i.price).toLocaleString()}</td>
-                  <td>{i.stock_total}</td>
-                  <td>
-                    <form action={toggleRentalActive.bind(null, i.id, !i.active)}>
-                      <button className={i.active ? "text-emerald-700" : "text-stone-400"}>{i.active ? "● Active" : "○ Hidden"}</button>
-                    </form>
-                  </td>
-                  <td className="text-right">
-                    <form action={deleteRental.bind(null, i.id)}>
-                      <button className="vy-btn-danger vy-btn">Remove</button>
-                    </form>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <InventoryManager
+        type="rentals"
+        venueId={venue.id}
+        items={(items ?? []) as Array<Record<string, unknown> & { id: string }>}
+        fields={INVENTORY_FIELDS.rentals.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options ?? null }))}
+        priceColumn="price"
+      />
     </div>
   );
 }

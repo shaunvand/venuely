@@ -1,6 +1,6 @@
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
-import { addCatalogue, deleteCatalogue, toggleCatalogueActive } from "./actions";
+import { addCatalogue } from "./actions";
 import { InventoryManager } from "@/components/InventoryManager";
 import { INVENTORY_FIELDS } from "@/lib/inventory/schemas";
 
@@ -23,14 +23,6 @@ export default async function VenueCatalogue() {
           Items included with your booking. Couples tick which days they need each.
         </p>
       </header>
-
-      <InventoryManager
-        type="catalogue"
-        venueId={venue.id}
-        items={(items ?? []) as Array<Record<string, unknown> & { id: string }>}
-        fields={INVENTORY_FIELDS.catalogue.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options ?? null }))}
-        priceColumn="price"
-      />
 
       <form action={addCatalogue.bind(null, venue.id)} className="vy-card grid gap-3 md:grid-cols-6">
         <div className="md:col-span-2 space-y-1">
@@ -62,45 +54,13 @@ export default async function VenueCatalogue() {
         </div>
       </form>
 
-      {!items?.length ? (
-        <div className="vy-empty">No catalogue items yet. Add your first above.</div>
-      ) : (
-        <div className="vy-card p-0 overflow-hidden">
-          <table className="vy-table">
-            <thead>
-              <tr>
-                <th>Category</th>
-                <th>Name</th>
-                <th>Price</th>
-                <th>Active</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((i) => (
-                <tr key={i.id}>
-                  <td><span className="vy-tag vy-tag-soft">{i.category}</span></td>
-                  <td>
-                    <div className="font-medium">{i.name}</div>
-                    {i.description && <div className="text-xs text-stone-500 mt-0.5">{i.description}</div>}
-                  </td>
-                  <td>R{Number(i.price).toLocaleString()} <span className="text-xs text-stone-500">{i.price_unit}</span></td>
-                  <td>
-                    <form action={toggleCatalogueActive.bind(null, i.id, !i.active)}>
-                      <button className={i.active ? "text-emerald-700" : "text-stone-400"}>{i.active ? "● Active" : "○ Hidden"}</button>
-                    </form>
-                  </td>
-                  <td className="text-right">
-                    <form action={deleteCatalogue.bind(null, i.id)}>
-                      <button className="vy-btn-danger vy-btn">Remove</button>
-                    </form>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <InventoryManager
+        type="catalogue"
+        venueId={venue.id}
+        items={(items ?? []) as Array<Record<string, unknown> & { id: string }>}
+        fields={INVENTORY_FIELDS.catalogue.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options ?? null }))}
+        priceColumn="price"
+      />
     </div>
   );
 }
