@@ -1,9 +1,25 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Logo, LogoMark } from "@/components/Logo";
 import { Reveal } from "@/components/Reveal";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string; token_hash?: string; type?: string }>;
+}) {
+  const sp = await searchParams;
+  // Defensive fallback — if Supabase ever sends a confirmation link to the site root
+  // instead of /auth/callback, forward the params over so the session still completes.
+  if (sp.code || sp.token_hash) {
+    const qs = new URLSearchParams();
+    if (sp.code) qs.set("code", sp.code);
+    if (sp.token_hash) qs.set("token_hash", sp.token_hash);
+    if (sp.type) qs.set("type", sp.type);
+    redirect(`/auth/callback?${qs.toString()}`);
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
