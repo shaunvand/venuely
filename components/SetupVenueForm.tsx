@@ -147,15 +147,15 @@ export function SetupVenueForm({
 
       <div className="space-y-1">
         <label className="text-sm font-medium">Logo URL (optional)</label>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col items-center gap-3">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="Logo preview" className="h-12 w-12 rounded border border-stone-200 bg-white object-contain p-1" />
+            <img src={logoUrl} alt="Logo preview" className="h-24 w-24 rounded border border-stone-200 bg-white object-contain p-2" />
           ) : (
-            <div className="h-12 w-12 rounded border border-dashed border-stone-300 bg-stone-50" aria-hidden />
+            <div className="h-24 w-24 rounded border border-dashed border-stone-300 bg-stone-50" aria-hidden />
           )}
           <input name="logo_url" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)}
-            placeholder="https://…/logo.png" className="flex-1 border rounded px-3 py-2" />
+            placeholder="https://…/logo.png" className="w-full border rounded px-3 py-2" />
         </div>
       </div>
 
