@@ -29,10 +29,10 @@ export default async function Home({
     role = data?.role ?? null;
   }
 
-  const dashboardHref =
-    role === "owner" ? "/owner"
-    : role === "venue_admin" ? "/venue"
-    : "/portal/pat-busch/demo-wedding";
+  // Always route via /dashboard — it knows how to handle every role + state.
+  const dashboardHref = "/dashboard";
+  void role; // role still useful for any future per-role landing decisions
+
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 overflow-x-hidden">
