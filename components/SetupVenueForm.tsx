@@ -110,6 +110,11 @@ export function SetupVenueForm({
             {importing ? "Importing…" : "Import"}
           </button>
         </div>
+        {importing && (
+          <div className="h-1.5 w-full overflow-hidden rounded bg-stone-200">
+            <div className="h-full w-1/3 animate-[vyImportBar_1.1s_ease-in-out_infinite] rounded bg-stone-900" />
+          </div>
+        )}
         {importMsg && <p className="text-xs text-stone-600">{importMsg}</p>}
         <p className="text-xs text-stone-500">We&apos;ll auto-fill what we&apos;re confident about. Review everything below before saving.</p>
       </div>
