@@ -29,6 +29,7 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   const protectedPrefixes = ["/admin", "/venue", "/portal"];
+  // /[wedding] is handled in its own route handler with custom redirect logic.
   const isProtected = protectedPrefixes.some((p) => path.startsWith(p));
 
   if (isProtected && !user) {
