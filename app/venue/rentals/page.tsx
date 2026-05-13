@@ -27,7 +27,7 @@ export default async function VenueRentals() {
         type="rentals"
         venueId={venue.id}
         items={(items ?? []) as Array<Record<string, unknown> & { id: string }>}
-        fields={INVENTORY_FIELDS.rentals.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options ?? null }))}
+        fields={INVENTORY_FIELDS.rentals.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options ?? null, required: !!f.required }))}
         priceColumn="price"
       />
     </div>

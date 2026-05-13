@@ -4,7 +4,7 @@ import { useState, useRef, useTransition } from "react";
 import { bulkDelete, bulkSetActive, bulkSetPrice, updateItem, bulkInsert, addItem } from "@/app/venue/_inventory/actions";
 import type { InventoryType } from "@/lib/inventory/schemas";
 
-type Field = { key: string; label: string; type: "string" | "number" | "select"; options: string[] | null };
+type Field = { key: string; label: string; type: "string" | "number" | "select"; options: string[] | null; required?: boolean };
 type Item = Record<string, unknown> & { id: string; active?: boolean };
 type ImportPreviewRow = Record<string, unknown> & { _include?: boolean };
 
@@ -82,7 +82,8 @@ export function InventoryManager({
       if (f.type === "number") patch[f.key] = v === "" || v == null ? null : Number(v);
       else patch[f.key] = v === "" ? null : v;
     }
-    if (!patch.name) return;
+    const missing = fields.filter((f) => f.required && !String(editDraft[f.key] ?? "").trim());
+    if (missing.length) return;
     startTransition(async () => {
       if (editMode === "edit" && editingId) {
         await updateItem(type, editingId, patch);
@@ -301,7 +302,7 @@ export function InventoryManager({
             <div className="grid grid-cols-2 gap-3">
               {fields.filter((f) => f.key !== "image_url").map((f) => (
                 <div key={f.key} className={f.key === "description" ? "col-span-2 space-y-1" : "space-y-1"}>
-                  <label className="text-xs text-stone-600 font-medium">{f.label}</label>
+                  <label className="text-xs text-stone-600 font-medium">{f.label}{f.required ? <span className="text-red-600"> *</span> : null}</label>
                   {f.type === "select" ? (
                     <select className="w-full border rounded-full px-3 py-2 text-sm"
                       value={String(editDraft[f.key] ?? "")}
@@ -326,12 +327,22 @@ export function InventoryManager({
                 placeholder="https://…" />
             </div>
           </div>
-          <div className="flex gap-2 justify-end mt-4 pt-4 border-t border-stone-200">
-            <button onClick={() => { setEditOpen(false); setEditingId(null); }} className={BUBBLE_GHOST}>Cancel</button>
-            <button disabled={isPending || !editDraft.name} onClick={saveEdit} className={BUBBLE_PRIMARY}>
-              {editMode === "add" ? "Add item" : "Save"}
-            </button>
-          </div>
+          {(() => {
+            const missing = fields.filter((f) => f.required && !String(editDraft[f.key] ?? "").trim()).map((f) => f.label);
+            return (
+              <>
+                {missing.length > 0 && (
+                  <p className="text-xs text-red-700 mt-3">Required: {missing.join(", ")}</p>
+                )}
+                <div className="flex gap-2 justify-end mt-4 pt-4 border-t border-stone-200">
+                  <button onClick={() => { setEditOpen(false); setEditingId(null); }} className={BUBBLE_GHOST}>Cancel</button>
+                  <button disabled={isPending || missing.length > 0} onClick={saveEdit} className={BUBBLE_PRIMARY}>
+                    {editMode === "add" ? "Add item" : "Save"}
+                  </button>
+                </div>
+              </>
+            );
+          })()}
         </Lightbox>
       )}
 
