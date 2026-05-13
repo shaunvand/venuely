@@ -10,6 +10,7 @@ type Imported = {
   name: string | null;
   description: string | null;
   region: string | null;
+  address: string | null;
   contact_email: string | null;
   contact_phone: string | null;
   logo_url: string | null;
@@ -41,6 +42,8 @@ export function SetupVenueForm({
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [addressSeed, setAddressSeed] = useState("");
+  const [pickerKey, setPickerKey] = useState(0);
 
   async function runImport() {
     if (!url.trim()) return;
@@ -64,6 +67,7 @@ export function SetupVenueForm({
       if (d.contact_email && !contactEmail) setContactEmail(d.contact_email);
       if (d.contact_phone && !contactPhone) setContactPhone(d.contact_phone);
       if (d.logo_url && !logoUrl) setLogoUrl(d.logo_url);
+      if (d.address) { setAddressSeed(d.address); setPickerKey((k) => k + 1); }
 
       const seeded = [
         d.catalogue?.length ? `${d.catalogue.length} catalogue` : null,
@@ -116,7 +120,12 @@ export function SetupVenueForm({
           placeholder="Pat Busch Mountain Reserve" className="w-full border rounded px-3 py-2" />
       </div>
 
-      <VenueAddressPicker apiKey={mapsKey} name="address" initial={{ region }} />
+      <VenueAddressPicker key={pickerKey} apiKey={mapsKey} name="address" initial={{ region, address: addressSeed }} />
+      {addressSeed && (
+        <p className="-mt-3 text-xs text-amber-700">
+          We prefilled the address from your website — click into the field and pick the matching Google result to lock in the exact location.
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">

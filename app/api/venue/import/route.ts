@@ -8,6 +8,7 @@ type Imported = {
   name: string | null;
   description: string | null;
   region: string | null;
+  address: string | null;
   contact_email: string | null;
   contact_phone: string | null;
   logo_url: string | null;
@@ -92,6 +93,7 @@ Schema:
   "name": string | null,
   "description": string | null,        // 1-2 sentence venue tagline
   "region": string | null,
+  "address": string | null,            // street address as written on the site (e.g. "Pat Busch Rd, Robertson, 6705"). Null if not stated.
   "contact_email": string | null,
   "contact_phone": string | null,
   "logo_url": string | null,
