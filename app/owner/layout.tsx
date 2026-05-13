@@ -11,6 +11,9 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
           <Link href="/owner" className="hover:underline">Dashboard</Link>
           <Link href="/owner/venues" className="hover:underline">Venues</Link>
           <Link href="/owner/billing" className="hover:underline">Billing</Link>
+          <div className="mt-4 mb-1 text-xs uppercase tracking-wide text-stone-400">Switch context</div>
+          <Link href="/venue" className="hover:underline">Venue admin →</Link>
+          <Link href="/dashboard" className="hover:underline text-stone-500">Portals</Link>
         </nav>
         <form action="/auth/signout" method="post">
           <button className="text-xs text-gray-500 hover:underline">Sign out</button>
