@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { VenueAddressPicker } from "@/components/VenueAddressPicker";
 
 type SeedItem = { name: string; description: string | null; price_zar: number | null; category: string | null };
@@ -44,6 +44,28 @@ export function SetupVenueForm({
   const [logoUrl, setLogoUrl] = useState("");
   const [addressSeed, setAddressSeed] = useState("");
   const [pickerKey, setPickerKey] = useState(0);
+  const [slugTaken, setSlugTaken] = useState(false);
+  const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
+  const [slugChecking, setSlugChecking] = useState(false);
+
+  useEffect(() => {
+    if (!slug) { setSlugTaken(false); setSlugSuggestions([]); return; }
+    setSlugChecking(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/venue/slug-check?slug=${encodeURIComponent(slug)}`);
+        const j = await r.json();
+        setSlugTaken(!!j.taken);
+        setSlugSuggestions(Array.isArray(j.suggestions) ? j.suggestions : []);
+      } catch {
+        setSlugTaken(false);
+        setSlugSuggestions([]);
+      } finally {
+        setSlugChecking(false);
+      }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [slug]);
 
   async function runImport() {
     if (!url.trim()) return;
@@ -175,10 +197,30 @@ export function SetupVenueForm({
             value={slug}
             onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
             placeholder="pat-busch"
-            className="flex-1 border rounded px-3 py-2 font-mono text-sm"
+            className={`flex-1 border rounded px-3 py-2 font-mono text-sm ${slugTaken ? "border-red-500" : ""}`}
           />
         </div>
-        <p className="text-xs text-stone-500">Lowercase letters, numbers and hyphens only.</p>
+        {slugTaken ? (
+          <div className="rounded border border-red-200 bg-red-50 p-3 mt-1 space-y-2">
+            <p className="text-xs text-red-700 font-medium">Already taken — pick another:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {slugSuggestions.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSlug(s)}
+                  className="px-2.5 py-1 rounded border border-stone-300 bg-white text-xs font-mono hover:bg-stone-900 hover:text-white transition"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : slug && !slugChecking ? (
+          <p className="text-xs text-green-700">✓ Available</p>
+        ) : (
+          <p className="text-xs text-stone-500">Lowercase letters, numbers and hyphens only.</p>
+        )}
       </div>
 
       {data && (data.catalogue?.length || data.rentals?.length || data.accommodation?.length) ? (
@@ -193,8 +235,8 @@ export function SetupVenueForm({
 
       <input type="hidden" name="seed_payload" value={data ? JSON.stringify({ catalogue: data.catalogue ?? [], rentals: data.rentals ?? [], accommodation: data.accommodation ?? [] }) : ""} />
 
-      <button className="w-full bg-stone-900 text-white rounded py-2.5 font-medium">
-        Create my venue
+      <button disabled={slugTaken} className="w-full bg-stone-900 text-white rounded py-2.5 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+        {slugTaken ? "Pick an available URL first" : "Create my venue"}
       </button>
     </form>
   );
