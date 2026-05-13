@@ -91,21 +91,21 @@ export function SetupVenueForm({
         </p>
       </div>
 
-      <div className="rounded-md border border-stone-300 bg-stone-50 p-4 space-y-2">
-        <label className="text-sm font-medium">Already have a website? Import it</label>
+      <div className="rounded-md border-2 border-stone-400 bg-stone-50 p-5 space-y-3">
+        <label className="text-base font-semibold">Already have a website? Import it</label>
         <div className="flex gap-2">
           <input
             type="url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://patbusch.co.za"
-            className="flex-1 border rounded px-3 py-2 text-sm"
+            className="flex-1 border rounded px-3 py-3 text-base"
           />
           <button
             type="button"
             onClick={runImport}
             disabled={importing || !url.trim()}
-            className="px-4 py-2 rounded bg-stone-900 text-white text-sm disabled:opacity-50"
+            className="px-6 py-3 rounded bg-stone-900 text-white text-base font-medium disabled:opacity-50"
           >
             {importing ? "Importing…" : "Import"}
           </button>
@@ -142,8 +142,16 @@ export function SetupVenueForm({
 
       <div className="space-y-1">
         <label className="text-sm font-medium">Logo URL (optional)</label>
-        <input name="logo_url" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)}
-          placeholder="https://…/logo.png" className="w-full border rounded px-3 py-2" />
+        <div className="flex items-center gap-3">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="Logo preview" className="h-12 w-12 rounded border border-stone-200 bg-white object-contain p-1" />
+          ) : (
+            <div className="h-12 w-12 rounded border border-dashed border-stone-300 bg-stone-50" aria-hidden />
+          )}
+          <input name="logo_url" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)}
+            placeholder="https://…/logo.png" className="flex-1 border rounded px-3 py-2" />
+        </div>
       </div>
 
       <div className="space-y-1">
