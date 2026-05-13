@@ -2,16 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type PlaceResult = {
-  formatted_address: string;
-  place_id: string;
-  geometry: {
-    location: { lat: () => number; lng: () => number };
-  };
-  url?: string;
-  address_components?: Array<{ short_name: string; long_name: string; types: string[] }>;
-};
-
 type AddressValue = {
   address: string;
   region: string;
@@ -24,40 +14,50 @@ type AddressValue = {
 declare global {
   interface Window {
     google?: typeof google;
-    _venuelyMapsLoading?: Promise<void>;
+    _venuelyMapsBootstrap?: Promise<typeof google>;
   }
 }
 
 const SCRIPT_ID = "venuely-google-maps";
 
-function loadGoogleMaps(apiKey: string): Promise<void> {
-  if (typeof window === "undefined") return Promise.resolve();
-  if (window.google?.maps?.places) return Promise.resolve();
-  if (window._venuelyMapsLoading) return window._venuelyMapsLoading;
+// Load Google Maps using the new async bootstrap loader. The script URL only
+// bootstraps the namespace; we then use importLibrary() to actually pull in
+// the Map + Places classes. Mixing `new google.maps.Map()` with `loading=async`
+// is what previously broke with "Map is not a constructor".
+function loadGoogleMaps(apiKey: string): Promise<typeof google> {
+  if (typeof window === "undefined") return Promise.reject(new Error("server"));
+  if (window._venuelyMapsBootstrap) return window._venuelyMapsBootstrap;
 
-  window._venuelyMapsLoading = new Promise((resolve, reject) => {
+  window._venuelyMapsBootstrap = new Promise((resolve, reject) => {
+    // If the bootstrap script is already on the page from a prior mount, poll for the namespace.
     if (document.getElementById(SCRIPT_ID)) {
-      // Already injected — poll until ready.
+      const t0 = Date.now();
       const check = () => {
-        if (window.google?.maps?.places) resolve();
-        else setTimeout(check, 100);
+        if (window.google?.maps && typeof window.google.maps.importLibrary === "function") return resolve(window.google);
+        if (Date.now() - t0 > 15000) return reject(new Error("Google Maps script loaded but namespace not ready"));
+        setTimeout(check, 60);
       };
       check();
       return;
     }
     const s = document.createElement("script");
     s.id = SCRIPT_ID;
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&loading=async&v=weekly`;
+    // v=weekly + loading=async + libraries=places.
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&loading=async&v=weekly&callback=__venuelyMapsReady`;
     s.async = true;
     s.defer = true;
-    s.onload = () => resolve();
     s.onerror = () => reject(new Error("Could not load Google Maps. Check API key + referrer restrictions."));
+    // Google calls this callback once the bootstrap is ready.
+    (window as unknown as { __venuelyMapsReady: () => void }).__venuelyMapsReady = () => {
+      if (window.google?.maps && typeof window.google.maps.importLibrary === "function") resolve(window.google);
+      else reject(new Error("Google Maps callback fired but maps namespace missing"));
+    };
     document.head.appendChild(s);
   });
-  return window._venuelyMapsLoading;
+  return window._venuelyMapsBootstrap;
 }
 
-function regionFromComponents(components: NonNullable<PlaceResult["address_components"]>): string {
+function regionFromComponents(components: Array<{ long_name: string; types: string[] }>): string {
   const findType = (t: string) => components.find((c) => c.types.includes(t))?.long_name;
   const region = findType("administrative_area_level_1") ?? findType("locality") ?? "";
   const country = findType("country");
@@ -89,42 +89,50 @@ export function VenueAddressPicker({
   });
   const [error, setError] = useState<string | null>(null);
 
-  // Initialise the map + autocomplete once Maps SDK is loaded.
   useEffect(() => {
     if (!apiKey) {
-      setError("Google Maps not configured — paste an address manually for now.");
+      setError("Google Maps not configured — paste an address manually.");
       return;
     }
     let cancelled = false;
-    loadGoogleMaps(apiKey)
-      .then(() => {
-        if (cancelled || !window.google || !inputRef.current || !mapRef.current) return;
-        const startLat = value.latitude ?? -33.918861;  // Cape Town default
+    (async () => {
+      try {
+        await loadGoogleMaps(apiKey);
+        if (cancelled || !inputRef.current || !mapRef.current) return;
+        // Pull in Map + Marker + Autocomplete via importLibrary (works with loading=async).
+        const [{ Map }, { Marker }, { Autocomplete }] = await Promise.all([
+          google.maps.importLibrary("maps") as Promise<google.maps.MapsLibrary>,
+          google.maps.importLibrary("marker") as Promise<google.maps.MarkerLibrary>,
+          google.maps.importLibrary("places") as Promise<google.maps.PlacesLibrary>,
+        ]);
+        if (cancelled) return;
+
+        const startLat = value.latitude ?? -33.918861;  // Cape Town
         const startLng = value.longitude ?? 18.4233;
-        mapInstance.current = new window.google.maps.Map(mapRef.current, {
+        mapInstance.current = new Map(mapRef.current, {
           center: { lat: startLat, lng: startLng },
           zoom: value.latitude ? 14 : 5,
           disableDefaultUI: true,
           zoomControl: true,
-          mapId: "venuely-setup-map",
         });
         if (value.latitude && value.longitude) {
-          markerInstance.current = new window.google.maps.Marker({
+          markerInstance.current = new Marker({
             map: mapInstance.current,
             position: { lat: value.latitude, lng: value.longitude },
           });
         }
 
-        const ac = new window.google.maps.places.Autocomplete(inputRef.current, {
+        const ac = new Autocomplete(inputRef.current, {
           fields: ["formatted_address", "place_id", "geometry", "address_components", "url"],
           componentRestrictions: { country: ["za"] },
         });
         ac.bindTo("bounds", mapInstance.current);
         ac.addListener("place_changed", () => {
-          const place = ac.getPlace() as unknown as PlaceResult;
-          if (!place.geometry?.location) return;
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
+          const place = ac.getPlace();
+          const loc = place.geometry?.location;
+          if (!loc || !place.place_id || !place.formatted_address) return;
+          const lat = loc.lat();
+          const lng = loc.lng();
           const region = place.address_components ? regionFromComponents(place.address_components) : "";
           const mapsUrl = place.url ?? `https://www.google.com/maps/place/?q=place_id:${place.place_id}`;
           const next: AddressValue = {
@@ -142,17 +150,17 @@ export function VenueAddressPicker({
             mapInstance.current.setZoom(15);
           }
           if (markerInstance.current) markerInstance.current.setMap(null);
-          markerInstance.current = new window.google.maps.Marker({
+          markerInstance.current = new Marker({
             map: mapInstance.current!,
             position: { lat, lng },
           });
         });
 
-        // Try geolocation as a hint for the map start position.
+        // Geolocation hint — only if no initial location.
         if (!value.latitude && navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             (pos) => {
-              if (!mapInstance.current) return;
+              if (cancelled || !mapInstance.current) return;
               mapInstance.current.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
               mapInstance.current.setZoom(10);
             },
@@ -160,8 +168,10 @@ export function VenueAddressPicker({
             { timeout: 4000, maximumAge: 60_000 }
           );
         }
-      })
-      .catch((e) => setError(e.message));
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      }
+    })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey]);
@@ -202,7 +212,6 @@ export function VenueAddressPicker({
 
       {error && <p className="text-sm text-amber-700">{error}</p>}
 
-      {/* Hidden fields so the form action receives all the address data. */}
       <input type="hidden" name={`${name ?? "address"}`}          value={value.address} />
       <input type="hidden" name={`${name ?? "address"}_region`}   value={value.region} />
       <input type="hidden" name={`${name ?? "address"}_lat`}      value={value.latitude ?? ""} />
