@@ -14,6 +14,7 @@ export default async function VenueLayout({ children }: { children: React.ReactN
           <Link href="/venue/rentals" className="hover:underline">Rentals</Link>
           <Link href="/venue/accommodation" className="hover:underline">Accommodation</Link>
           <Link href="/venue/payments" className="hover:underline">Payments</Link>
+          <Link href="/venue/settings" className="hover:underline">Settings</Link>
         </nav>
         <form action="/auth/signout" method="post">
           <button className="text-xs text-gray-500 hover:underline">Sign out</button>
