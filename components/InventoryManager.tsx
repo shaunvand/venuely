@@ -25,7 +25,7 @@ export function InventoryManager({
   venueId: string;
   items: Item[];
   fields: Field[];
-  priceColumn: "price" | "price_per_night";
+  priceColumn: "price" | "price_per_night" | "price_from";
 }) {
   const [importOpen, setImportOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);

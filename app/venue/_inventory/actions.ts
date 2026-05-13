@@ -25,7 +25,9 @@ export async function bulkSetActive(type: InventoryType, ids: string[], active: 
 export async function bulkSetPrice(type: InventoryType, ids: string[], price: number) {
   if (!ids.length || !Number.isFinite(price)) return;
   const supabase = await client();
-  const col = type === "accommodation" ? "price_per_night" : "price";
+  const col = type === "accommodation" ? "price_per_night"
+    : (type === "catalogue" || type === "rentals") ? "price"
+    : "price_from";
   await supabase.from(INVENTORY_TABLES[type]).update({ [col]: price }).in("id", ids);
   revalidatePath(INVENTORY_PATHS[type]);
 }
