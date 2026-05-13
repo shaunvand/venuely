@@ -44,26 +44,38 @@ export async function setupVenue(formData: FormData) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
-  const { data: venue, error: vErr } = await admin
-    .from("venues")
-    .insert({
-      slug,
-      name,
-      region,
-      address,
-      latitude: lat,
-      longitude: lng,
-      google_place_id: placeId,
-      google_maps_url: mapsUrl,
-      contact_email: contactEmail,
-      contact_phone: contactPhone,
-      branding_logo_url: logoUrl,
-      subscription_status: "trialing",
-      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-    })
-    .select("id, slug")
-    .single();
-  if (vErr || !venue) throw new Error(`Could not create venue: ${vErr?.message ?? "unknown"}`);
+  let attemptSlug = slug;
+  let venue: { id: string; slug: string } | null = null;
+  let lastErr: { message?: string; code?: string } | null = null;
+  for (let i = 0; i < 6; i++) {
+    const { data, error } = await admin
+      .from("venues")
+      .insert({
+        slug: attemptSlug,
+        name,
+        region,
+        address,
+        latitude: lat,
+        longitude: lng,
+        google_place_id: placeId,
+        google_maps_url: mapsUrl,
+        contact_email: contactEmail,
+        contact_phone: contactPhone,
+        branding_logo_url: logoUrl,
+        subscription_status: "trialing",
+        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .select("id, slug")
+      .single();
+    if (data) { venue = data; break; }
+    lastErr = error;
+    if (error?.code === "23505") {
+      attemptSlug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
+      continue;
+    }
+    break;
+  }
+  if (!venue) throw new Error(`Could not create venue: ${lastErr?.message ?? "unknown"}`);
 
   const { error: mErr } = await admin
     .from("venue_members")
