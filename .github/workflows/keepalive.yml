@@ -5,8 +5,8 @@ name: Keep venuely.co.za awake
 # Skip overnight (00:00-05:00 SAST = 22:00-03:00 UTC) — let it sleep.
 
 on:
-  schedule:
-    - cron: '*/12 3-22 * * *'  # UTC, runs every 12 min between 03:00-22:59 UTC (05:00-00:59 SAST)
+  # Render Starter plan never sleeps — keepalive scheduled run is disabled.
+  # Kept as a manual smoke ping; trigger from the Actions tab when needed.
   workflow_dispatch: {}
 
 jobs:
