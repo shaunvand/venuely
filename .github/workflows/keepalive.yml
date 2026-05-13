@@ -1,0 +1,22 @@
+name: Keep venuely.co.za awake
+
+# Render free tier sleeps after ~15 min of no traffic.
+# This pings every 12 minutes to keep the dyno hot during business hours.
+# Skip overnight (00:00-05:00 SAST = 22:00-03:00 UTC) — let it sleep.
+
+on:
+  schedule:
+    - cron: '*/12 3-22 * * *'  # UTC, runs every 12 min between 03:00-22:59 UTC (05:00-00:59 SAST)
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Wake venuely.co.za
+        run: |
+          for url in https://venuely.co.za/ https://venuely.co.za/login; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$url")
+            echo "$url → $CODE"
+          done

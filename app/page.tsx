@@ -187,14 +187,14 @@ function ForCouples() {
         <Reveal>
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-stone-400 mb-4">For your couples</p>
-            <h2 className="font-serif text-4xl sm:text-5xl tracking-tight">A portal they'll actually use</h2>
+            <h2 className="font-serif text-4xl sm:text-5xl tracking-tight">A portal they&apos;ll actually use</h2>
             <p className="mt-5 text-stone-300 leading-relaxed">
               No more PDFs that go out of date the moment you save them. No more group WhatsApp confusion. Each couple gets a single link — bookmark it, share it with bridesmaids, check it on the morning of the wedding. Always current, always yours.
             </p>
             <ul className="mt-7 space-y-2.5 text-stone-300 text-sm">
               <li className="flex gap-3"><Tick /> Browse your catalogue and pick what they want</li>
               <li className="flex gap-3"><Tick /> Track their own budget and supplier payments</li>
-              <li className="flex gap-3"><Tick /> See the day-of timeline you've planned together</li>
+              <li className="flex gap-3"><Tick /> See the day-of timeline you&apos;ve planned together</li>
               <li className="flex gap-3"><Tick /> Build their guest list and dietary requirements</li>
             </ul>
           </div>
@@ -283,7 +283,7 @@ function Pricing() {
             Start free trial
           </Link>
           <p className="text-xs text-stone-500 mt-5">
-            Compare: Sonas (UK) is ~R2 300/mo and won't take ZAR. Spreadsheets are free until they aren't.
+            Compare: Sonas (UK) is ~R2 300/mo and won&apos;t take ZAR. Spreadsheets are free until they aren&apos;t.
           </p>
         </div>
       </Reveal>
@@ -334,7 +334,7 @@ function CTA() {
             Try it on your next wedding.
           </h2>
           <p className="mt-4 text-stone-600">
-            14 days free. No card. If it doesn't save you a Sunday evening of admin, walk away.
+            14 days free. No card. If it doesn&apos;t save you a Sunday evening of admin, walk away.
           </p>
           <Link
             href="/signup"

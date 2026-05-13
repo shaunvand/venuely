@@ -14,7 +14,7 @@ export async function addGuest(weddingId: string, formData: FormData) {
   revalidatePath("/portal", "layout");
 }
 
-export async function deleteGuest(guestId: string, _weddingId: string) {
+export async function deleteGuest(guestId: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("guests").delete().eq("id", guestId);
   if (error) throw new Error(`Could not delete guest: ${error.message}`);

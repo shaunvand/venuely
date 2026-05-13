@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
+// No React state — IntersectionObserver toggles the class directly on the DOM node.
+// SSR renders the element WITHOUT the reveal class so content is visible if JS fails.
+// `useEffect` adds the reveal class, then IO upgrades it to in-view when scrolled into range.
 export function Reveal({
   children,
   delay = 0,
@@ -12,14 +15,11 @@ export function Reveal({
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  // Start visible on SSR/first render so content never hides if JS fails.
-  // Once mounted, opt into the reveal class, then let IntersectionObserver toggle in-view.
-  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setHydrated(true);
     const el = ref.current;
     if (!el) return;
+    el.classList.add("reveal");
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((e) => {
@@ -36,7 +36,7 @@ export function Reveal({
   }, [delay]);
 
   return (
-    <div ref={ref} className={`${hydrated ? "reveal" : ""} ${className}`}>
+    <div ref={ref} className={className}>
       {children}
     </div>
   );

@@ -49,7 +49,7 @@ export default async function GuestList({ params }: { params: Promise<{ venue: s
               <td>{g.dietary || "—"}</td>
               <td>{g.table_number || "—"}</td>
               <td>
-                <form action={deleteGuest.bind(null, g.id, wedding.id)}>
+                <form action={deleteGuest.bind(null, g.id)}>
                   <button className="text-red-600 text-xs hover:underline">delete</button>
                 </form>
               </td>

@@ -15,7 +15,7 @@ export default async function Dashboard({ params }: { params: Promise<{ venue: s
   ]);
 
   const daysOut = wedding.wedding_date
-    ? Math.max(0, Math.ceil((new Date(wedding.wedding_date).getTime() - Date.now()) / 86400000))
+    ? Math.max(0, Math.ceil((new Date(wedding.wedding_date).getTime() - new Date().getTime()) / 86400000))
     : null;
 
   const cards = [
