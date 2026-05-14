@@ -8,6 +8,7 @@ type Item = {
   category: string;
   source_file: string | null;
   data: Record<string, unknown>;
+  image_source?: "embedded" | "online" | "none";
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -271,8 +272,16 @@ export function BulkUploader({ venueId }: { venueId: string }) {
                       </td>
                       <td className="px-2 py-2">
                         {it.data.image_url ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={String(it.data.image_url)} alt="" className="h-14 w-14 rounded border border-stone-200 object-cover" />
+                          <div className="relative">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={String(it.data.image_url)} alt="" className="h-14 w-14 rounded border border-stone-200 object-cover" />
+                            {it.image_source === "online" && (
+                              <span className="absolute -bottom-1 -right-1 bg-amber-100 text-amber-800 text-[9px] px-1 rounded-full border border-amber-200" title="Auto-fetched from Unsplash">🌐</span>
+                            )}
+                            {it.image_source === "embedded" && (
+                              <span className="absolute -bottom-1 -right-1 bg-emerald-100 text-emerald-800 text-[9px] px-1 rounded-full border border-emerald-200" title="From your file">📎</span>
+                            )}
+                          </div>
                         ) : (
                           <div className="h-14 w-14 rounded border border-dashed border-stone-300 bg-stone-50 flex items-center justify-center text-stone-400 text-[10px]">none</div>
                         )}

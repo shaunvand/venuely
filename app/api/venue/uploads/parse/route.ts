@@ -4,6 +4,7 @@ import { extractText, getDocumentProxy } from "unpdf";
 import Anthropic from "@anthropic-ai/sdk";
 import { INVENTORY_FIELDS, type InventoryType } from "@/lib/inventory/schemas";
 import { extractXlsxImages, type ExtractedImage } from "@/lib/imports/extract-images";
+import { searchOneImage, mapWithConcurrency } from "@/lib/imports/image-search";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -167,10 +168,15 @@ export async function POST(req: NextRequest) {
         const fileImages = imagesByFile.get(ex.filename) ?? [];
         let imgIdx = 0;
         valid.forEach((it) => {
+          let image_source: "embedded" | "online" | "none" = "none";
           if (!it.data.image_url && fileImages[imgIdx]) {
             it.data.image_url = fileImages[imgIdx].url;
+            image_source = "embedded";
             imgIdx++;
+          } else if (it.data.image_url) {
+            image_source = "embedded";
           }
+          (it as { image_source?: string }).image_source = image_source;
           allItems.push({ ...it, source_file: ex.filename });
         });
         const imgNote = fileImages.length ? ` (+${fileImages.length} images)` : "";
@@ -180,12 +186,37 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Auto-search Unsplash for items that ended the parse pass without any image.
+    // Concurrency 4 keeps us well under Unsplash demo (50/hr) and production caps.
+    const needSearch: number[] = [];
+    allItems.forEach((it, i) => { if (!it.data.image_url) needSearch.push(i); });
+    if (needSearch.length) {
+      const queries = needSearch.map((i) => {
+        const it = allItems[i];
+        const parts = [
+          String(it.data.name ?? ""),
+          String(it.data.description ?? ""),
+          it.category,
+          "wedding",
+        ].filter((s) => s && s.trim());
+        return parts.join(" ");
+      });
+      const results = await mapWithConcurrency(queries, 4, (q) => searchOneImage(q));
+      results.forEach((url, k) => {
+        if (!url) return;
+        const it = allItems[needSearch[k]];
+        it.data.image_url = url;
+        (it as { image_source?: string }).image_source = "online";
+      });
+    }
+
     const items = allItems.map((it, i) => ({
       _id: i,
       _include: true,
       category: it.category,
       source_file: it.source_file,
       data: it.data,
+      image_source: ((it as unknown as { image_source?: string }).image_source) ?? (it.data.image_url ? "embedded" : "none"),
     }));
 
     const counts: Record<string, number> = {};
