@@ -1,7 +1,37 @@
 import { NextResponse, type NextRequest } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
+
+function hashPassword(plain: string): string {
+  const salt = process.env.PORTAL_PASSWORD_SALT ?? "venuely-portal-v1";
+  return createHash("sha256").update(`${salt}::${plain}`).digest("hex");
+}
+
+function passwordGateHtml(slug: string, couple: string, error?: string): string {
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Enter password — Venuely</title>
+<style>
+  body{font-family:Georgia,serif;background:#f5efe6;color:#2d2a26;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:24px;box-sizing:border-box}
+  .card{background:#fff;border-radius:14px;padding:40px;max-width:420px;width:100%;box-shadow:0 12px 40px rgba(45,74,58,0.08)}
+  h1{font-size:24px;margin:0 0 6px;color:#2d4a3a}
+  p{margin:0 0 22px;color:#7a6f63;font-size:14px;font-family:system-ui,sans-serif}
+  input{width:100%;padding:12px 14px;border:1px solid #d8d0c0;border-radius:8px;font-size:15px;box-sizing:border-box;font-family:system-ui,sans-serif}
+  button{margin-top:14px;width:100%;padding:12px 14px;border:none;border-radius:8px;background:#2d4a3a;color:#fff;font-size:15px;cursor:pointer;font-family:system-ui,sans-serif}
+  button:hover{background:#1f3528}
+  .err{color:#b91c1c;font-size:13px;margin-top:10px;font-family:system-ui,sans-serif}
+</style></head>
+<body><div class="card">
+  <h1>${couple.replace(/[<>&"]/g, "")}</h1>
+  <p>This wedding portal is password-protected. Enter the password your venue gave you.</p>
+  <form method="GET" action="/${slug}">
+    <input type="password" name="p" autofocus placeholder="Password" required />
+    <button type="submit">Unlock portal</button>
+    ${error ? `<div class="err">${error}</div>` : ""}
+  </form>
+</div></body></html>`;
+}
 
 const RESERVED = new Set([
   "admin", "venue", "portal", "dashboard", "login", "signup",
@@ -65,20 +95,49 @@ export async function GET(
   if (RESERVED.has(rawSlug)) return new NextResponse("Not found", { status: 404 });
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("redirect", `/${rawSlug}`);
-    return NextResponse.redirect(url);
-  }
 
+  // Fetch the wedding (no auth required to look up — auth/password gate below).
   const { data: wedding } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, wedding_state, venue:venues(id, name, slug)")
+    .select("id, slug, couple_names, wedding_date, wedding_state, portal_password_hash, venue:venues(id, name, slug)")
     .eq("slug", rawSlug)
     .maybeSingle();
   if (!wedding) return new NextResponse("Wedding portal not found.", { status: 404 });
+
+  const expectedHash = (wedding as unknown as { portal_password_hash: string | null }).portal_password_hash;
+
+  // Access logic:
+  //  - If a portal password is set → that password is the gate; no Supabase Auth needed.
+  //  - If no password set → fall back to Supabase Auth login.
+  if (expectedHash) {
+    const cookieName = `vy_portal_${wedding.id}`;
+    const cookieValue = request.cookies.get(cookieName)?.value;
+    if (cookieValue !== expectedHash) {
+      const supplied = request.nextUrl.searchParams.get("p");
+      if (supplied && hashPassword(supplied) === expectedHash) {
+        const cleanUrl = request.nextUrl.clone();
+        cleanUrl.searchParams.delete("p");
+        const res = NextResponse.redirect(cleanUrl);
+        res.cookies.set(cookieName, expectedHash, {
+          httpOnly: true, sameSite: "lax", secure: true,
+          maxAge: 60 * 60 * 24 * 30, path: `/${rawSlug}`,
+        });
+        return res;
+      }
+      const err = supplied ? "Incorrect password — try again." : undefined;
+      return new NextResponse(passwordGateHtml(rawSlug, wedding.couple_names, err), {
+        status: 200, headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+  } else {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("redirect", `/${rawSlug}`);
+      return NextResponse.redirect(url);
+    }
+  }
 
   const venue = (wedding as unknown as { venue: { id: string; name: string; slug: string } | null }).venue;
   const venueId = venue?.id;
