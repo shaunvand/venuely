@@ -15,7 +15,7 @@ export default async function VenueLayout({ children }: { children: React.ReactN
         <nav className="flex flex-col flex-1">
           <Link href="/venue" className="vy-side-link">Overview</Link>
           <Link href="/venue/weddings" className="vy-side-link">Weddings</Link>
-          <Link href="/venue/uploads" className="vy-side-link">Uploads</Link>
+          <Link href="/venue/uploads" className="vy-side-link">Quick Import</Link>
           <div className="vy-side-section">Marketplace</div>
           <Link href="/venue/catalogue" className="vy-side-link">Catalogue</Link>
           <Link href="/venue/rentals" className="vy-side-link">Rentals</Link>
