@@ -84,12 +84,18 @@ ${FIELDS_SCHEMA}
 OUTPUT FORMAT — return ONLY a JSON object, no prose, no markdown fences:
 {"items":[{"category":"<category>","data":{...}}, ...]}
 
-RULES:
-- Be conservative. Skip rows you can't confidently identify or that aren't inventory/vendors (T&Cs, table-of-contents, terms, deposit policies, floor-plan labels, addresses).
-- For prices: only include if clearly stated; strip "R", spaces, commas; return a number. Skip if unclear.
-- Each item needs at minimum a name.
+EXTRACTION RULES — extract everything that *could* plausibly be a marketplace item, even when partial:
+- A row qualifies if it has a NAME or CODE that identifies an item, vendor, or service. Price is NOT required — leave price null when missing.
+- Pat Busch's convention: items prefixed "F1, F2 …" are FREE (cost_treatment: "included"). Items prefixed "R1, R2 …" are paid RENTAL (cost_treatment: "extra"). Use the code as the description if no other description is given.
+- Extract company / supplier names from "Preferred Service Providers" / "Recommended Vendors" pages — phone, email, website all optional.
+- For decor / rental / catalogue lists: each numbered or bulleted item is its own row. Group only when the source clearly groups them (e.g. "120 Dinner Knives, Forks, Spoons" → 1 row labelled "Dinner cutlery set").
+- Default cost_treatment to "extra" unless the document says complimentary / free / included / F-coded.
+- For prices: include if clearly stated as a number; strip "R", spaces, commas. If absent, leave null — DO NOT skip the item.
+- Each item needs at minimum a name (or a code that can serve as the name).
 - Keep descriptions short (one sentence max).
-- If the document has NO inventory or vendor content (e.g. it's a floor plan, address map, or pure policy doc), return {"items":[]}.`;
+- If the document has truly NO inventory or vendor content (e.g. address-only map, T&Cs, raw floor plan), return {"items":[]}.
+
+If you are unsure whether something qualifies, INCLUDE it — the user reviews and edits before commit.`;
 
   const userMsg = `Source filename: ${filename}
 
@@ -107,12 +113,20 @@ Return the JSON now.`;
 
   const block = response.content.find((c) => c.type === "text");
   const raw = block && block.type === "text" ? block.text.trim() : "";
+  console.log(`[smart-import] ${filename}: input ${text.length}c → claude returned ${raw.length}c. First 300: ${raw.slice(0, 300)}`);
   const s = raw.indexOf("{"); const e = raw.lastIndexOf("}");
-  if (s < 0 || e < 0) return [];
+  if (s < 0 || e < 0) {
+    console.warn(`[smart-import] ${filename}: no JSON in Claude response`);
+    return [];
+  }
   try {
     const parsed = JSON.parse(raw.slice(s, e + 1)) as { items?: Array<{ category: string; data: Record<string, unknown> }> };
+    console.log(`[smart-import] ${filename}: parsed ${parsed.items?.length ?? 0} items`);
     return parsed.items ?? [];
-  } catch { return []; }
+  } catch (err) {
+    console.warn(`[smart-import] ${filename}: JSON parse error — ${err instanceof Error ? err.message : err}`);
+    return [];
+  }
 }
 
 export async function POST(req: NextRequest) {
