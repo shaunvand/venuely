@@ -81,8 +81,10 @@ ${CATEGORY_GUIDE}
 
 ${FIELDS_SCHEMA}
 
-OUTPUT FORMAT — return ONLY a JSON object, no prose, no markdown fences:
-{"items":[{"category":"<category>","data":{...}}, ...]}
+OUTPUT FORMAT — return ONE JSON object PER LINE (JSONL / NDJSON), no prose, no markdown fences, no outer array:
+{"category":"rentals","data":{"name":"Champagne flutes","item_code":"F1","cost_treatment":"included"}}
+{"category":"catalogue","data":{"name":"...", ...}}
+… one line per item, that's it.
 
 EXTRACTION RULES — extract everything that *could* plausibly be a marketplace item, even when partial:
 - A row qualifies if it has a NAME or CODE that identifies an item, vendor, or service. Price is NOT required — leave price null when missing.
@@ -106,27 +108,30 @@ Return the JSON now.`;
 
   const response = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 8192,
+    max_tokens: 16384,
     system,
     messages: [{ role: "user", content: userMsg }],
   });
 
   const block = response.content.find((c) => c.type === "text");
-  const raw = block && block.type === "text" ? block.text.trim() : "";
-  console.log(`[smart-import] ${filename}: input ${text.length}c → claude returned ${raw.length}c. First 300: ${raw.slice(0, 300)}`);
-  const s = raw.indexOf("{"); const e = raw.lastIndexOf("}");
-  if (s < 0 || e < 0) {
-    console.warn(`[smart-import] ${filename}: no JSON in Claude response`);
-    return [];
+  const raw = block && block.type === "text" ? block.text : "";
+  console.log(`[smart-import] ${filename}: input ${text.length}c → claude returned ${raw.length}c. Stop reason: ${response.stop_reason}`);
+
+  // Strip markdown fences if Claude added them, then parse each line as JSON.
+  const cleaned = raw.replace(/^```(?:json|jsonl|ndjson)?\s*/i, "").replace(/```\s*$/i, "");
+  const items: Array<{ category: string; data: Record<string, unknown> }> = [];
+  for (const line of cleaned.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.startsWith("{")) continue;
+    try {
+      const obj = JSON.parse(trimmed);
+      if (obj.category && obj.data) items.push(obj);
+    } catch {
+      // line incomplete (truncated final line) — skip silently
+    }
   }
-  try {
-    const parsed = JSON.parse(raw.slice(s, e + 1)) as { items?: Array<{ category: string; data: Record<string, unknown> }> };
-    console.log(`[smart-import] ${filename}: parsed ${parsed.items?.length ?? 0} items`);
-    return parsed.items ?? [];
-  } catch (err) {
-    console.warn(`[smart-import] ${filename}: JSON parse error — ${err instanceof Error ? err.message : err}`);
-    return [];
-  }
+  console.log(`[smart-import] ${filename}: parsed ${items.length} items from JSONL`);
+  return items;
 }
 
 export async function POST(req: NextRequest) {
