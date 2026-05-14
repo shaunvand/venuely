@@ -37,7 +37,7 @@ function passwordGateHtml(slug: string, couple: string, error?: string): string 
 const RESERVED = new Set([
   "admin", "venue", "portal", "dashboard", "login", "signup",
   "auth", "onboarding", "api", "favicon.ico", "wedding-portal",
-  "_next", "robots.txt", "sitemap.xml", "brand", "docs", "logout",
+  "_next", "robots.txt", "sitemap.xml", "brand", "docs", "logout", "booking",
 ]);
 
 let _templateCache: string | null = null;
@@ -161,7 +161,7 @@ export async function GET(
   window.VENUE_RENTAL_ITEMS    = ${JSON.stringify(shaped.RENTAL_ITEMS)};
   window.VENUE_RENTAL_CATS     = ${JSON.stringify(shaped.RENTAL_CATS)};
   window.VENUE_ACCOMMODATION   = ${JSON.stringify(shaped.ACCOMMODATION)};
-  window.VENUE_ACCOMMODATION_LINK = ${JSON.stringify(`/portal/${wedding.slug}/accommodation`)};
+  window.VENUE_ACCOMMODATION_LINK = ${JSON.stringify(`/booking/${wedding.slug}/accommodation`)};
   window.VENUE_VENDORS         = ${JSON.stringify((vendorRaw ?? []).map((v) => {
     const vv = v as Record<string, unknown>;
     return {

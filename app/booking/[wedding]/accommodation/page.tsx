@@ -5,8 +5,8 @@ import { portalAccess } from "@/lib/portal/access";
 import { AccommodationGrid } from "@/components/AccommodationGrid";
 import { applyMarkup } from "@/lib/billing/compute";
 
-export default async function CoupleAccommodation({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export default async function CoupleAccommodation({ params }: { params: Promise<{ wedding: string }> }) {
+  const { wedding: slug } = await params;
   const access = await portalAccess(slug);
   if (!access.ok) {
     if (access.status === 404) notFound();
