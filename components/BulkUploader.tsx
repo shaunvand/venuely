@@ -49,6 +49,7 @@ export function BulkUploader({ venueId }: { venueId: string }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
+  const [fileReports, setFileReports] = useState<Array<{ filename: string; chars: number; items: number; status: string; error?: string }>>([]);
   const [filter, setFilter] = useState<string>("all");
   const [isPending, startTransition] = useTransition();
 
@@ -67,8 +68,9 @@ export function BulkUploader({ venueId }: { venueId: string }) {
       const j = await res.json();
       if (!res.ok || !j.ok) { setMsg(`Failed: ${j.error ?? "unknown"}`); return; }
       setItems(j.items as Item[]);
+      setFileReports(j.files ?? []);
       const counts = Object.entries(j.counts as Record<string, number>).map(([k, v]) => `${v} ${CATEGORY_LABELS[k] ?? k}`).join(", ");
-      setMsg(counts ? `Detected: ${counts}. Review below and confirm.` : "Nothing recognisable found in those files.");
+      setMsg(counts ? `Detected: ${counts}. Review below and confirm.` : "Nothing recognisable found — see per-file report below.");
     } catch (e) {
       setMsg(`Error: ${e instanceof Error ? e.message : String(e)}`);
     } finally { setBusy(false); }
@@ -142,6 +144,27 @@ export function BulkUploader({ venueId }: { venueId: string }) {
       )}
 
       {msg && <p className="text-sm text-stone-700">{msg}</p>}
+
+      {fileReports.length > 0 && (
+        <details className="text-xs border border-stone-200 rounded-lg p-3 bg-stone-50">
+          <summary className="cursor-pointer font-medium">Per-file report ({fileReports.length} files)</summary>
+          <table className="w-full mt-2">
+            <thead className="text-left text-stone-500">
+              <tr><th className="py-1">File</th><th>Chars</th><th>Items</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {fileReports.map((r) => (
+                <tr key={r.filename} className="border-t border-stone-200">
+                  <td className="py-1 pr-2 max-w-[260px] truncate" title={r.filename}>{r.filename}</td>
+                  <td className="text-stone-600">{r.chars.toLocaleString()}</td>
+                  <td className={r.items > 0 ? "text-emerald-700 font-medium" : "text-stone-500"}>{r.items}</td>
+                  <td className={r.error ? "text-red-700" : "text-stone-600"}>{r.error ? r.error : r.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
 
       {items.length > 0 && (
         <>
