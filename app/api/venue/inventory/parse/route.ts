@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     const file = form.get("file") as File | null;
     const type = (form.get("type") as string || "") as InventoryType;
     if (!file) return NextResponse.json({ error: "Missing file" }, { status: 400 });
-    if (!["catalogue", "rentals", "accommodation"].includes(type)) {
+    if (!INVENTORY_FIELDS[type]) {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
 

@@ -1954,38 +1954,15 @@ function showToast(msg) { const t = document.getElementById('toast'); t.textCont
 
 
 // ── Portal Access Code ────────────────────────────────────────────
-// Change this per couple before sending the portal link
-const PORTAL_ACCESS_CODE = 'PATBUSCH2027';
-
+// Legacy in-browser lock REMOVED — server-side password gate at /[wedding]
+// route.ts is now the single source of truth. Auto-dismiss any stale lock screen.
 function tryUnlock() {
-  const input = document.getElementById('lockPin').value.trim().toUpperCase().replace(/\s/g,'');
-  const code   = PORTAL_ACCESS_CODE.toUpperCase().replace(/\s/g,'');
-  if (input === code) {
-    sessionStorage.setItem('pb_unlocked', '1');
-    const screen = document.getElementById('lockScreen');
-    screen.style.transition = 'opacity 0.5s';
-    screen.style.opacity = '0';
-    setTimeout(() => screen.style.display = 'none', 500);
-  } else {
-    const err = document.getElementById('lockError');
-    err.textContent = 'Incorrect access code — please try again';
-    document.getElementById('lockPin').value = '';
-    document.getElementById('lockPin').focus();
-    setTimeout(() => err.innerHTML = '&nbsp;', 3000);
-  }
+  const screen = document.getElementById('lockScreen');
+  if (screen) screen.style.display = 'none';
 }
-
-// Check on load — skip lock if already unlocked this session
 (function() {
-  if (sessionStorage.getItem('pb_unlocked') === '1') {
-    const s = document.getElementById('lockScreen');
-    if (s) s.style.display = 'none';
-  } else {
-    setTimeout(() => {
-      const pin = document.getElementById('lockPin');
-      if (pin) pin.focus();
-    }, 200);
-  }
+  const s = document.getElementById('lockScreen');
+  if (s) s.style.display = 'none';
 })();
 
 // ── Mobile Nav ────────────────────────────────────────────────────

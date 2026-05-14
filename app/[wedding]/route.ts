@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
+import { applyMarkup } from "@/lib/billing/compute";
 
 function hashPassword(plain: string): string {
   const salt = process.env.PORTAL_PASSWORD_SALT ?? "venuely-portal-v1";
@@ -36,7 +37,7 @@ function passwordGateHtml(slug: string, couple: string, error?: string): string 
 const RESERVED = new Set([
   "admin", "venue", "portal", "dashboard", "login", "signup",
   "auth", "onboarding", "api", "favicon.ico", "wedding-portal",
-  "_next", "robots.txt", "sitemap.xml",
+  "_next", "robots.txt", "sitemap.xml", "brand", "docs", "logout",
 ]);
 
 let _templateCache: string | null = null;
@@ -52,12 +53,7 @@ type Catalogue = { id: string; category: string; name: string; description: stri
 type Rental    = { id: string; category: string; name: string; description: string | null; price: number; stock_total: number; sort_order: number } & Commish;
 type Room      = { id: string; name: string; room_type: string | null; sleeps: number; description: string | null; sort_order: number; price_per_night: number } & Commish;
 
-function applyMarkup(price: number, value: number | null | undefined, type: string | null | undefined): number {
-  const v = Number(value ?? 0);
-  if (!v) return price;
-  if (type === "percent") return Math.round((price * (1 + v / 100)) * 100) / 100;
-  return Math.round((price + v) * 100) / 100;
-}
+// applyMarkup imported from @/lib/billing/compute — single source of truth
 
 // Translate venue inventory (Supabase rows) into the shape the static app.js expects.
 function shapeForApp(

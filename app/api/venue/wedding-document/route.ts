@@ -21,8 +21,11 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { data: w } = await auth.from("weddings").select("id, venue_id, slug").eq("id", weddingId).single();
     if (!w) return NextResponse.json({ error: "Wedding not found" }, { status: 404 });
-    const { data: m } = await auth.from("venue_members").select("venue_id").eq("user_id", user.id).eq("venue_id", w.venue_id).maybeSingle();
-    if (!m) return NextResponse.json({ error: "Not your wedding" }, { status: 403 });
+    const [{ data: m }, { data: profile }] = await Promise.all([
+      auth.from("venue_members").select("venue_id").eq("user_id", user.id).eq("venue_id", w.venue_id).maybeSingle(),
+      auth.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+    ]);
+    if (!m && profile?.role !== "owner") return NextResponse.json({ error: "Not your wedding" }, { status: 403 });
 
     const admin = createAdmin(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

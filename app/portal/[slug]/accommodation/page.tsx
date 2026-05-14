@@ -1,32 +1,35 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdmin } from "@supabase/supabase-js";
+import { portalAccess } from "@/lib/portal/access";
 import { AccommodationGrid } from "@/components/AccommodationGrid";
 import { applyMarkup } from "@/lib/billing/compute";
 
 export default async function CoupleAccommodation({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const supabase = await createClient();
-  const { data: wedding } = await supabase
-    .from("weddings")
-    .select("id, slug, couple_names, wedding_date, venue_id, wedding_state, venue:venues(id, name)")
-    .eq("slug", slug)
-    .single();
-  if (!wedding) notFound();
+  const access = await portalAccess(slug);
+  if (!access.ok) {
+    if (access.status === 404) notFound();
+    // For 401/403 send them back to the main portal which handles the password prompt.
+    redirect(`/${slug}`);
+  }
 
-  const [{ data: rooms }, { data: media }] = await Promise.all([
-    supabase
-      .from("accommodation_rooms")
+  const ad = createAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SECRET_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+
+  const [{ data: wedding }, { data: rooms }, { data: media }] = await Promise.all([
+    ad.from("weddings").select("id, slug, couple_names, wedding_date, venue_id, wedding_state, venue:venues(id, name)").eq("id", access.wedding.id).single(),
+    ad.from("accommodation_rooms")
       .select("id, name, room_type, tier, sleeps, ideal_sleeps, max_sleeps, price_per_night, description, image_url, hero_image_url, floor_plan_url, amenities, bridal_suite, parent_room_id, bed_config, commission_value, commission_type, active, sort_order")
-      .eq("venue_id", wedding.venue_id)
+      .eq("venue_id", access.wedding.venue_id)
       .eq("active", true)
       .order("sort_order"),
-    supabase
-      .from("media_assets")
-      .select("id, owner_id, kind, url, label, sort_order")
-      .in("kind", ["photo", "floorplan"])
-      .order("sort_order"),
+    ad.from("media_assets").select("id, owner_id, kind, url, label, sort_order").in("kind", ["photo", "floorplan"]).order("sort_order"),
   ]);
+  if (!wedding) notFound();
 
   const mediaByOwner: Record<string, Array<{ url: string; kind: string; label: string | null }>> = {};
   (media ?? []).forEach((m) => {

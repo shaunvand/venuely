@@ -18,8 +18,11 @@ export async function POST(req: NextRequest) {
     const auth = await createServerClient();
     const { data: { user } } = await auth.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const { data: member } = await auth.from("venue_members").select("venue_id").eq("user_id", user.id).eq("venue_id", venueId).maybeSingle();
-    if (!member) return NextResponse.json({ error: "Not your venue" }, { status: 403 });
+    const [{ data: member }, { data: profile }] = await Promise.all([
+      auth.from("venue_members").select("venue_id").eq("user_id", user.id).eq("venue_id", venueId).maybeSingle(),
+      auth.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+    ]);
+    if (!member && profile?.role !== "owner") return NextResponse.json({ error: "Not your venue" }, { status: 403 });
 
     const admin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

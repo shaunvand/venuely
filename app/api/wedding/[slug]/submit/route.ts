@@ -1,5 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdmin } from "@supabase/supabase-js";
+import { portalAccess } from "@/lib/portal/access";
+
+function admin() {
+  return createAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SECRET_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 const RESEND_API = "https://api.resend.com/emails";
 
@@ -15,9 +24,8 @@ export async function POST(
   ctx: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await ctx.params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const access = await portalAccess(slug, request);
+  if (!access.ok) return NextResponse.json({ error: access.reason }, { status: access.status });
 
   let body: SubmitBody;
   try { body = (await request.json()) as SubmitBody; }
@@ -27,15 +35,15 @@ export async function POST(
     return NextResponse.json({ error: "kind required" }, { status: 400 });
   }
 
-  // Find wedding + venue (RLS-gated read).
+  const supabase = admin();
+
   const { data: wedding } = await supabase
     .from("weddings")
     .select("id, slug, couple_names, wedding_date, venue:venues(name, contact_email)")
-    .eq("slug", slug)
-    .maybeSingle();
-  if (!wedding) return NextResponse.json({ error: "wedding not found or forbidden" }, { status: 404 });
+    .eq("id", access.wedding.id)
+    .single();
+  if (!wedding) return NextResponse.json({ error: "wedding not found" }, { status: 404 });
 
-  // Insert submission.
   const { data: submission, error: sErr } = await supabase
     .from("submissions")
     .insert({
