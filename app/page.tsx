@@ -73,7 +73,7 @@ function Nav({ signedIn, dashboardHref }: { signedIn: boolean; dashboardHref: st
             <>
               <Link href="/login" className="hover:text-stone-600 transition-colors">Sign in</Link>
               <Link href="/signup" className="px-3.5 py-1.5 rounded-md bg-stone-900 text-white hover:bg-stone-800 transition-colors">
-                Start free trial
+                Get started
               </Link>
             </>
           )}
@@ -109,7 +109,7 @@ function Hero() {
             href="/signup"
             className="px-7 py-3.5 rounded-md bg-stone-900 text-white hover:bg-stone-800 font-medium transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm hover:shadow-md"
           >
-            Start your 14-day free trial
+            Get started — no monthly fee
           </Link>
           <a
             href="#features"
@@ -261,29 +261,29 @@ function Pricing() {
     <section id="pricing" className="max-w-3xl mx-auto px-6 py-28 text-center">
       <Reveal>
         <h2 className="font-serif text-4xl sm:text-5xl tracking-tight">
-          One price. No tiers. No surprises.
+          Pay nothing until your wedding pays.
         </h2>
-        <p className="mt-4 text-stone-600">Every feature. Unlimited weddings. Unlimited couples.</p>
+        <p className="mt-4 text-stone-600">No subscription. No setup fee. We take 1% of what couples spend through the platform — that&apos;s it.</p>
       </Reveal>
 
       <Reveal delay={150}>
         <div className="mt-12 border border-stone-300 rounded-2xl p-10 bg-white lift">
-          <div className="text-stone-500 text-xs uppercase tracking-[0.3em]">Per venue</div>
+          <div className="text-stone-500 text-xs uppercase tracking-[0.3em]">Per booking</div>
           <div className="mt-3 flex items-baseline justify-center gap-2">
-            <span className="text-6xl font-serif">R1 499</span>
-            <span className="text-stone-500 text-lg">/ month</span>
+            <span className="text-6xl font-serif">1%</span>
+            <span className="text-stone-500 text-lg">of wedding spend</span>
           </div>
-          <div className="text-stone-500 text-sm mt-2">Billed in rand · cancel anytime</div>
+          <div className="text-stone-500 text-sm mt-2">No monthly fee · no contract · cancel anytime</div>
 
           <ul className="mt-9 space-y-2.5 text-left max-w-md mx-auto text-sm">
             {[
               "Unlimited weddings per year",
               "Branded couple portals",
               "Catalogue, rentals & accommodation tracking",
-              "Supplier directory",
+              "Partner-vendor marketplace with your commission built in",
               "Payment tracking & invoicing",
               "Email support (WhatsApp support coming soon)",
-              "14-day free trial — no card required",
+              "Free until your first booking",
             ].map((f) => (
               <li key={f} className="flex gap-2.5">
                 <span className="text-emerald-600 mt-0.5"><Tick /></span>
@@ -292,14 +292,18 @@ function Pricing() {
             ))}
           </ul>
 
+          <div className="mt-9 rounded-lg bg-stone-50 border border-stone-200 px-5 py-4 text-sm text-stone-700 max-w-md mx-auto">
+            <span className="font-medium">Example:</span> couple spends R120,000 through the portal → we invoice you R1,200. You keep R118,800.
+          </div>
+
           <Link
             href="/signup"
             className="mt-10 inline-block px-8 py-3.5 rounded-md bg-stone-900 text-white hover:bg-stone-800 font-medium transition-all hover:scale-[1.02] shadow-sm hover:shadow-md"
           >
-            Start free trial
+            Get started — free
           </Link>
           <p className="text-xs text-stone-500 mt-5">
-            Compare: Sonas (UK) is ~R2 300/mo and won&apos;t take ZAR. Spreadsheets are free until they aren&apos;t.
+            Compare: Sonas (UK) is ~R2 300/mo whether you book or not. Spreadsheets are free until they aren&apos;t.
           </p>
         </div>
       </Reveal>
@@ -350,13 +354,13 @@ function CTA() {
             Try it on your next wedding.
           </h2>
           <p className="mt-4 text-stone-600">
-            14 days free. No card. If it doesn&apos;t save you a Sunday evening of admin, walk away.
+            Free until a couple books. Then we take 1% — never more.
           </p>
           <Link
             href="/signup"
             className="mt-9 inline-block px-8 py-3.5 rounded-md bg-stone-900 text-white hover:bg-stone-800 font-medium transition-all hover:scale-[1.02] shadow-sm hover:shadow-md"
           >
-            Start your free trial
+            Get started
           </Link>
         </Reveal>
       </div>
@@ -376,7 +380,7 @@ function Footer() {
         <div className="flex gap-6 text-sm text-stone-500">
           <a href="mailto:hello@venuely.co.za" className="hover:text-stone-900 transition-colors">hello@venuely.co.za</a>
           <Link href="/login" className="hover:text-stone-900 transition-colors">Sign in</Link>
-          <Link href="/signup" className="hover:text-stone-900 transition-colors">Start trial</Link>
+          <Link href="/signup" className="hover:text-stone-900 transition-colors">Get started</Link>
         </div>
       </div>
       <div className="max-w-6xl mx-auto px-6 pb-6 text-xs text-stone-400">

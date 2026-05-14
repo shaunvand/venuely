@@ -54,7 +54,7 @@ export default async function OwnerDashboard() {
           >
             <div className="font-medium">Billing →</div>
             <div className="text-sm text-gray-600 mt-1">
-              R1499/mo subscription state per venue. Yoco scaffold (not yet wired).
+              1% platform fee on wedding spend per venue. Live tally of collected vs outstanding.
             </div>
           </Link>
         </div>

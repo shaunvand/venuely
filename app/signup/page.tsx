@@ -45,7 +45,7 @@ export default function SignupPage() {
         <div>
           <h1 className="font-serif text-3xl">List your venue on Venuely</h1>
           <p className="text-stone-600 text-sm mt-2">
-            For wedding-venue owners and managers. 14-day free trial — no card. Couples get invited by you afterwards.
+            For wedding-venue owners and managers. No monthly fee — we take 1% of wedding spend when couples book through your portal. Couples get invited by you afterwards.
           </p>
         </div>
 
@@ -91,7 +91,7 @@ export default function SignupPage() {
           disabled={loading || ok}
           className="w-full bg-stone-900 text-white rounded py-2.5 font-medium disabled:opacity-50"
         >
-          {loading ? "..." : ok ? "Check your email" : "Start free trial"}
+          {loading ? "..." : ok ? "Check your email" : "Get started"}
         </button>
 
         {msg && (

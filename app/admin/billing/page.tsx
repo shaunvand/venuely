@@ -1,43 +1,50 @@
 import { createClient } from "@/lib/supabase/server";
-import { getYocoConfig } from "@/lib/billing/yoco";
-import { startSubscription } from "./actions";
-
-const MONTHLY_R = 1499;
 
 export default async function OwnerBilling() {
   const supabase = await createClient();
   const { data: venues } = await supabase
     .from("venues")
-    .select("id, name, slug, subscription_status, trial_ends_at, yoco_customer_id")
+    .select("id, name, slug, platform_fee_rate, platform_fee_active, created_at")
     .order("created_at");
 
-  const yoco = getYocoConfig();
+  // Compute fees owed per venue from confirmed wedding selections.
+  // For each venue: sum (booked weddings total_budget) × platform_fee_rate.
+  const venueIds = (venues ?? []).map((v) => v.id);
+  let weddingsByVenue: Record<string, { total: number; booked: number; pending: number }> = {};
+  if (venueIds.length) {
+    const { data: weds } = await supabase
+      .from("weddings")
+      .select("venue_id, status, total_budget, platform_fee_owed, platform_fee_paid_at")
+      .in("venue_id", venueIds);
+    weddingsByVenue = (weds ?? []).reduce((acc, w) => {
+      const k = w.venue_id as string;
+      acc[k] = acc[k] || { total: 0, booked: 0, pending: 0 };
+      const budget = Number(w.total_budget ?? 0);
+      acc[k].total += budget;
+      if (w.platform_fee_paid_at) acc[k].booked += Number(w.platform_fee_owed ?? 0);
+      else acc[k].pending += Number(w.platform_fee_owed ?? 0);
+      return acc;
+    }, {} as Record<string, { total: number; booked: number; pending: number }>);
+  }
 
   return (
     <div className="space-y-6">
       <header>
-        <div className="vy-eyebrow">Subscriptions</div>
-        <h1 className="vy-h1 mt-1">Billing</h1>
+        <div className="vy-eyebrow">Revenue</div>
+        <h1 className="vy-h1 mt-1">Platform fees</h1>
+        <p className="text-stone-600 text-sm mt-1">
+          1% of wedding spend, billed per booking. No flat subscription.
+        </p>
       </header>
 
       <div className="vy-card-hero flex items-center justify-between">
         <div>
-          <div className="vy-eyebrow">Per venue</div>
+          <div className="vy-eyebrow">Pricing model</div>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className="font-serif text-4xl">R{MONTHLY_R}</span>
-            <span className="text-stone-500">/ month</span>
+            <span className="font-serif text-4xl">1%</span>
+            <span className="text-stone-500">of wedding spend</span>
           </div>
-          <div className="text-xs text-stone-500 mt-1">14-day free trial · cancel anytime</div>
-        </div>
-        <div>
-          <span className={`vy-tag ${yoco.live ? "vy-tag-active" : "vy-tag-paused"}`}>
-            Yoco {yoco.live ? "live" : "not configured"}
-          </span>
-          {!yoco.live && (
-            <div className="text-xs text-stone-500 mt-2 max-w-xs text-right">
-              Set <code className="bg-stone-100 px-1 rounded">YOCO_SECRET_KEY</code> on Render.
-            </div>
-          )}
+          <div className="text-xs text-stone-500 mt-1">Per-venue rate adjustable below · no monthly fee</div>
         </div>
       </div>
 
@@ -49,32 +56,32 @@ export default async function OwnerBilling() {
             <thead>
               <tr>
                 <th>Venue</th>
+                <th>Rate</th>
                 <th>Status</th>
-                <th>Trial ends</th>
-                <th>Yoco customer</th>
-                <th></th>
+                <th>Wedding spend (R)</th>
+                <th>Fees collected</th>
+                <th>Fees outstanding</th>
               </tr>
             </thead>
             <tbody>
-              {venues.map((v) => (
-                <tr key={v.id}>
-                  <td><div className="font-medium">{v.name}</div></td>
-                  <td>
-                    <span className={`vy-tag ${v.subscription_status === "active" ? "vy-tag-active" : v.subscription_status === "trialing" ? "vy-tag-trial" : "vy-tag-soft"}`}>
-                      {v.subscription_status}
-                    </span>
-                  </td>
-                  <td>{v.trial_ends_at?.slice(0, 10) ?? "—"}</td>
-                  <td className="font-mono text-xs">{v.yoco_customer_id ?? "—"}</td>
-                  <td className="text-right">
-                    {v.subscription_status !== "active" && (
-                      <form action={startSubscription.bind(null, v.id, v.slug)}>
-                        <button className="vy-btn vy-btn-secondary">Start subscription</button>
-                      </form>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {venues.map((v) => {
+                const stats = weddingsByVenue[v.id as string] || { total: 0, booked: 0, pending: 0 };
+                const rate = Number(v.platform_fee_rate ?? 0.01);
+                return (
+                  <tr key={v.id}>
+                    <td><div className="font-medium">{v.name}</div></td>
+                    <td>{(rate * 100).toFixed(2)}%</td>
+                    <td>
+                      <span className={`vy-tag ${v.platform_fee_active ? "vy-tag-active" : "vy-tag-soft"}`}>
+                        {v.platform_fee_active ? "active" : "waived"}
+                      </span>
+                    </td>
+                    <td>R{stats.total.toLocaleString()}</td>
+                    <td>R{stats.booked.toLocaleString()}</td>
+                    <td>{stats.pending > 0 ? <span className="text-amber-700">R{stats.pending.toLocaleString()}</span> : "—"}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
