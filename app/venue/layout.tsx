@@ -20,6 +20,7 @@ export default async function VenueLayout({ children }: { children: React.ReactN
           <Link href="/venue/catalogue" className="vy-side-link">Catalogue</Link>
           <Link href="/venue/rentals" className="vy-side-link">Rentals</Link>
           <Link href="/venue/accommodation" className="vy-side-link">Accommodation</Link>
+          <Link href="/venue/areas" className="vy-side-link">Areas</Link>
           <div className="vy-side-section">Partner vendors</div>
           <Link href="/venue/marketplace/caterers" className="vy-side-link">Caterers</Link>
           <Link href="/venue/marketplace/planners" className="vy-side-link">Planners</Link>

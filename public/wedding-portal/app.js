@@ -929,6 +929,11 @@ function toggleCatDay(code, day) {
 // ── Accommodation ──────────────────────────────────────────────────────────
 let selectedGuest = null;
 function renderAccommodation() {
+  // Show "try new view" banner if available
+  const linkBanner = document.getElementById('accommNewBanner');
+  if (linkBanner && window.VENUE_ACCOMMODATION_LINK) {
+    linkBanner.innerHTML = `<a href="${window.VENUE_ACCOMMODATION_LINK}" style="display:inline-flex;align-items:center;gap:8px;background:var(--forest,#2d4a3a);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;text-decoration:none">✨ Try the new Airbnb-style accommodation view →</a>`;
+  }
   // Guest pool
   const placed = new Set(Object.values(state.roomAssignments).flat());
   const pool = document.getElementById('guestPool');

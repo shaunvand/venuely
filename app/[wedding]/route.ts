@@ -165,6 +165,7 @@ export async function GET(
   window.VENUE_RENTAL_ITEMS    = ${JSON.stringify(shaped.RENTAL_ITEMS)};
   window.VENUE_RENTAL_CATS     = ${JSON.stringify(shaped.RENTAL_CATS)};
   window.VENUE_ACCOMMODATION   = ${JSON.stringify(shaped.ACCOMMODATION)};
+  window.VENUE_ACCOMMODATION_LINK = ${JSON.stringify(`/portal/${wedding.slug}/accommodation`)};
   window.VENUE_VENDORS         = ${JSON.stringify((vendorRaw ?? []).map((v) => {
     const vv = v as Record<string, unknown>;
     return {
