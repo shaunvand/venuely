@@ -79,8 +79,28 @@ async function parseDrawingAnchors(zip: JSZip): Promise<Map<string, { sheet: str
 }
 
 export async function extractXlsxImages(buf: Buffer, filename: string, venueId: string): Promise<ExtractedImage[]> {
-  const zip = await JSZip.loadAsync(buf);
-  const mediaEntries = Object.keys(zip.files).filter((p) => p.startsWith("xl/media/"));
+  let zip: JSZip;
+  try {
+    zip = await JSZip.loadAsync(buf);
+  } catch (e) {
+    console.warn(`[image-extract] ${filename}: not a valid zip (.xls binary?) — ${e instanceof Error ? e.message : e}`);
+    return [];
+  }
+
+  // Look in every plausible image location inside the xlsx zip.
+  const allPaths = Object.keys(zip.files);
+  const mediaEntries = allPaths.filter((p) => {
+    if (zip.files[p].dir) return false;
+    const lp = p.toLowerCase();
+    if (lp.startsWith("xl/media/")) return true;       // standard embedded images
+    if (lp.startsWith("xl/embeddings/")) return true;  // OLE embeds (often images)
+    if (lp.startsWith("xl/cellimages/")) return true;  // newer Excel cell images
+    if (lp.startsWith("media/")) return true;          // some older variants
+    return false;
+  });
+
+  console.log(`[image-extract] ${filename}: zip has ${allPaths.length} entries, ${mediaEntries.length} candidate images. Paths sample: ${allPaths.slice(0, 12).join(", ")}`);
+
   if (!mediaEntries.length) return [];
   const anchors = await parseDrawingAnchors(zip);
   const ad = admin();
@@ -88,16 +108,22 @@ export async function extractXlsxImages(buf: Buffer, filename: string, venueId: 
   let ordinal = 0;
   for (const path of mediaEntries.sort()) {
     const file = zip.files[path];
-    if (file.dir) continue;
     const ext = (path.split(".").pop() || "png").toLowerCase();
-    if (!MIME[ext]) continue;
-    const data = Buffer.from(await file.async("arraybuffer"));
+    if (!MIME[ext]) {
+      console.log(`[image-extract] ${filename}: skipping unsupported ext .${ext} at ${path}`);
+      continue;
+    }
     try {
+      const data = Buffer.from(await file.async("arraybuffer"));
+      if (data.length < 200) { console.log(`[image-extract] ${filename}: ${path} too small (${data.length}B), skipping`); continue; }
       const url = await uploadOne(ad, venueId, data, ext);
       const anchor = anchors.get(path) ?? { sheet: null, row: null };
       out.push({ url, source_file: filename, sheet: anchor.sheet, row: anchor.row, ordinal: ordinal++ });
-    } catch { /* skip individual upload failures */ }
+    } catch (e) {
+      console.warn(`[image-extract] ${filename}: upload failed for ${path}: ${e instanceof Error ? e.message : e}`);
+    }
   }
+  console.log(`[image-extract] ${filename}: extracted ${out.length} images`);
   return out;
 }
 

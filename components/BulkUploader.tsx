@@ -50,6 +50,7 @@ export function BulkUploader({ venueId }: { venueId: string }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [extractedImages, setExtractedImages] = useState<Array<{ url: string; source_file: string; ordinal: number }>>([]);
+  const [searchOpen, setSearchOpen] = useState<{ itemId: number; query: string; results: Array<{ url: string; thumb: string; alt: string; attribution: string }>; busy: boolean; err: string | null } | null>(null);
   const [fileReports, setFileReports] = useState<Array<{ filename: string; chars: number; items: number; status: string; error?: string }>>([]);
   const [filter, setFilter] = useState<string>("all");
   const [isPending, startTransition] = useTransition();
@@ -82,6 +83,50 @@ export function BulkUploader({ venueId }: { venueId: string }) {
   function updateItem(id: number, patch: Partial<Item>) {
     setItems((curr) => curr.map((it) => it._id === id ? { ...it, ...patch } : it));
   }
+  async function findOnline(itemId: number) {
+    const it = items.find((x) => x._id === itemId);
+    if (!it) return;
+    const name = String(it.data.name ?? "").trim();
+    const desc = String(it.data.description ?? "").trim();
+    const query = [name, desc].filter(Boolean).join(" ").slice(0, 120) || "wedding venue";
+    setSearchOpen({ itemId, query, results: [], busy: true, err: null });
+    try {
+      const res = await fetch("/api/venue/image-search", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      const j = await res.json();
+      if (!res.ok || !j.ok) {
+        setSearchOpen({ itemId, query, results: [], busy: false, err: j.error ?? "Search failed" });
+        return;
+      }
+      setSearchOpen({ itemId, query, results: j.results ?? [], busy: false, err: null });
+    } catch (e) {
+      setSearchOpen({ itemId, query, results: [], busy: false, err: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  async function rerunSearch(query: string) {
+    if (!searchOpen) return;
+    setSearchOpen({ ...searchOpen, query, busy: true, err: null });
+    try {
+      const res = await fetch("/api/venue/image-search", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      const j = await res.json();
+      if (!res.ok || !j.ok) {
+        setSearchOpen({ ...searchOpen, query, results: [], busy: false, err: j.error ?? "Search failed" });
+        return;
+      }
+      setSearchOpen({ ...searchOpen, query, results: j.results ?? [], busy: false, err: null });
+    } catch (e) {
+      setSearchOpen({ ...searchOpen, query, results: [], busy: false, err: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
   function updateField(id: number, key: string, value: string) {
     setItems((curr) => curr.map((it) => it._id === id ? { ...it, data: { ...it.data, [key]: value } } : it));
   }
@@ -241,6 +286,10 @@ export function BulkUploader({ venueId }: { venueId: string }) {
                             </option>
                           ))}
                         </select>
+                        <button type="button" onClick={() => findOnline(it._id)}
+                          className="mt-1 w-20 rounded-full bg-stone-900 text-white text-[10px] px-1 py-0.5 hover:bg-stone-700">
+                          🔍 Find online
+                        </button>
                       </td>
                       <td className="px-2 py-2">
                         <div className="grid grid-cols-2 gap-1">
@@ -271,6 +320,49 @@ export function BulkUploader({ venueId }: { venueId: string }) {
             </button>
           </div>
         </>
+      )}
+
+      {searchOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setSearchOpen(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-stone-200 sticky top-0 bg-white">
+              <h3 className="font-medium">Find an image online</h3>
+              <button onClick={() => setSearchOpen(null)} className="text-stone-500 hover:text-stone-900">✕</button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="flex gap-2">
+                <input value={searchOpen.query}
+                  onChange={(e) => setSearchOpen({ ...searchOpen, query: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === "Enter") rerunSearch(searchOpen.query); }}
+                  className="flex-1 border rounded-full px-3 py-2 text-sm" />
+                <button onClick={() => rerunSearch(searchOpen.query)} disabled={searchOpen.busy}
+                  className="rounded-full bg-stone-900 text-white px-4 py-2 text-sm hover:bg-stone-700 disabled:opacity-50">
+                  {searchOpen.busy ? "Searching…" : "Search"}
+                </button>
+              </div>
+              {searchOpen.err && <p className="text-xs text-red-700">{searchOpen.err}</p>}
+              {searchOpen.busy && <p className="text-xs text-stone-500">Searching Unsplash…</p>}
+              {!searchOpen.busy && searchOpen.results.length === 0 && !searchOpen.err && (
+                <p className="text-xs text-stone-500">No results. Try a more generic query like the item type.</p>
+              )}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {searchOpen.results.map((r) => (
+                  <button key={r.url} onClick={() => {
+                    updateField(searchOpen.itemId, "image_url", r.url);
+                    setSearchOpen(null);
+                  }} className="text-left group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={r.thumb} alt={r.alt} className="aspect-[4/3] w-full object-cover rounded-lg border border-stone-200 group-hover:border-stone-900 transition" />
+                    <div className="text-[10px] text-stone-500 mt-1 truncate">📷 {r.attribution}</div>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-stone-500 pt-2 border-t border-stone-200">
+                Images from Unsplash. Licence-free for commercial use. Attribution shown.
+              </p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
