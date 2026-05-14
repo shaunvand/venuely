@@ -62,12 +62,14 @@ DISTINCTION RULES:
 `.trim();
 
 const FIELDS_SCHEMA = `
-PER-ITEM SCHEMA — only fields relevant to the category should be filled, leave others null:
-- catalogue: { category, name, description, price, price_unit ("fixed"|"per_person"|"per_hour"), image_url }
-- rentals:   { category, name, description, price, stock_total, image_url }
-- accommodation: { name, room_type, sleeps, price_per_night, description, image_url }
+PER-ITEM SCHEMA — only fields relevant to the category should be filled, leave others null.
+EVERY item MUST include "cost_treatment" — one of "included" (in venue's base price) or "extra" (charged on top).
+Default to "extra" unless the document clearly labels it complimentary / free / in-package / included.
+- catalogue: { category, name, description, cost_treatment, price, price_unit ("fixed"|"per_person"|"per_hour"), image_url }
+- rentals:   { category, name, description, cost_treatment, price, stock_total, image_url }
+- accommodation: { name, room_type, sleeps, cost_treatment, price_per_night, description, contact_name, contact_phone, contact_email, website_url, address, image_url }
 - vendor types (caterers/planners/florists/djs/photographers/decor/bar):
-    { name, description, price_from, contact_email, contact_phone, website_url, image_url }
+    { name, description, cost_treatment, price_from, contact_email, contact_phone, website_url, image_url }
 `.trim();
 
 async function parseWithClaude(client: Anthropic, filename: string, text: string): Promise<Array<{ category: string; data: Record<string, unknown> }>> {

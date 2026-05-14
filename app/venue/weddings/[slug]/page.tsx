@@ -11,6 +11,7 @@ import { addPayment, deletePayment, addCharge, deleteCharge } from "./ledger-act
 import { PortalLinkCard } from "@/components/PortalLinkCard";
 import { WeddingDocuments } from "@/components/WeddingDocuments";
 import { loadRules, computeTotals, applyMarkup, type Charge, type Payment } from "@/lib/billing/compute";
+import { whatsappUrl, bookingNotificationMessage } from "@/lib/whatsapp";
 
 type WeddingState = {
   rentalSelections?: Record<string, { sel?: boolean; qty?: number; mg?: boolean; wed?: boolean; fb?: boolean }>;
@@ -47,10 +48,10 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
   const rules = await loadRules(supabase, venue.id);
 
   const [rentalsRes, cataRes, accomRes, vendorsRes, areasRes, areaPricingRes, paymentsRes, chargesRes, docsRes] = await Promise.all([
-    supabase.from("rental_items").select("id, name, price, commission_value, commission_type, item_code").eq("venue_id", venue.id),
-    supabase.from("catalogue_items").select("id, name, price, commission_value, commission_type").eq("venue_id", venue.id),
-    supabase.from("accommodation_rooms").select("id, name, price_per_night, commission_value, commission_type, tier").eq("venue_id", venue.id),
-    supabase.from("vendor_partners").select("id, name, vendor_type, price_from, commission_value, commission_type").eq("venue_id", venue.id),
+    supabase.from("rental_items").select("id, name, price, commission_value, commission_type, item_code, cost_treatment").eq("venue_id", venue.id),
+    supabase.from("catalogue_items").select("id, name, price, commission_value, commission_type, cost_treatment").eq("venue_id", venue.id),
+    supabase.from("accommodation_rooms").select("id, name, price_per_night, commission_value, commission_type, tier, cost_treatment, contact_name, contact_phone, contact_email, website_url, address").eq("venue_id", venue.id),
+    supabase.from("vendor_partners").select("id, name, vendor_type, price_from, commission_value, commission_type, cost_treatment, contact_phone, contact_email, website_url").eq("venue_id", venue.id),
     supabase.from("venue_areas").select("id, name, slug, area_kind").eq("venue_id", venue.id).eq("active", true),
     supabase.from("area_pricing").select("area_id, day_type, price"),
     supabase.from("payment_ledger").select("id, amount, direction, kind, method, reference, paid_at, notes").eq("wedding_id", wedding.id).order("paid_at", { ascending: false }),
@@ -81,7 +82,16 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     const dayCount = days.length || 1;
     const qty = v.qty ?? 1;
     const unit = applyMarkup(Number(item.price), item.commission_value, item.commission_type);
-    charges.push({ kind: "rental", label: `${item.name}${dayCount > 1 ? ` × ${dayCount} days` : ""}`, qty: qty * dayCount, unit_price: unit, amount: unit * qty * dayCount, is_refundable: false });
+    const included = (item as { cost_treatment?: string }).cost_treatment === "included";
+    const fullAmount = unit * qty * dayCount;
+    charges.push({
+      kind: "rental",
+      label: `${item.name}${dayCount > 1 ? ` × ${dayCount} days` : ""}${included ? " (included)" : ""}`,
+      qty: qty * dayCount,
+      unit_price: unit,
+      amount: included ? 0 : fullAmount,
+      is_refundable: false,
+    });
   }
 
   // Catalogue (per-head)
@@ -93,14 +103,30 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     const dayCount = days.length || 1;
     const unit = applyMarkup(Number(item.price), item.commission_value, item.commission_type);
     const total = unit * dayCount * guestCount;
-    charges.push({ kind: "catalogue", label: `${item.name} (${dayCount} day${dayCount>1?"s":""} × ${guestCount} guests)`, qty: dayCount * guestCount, unit_price: unit, amount: total, is_refundable: false });
+    const included = (item as { cost_treatment?: string }).cost_treatment === "included";
+    charges.push({
+      kind: "catalogue",
+      label: `${item.name} (${dayCount} day${dayCount>1?"s":""} × ${guestCount} guests)${included ? " (included)" : ""}`,
+      qty: dayCount * guestCount,
+      unit_price: unit,
+      amount: included ? 0 : total,
+      is_refundable: false,
+    });
   }
 
   // Accommodation
   for (const [roomId, names] of Object.entries(state.roomAssignments ?? {})) {
     const room = accomMap.get(roomId); if (!room || !names.length) continue;
     const unit = applyMarkup(Number(room.price_per_night), room.commission_value, room.commission_type);
-    charges.push({ kind: "accommodation", label: `${room.name} (${names.length} guests, 1 night)`, qty: 1, unit_price: unit, amount: unit, is_refundable: false });
+    const included = (room as { cost_treatment?: string }).cost_treatment === "included";
+    charges.push({
+      kind: "accommodation",
+      label: `${room.name} (${names.length} guests, 1 night)${included ? " (included)" : ""}`,
+      qty: 1,
+      unit_price: unit,
+      amount: included ? 0 : unit,
+      is_refundable: false,
+    });
   }
 
   // Vendor partners selected
@@ -109,7 +135,17 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     const v = s.fromVendorId ? vendorMap.get(s.fromVendorId) : null;
     const fallback = v ? applyMarkup(Number(v.price_from ?? 0), v.commission_value, v.commission_type) : 0;
     const cost = parseMoney(s.price) || fallback;
-    if (cost > 0) charges.push({ kind: "vendor", label: `${s.name} (${s.category ?? "supplier"})`, qty: 1, unit_price: cost, amount: cost, is_refundable: false });
+    const included = v && (v as { cost_treatment?: string }).cost_treatment === "included";
+    if (cost > 0) {
+      charges.push({
+        kind: "vendor",
+        label: `${s.name} (${s.category ?? "supplier"})${included ? " (included)" : ""}`,
+        qty: 1,
+        unit_price: cost,
+        amount: included ? 0 : cost,
+        is_refundable: false,
+      });
+    }
   });
 
   // Areas (paid extras only)
@@ -308,6 +344,62 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
           <button className="vy-btn vy-btn-primary">+ Add payment</button>
         </form>
       </section>
+
+      {/* Notify suppliers via WhatsApp */}
+      {(() => {
+        type ContactRow = { label: string; phone: string | null | undefined; contact_name?: string | null; itemLabel: string };
+        const contacts: ContactRow[] = [];
+        // Booked vendor partners with phone
+        (state.suppliers ?? []).forEach((s) => {
+          if (s.status !== "booked") return;
+          const v = s.fromVendorId ? vendorMap.get(s.fromVendorId) : null;
+          if (v?.contact_phone) contacts.push({ label: v.name, phone: v.contact_phone, itemLabel: `${v.name} — ${s.category ?? "supplier"}` });
+        });
+        // Accommodation rooms with contact_phone (external lodges)
+        Object.entries(state.roomAssignments ?? {}).forEach(([rid, names]) => {
+          if (!names.length) return;
+          const r = accomMap.get(rid) as { name: string; contact_name?: string | null; contact_phone?: string | null } | undefined;
+          if (r?.contact_phone) contacts.push({ label: r.name, phone: r.contact_phone, contact_name: r.contact_name, itemLabel: `${r.name} (${names.length} guests)` });
+        });
+        if (!contacts.length) return null;
+        return (
+          <section className="vy-card space-y-3">
+            <div className="vy-eyebrow">Notify suppliers</div>
+            <h3 className="font-medium">WhatsApp the booked vendors</h3>
+            <p className="text-xs text-stone-500">
+              Click a row to open WhatsApp with a templated booking confirmation message. Reviewed before sending.
+            </p>
+            <ul className="space-y-1.5">
+              {contacts.map((c, i) => {
+                const msg = bookingNotificationMessage({
+                  venueName: venue.name,
+                  coupleNames: wedding.couple_names,
+                  weddingDate: wedding.wedding_date,
+                  itemLabel: c.itemLabel,
+                  contactName: c.contact_name ?? null,
+                });
+                const wa = whatsappUrl(c.phone, msg);
+                return (
+                  <li key={i} className="flex items-center justify-between gap-2 py-2 border-b border-stone-100 last:border-0">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{c.label}</div>
+                      <div className="text-xs text-stone-500">{c.phone}</div>
+                    </div>
+                    {wa ? (
+                      <a href={wa} target="_blank" rel="noopener noreferrer"
+                        className="rounded-full bg-emerald-600 text-white px-4 py-1.5 text-xs font-medium hover:bg-emerald-700 whitespace-nowrap">
+                        ↗ Message on WhatsApp
+                      </a>
+                    ) : (
+                      <span className="text-xs text-stone-400">Invalid phone</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })()}
 
       <WeddingDocuments weddingId={wedding.id} docs={docsRes.data ?? []} />
     </div>

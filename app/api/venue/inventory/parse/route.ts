@@ -47,7 +47,8 @@ Target schema fields (only these keys allowed in output): ${fieldList}
 Rules:
 - Be conservative: return null when no header is clearly the right match. Do not guess.
 - The output object MUST have every schema field as a key, with either the source header string or null as the value.
-- Match by meaning, not exact text. "Item", "Product" → "name". "Cost", "ZAR", "R" → "price". "Picture", "Photo" → "image_url".`;
+- Match by meaning, not exact text. "Item", "Product" → "name". "Cost", "ZAR", "R" → "price". "Picture", "Photo" → "image_url".
+- "Included", "Complimentary", "Free", "In package", "Extra", "Optional" → "cost_treatment" (we'll normalise yes/free to "included" and the rest to "extra" downstream).`;
 
     const userMsg = `Inventory type: ${type}
 Spreadsheet headers: ${JSON.stringify(headers)}

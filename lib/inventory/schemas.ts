@@ -67,11 +67,12 @@ export type FieldSpec = {
 const VENDOR_FIELDS: FieldSpec[] = [
   { key: "name", label: "Name", type: "string", required: true },
   { key: "description", label: "Description", type: "string" },
+  { key: "cost_treatment", label: "Included or Extra?", type: "select", options: ["included", "extra"], required: true },
   { key: "price_from", label: "Price from (R)", type: "number" },
   { key: "commission_type", label: "Commission type", type: "select", options: ["fixed", "percent"] },
   { key: "commission_value", label: "Commission (R or %)", type: "number" },
   { key: "contact_email", label: "Contact email", type: "string" },
-  { key: "contact_phone", label: "Contact phone", type: "string" },
+  { key: "contact_phone", label: "Phone (for WhatsApp)", type: "string" },
   { key: "website_url", label: "Website", type: "string" },
   { key: "image_url", label: "Image URL", type: "string" },
 ];
@@ -81,6 +82,7 @@ export const INVENTORY_FIELDS: Record<InventoryType, FieldSpec[]> = {
     { key: "category", label: "Category", type: "string", required: true },
     { key: "name", label: "Name", type: "string", required: true },
     { key: "description", label: "Description", type: "string" },
+    { key: "cost_treatment", label: "Included or Extra?", type: "select", options: ["included", "extra"], required: true },
     { key: "price", label: "Price (R)", type: "number" },
     { key: "price_unit", label: "Unit", type: "select", options: ["fixed", "per_person", "per_hour"] },
     { key: "commission_type", label: "Commission type", type: "select", options: ["fixed", "percent"] },
@@ -91,6 +93,7 @@ export const INVENTORY_FIELDS: Record<InventoryType, FieldSpec[]> = {
     { key: "category", label: "Category", type: "string", required: true },
     { key: "name", label: "Name", type: "string", required: true },
     { key: "description", label: "Description", type: "string" },
+    { key: "cost_treatment", label: "Included or Extra?", type: "select", options: ["included", "extra"], required: true },
     { key: "price", label: "Price (R)", type: "number" },
     { key: "stock_total", label: "Stock", type: "number" },
     { key: "commission_type", label: "Commission type", type: "select", options: ["fixed", "percent"] },
@@ -101,8 +104,14 @@ export const INVENTORY_FIELDS: Record<InventoryType, FieldSpec[]> = {
     { key: "name", label: "Name", type: "string", required: true },
     { key: "room_type", label: "Type", type: "string" },
     { key: "sleeps", label: "Sleeps", type: "number" },
+    { key: "cost_treatment", label: "Included or Extra?", type: "select", options: ["included", "extra"], required: true },
     { key: "price_per_night", label: "Price / night (R)", type: "number" },
     { key: "description", label: "Description", type: "string" },
+    { key: "contact_name", label: "Contact name", type: "string" },
+    { key: "contact_phone", label: "Phone (for WhatsApp)", type: "string" },
+    { key: "contact_email", label: "Email", type: "string" },
+    { key: "website_url", label: "Website", type: "string" },
+    { key: "address", label: "Address", type: "string" },
     { key: "commission_type", label: "Commission type", type: "select", options: ["fixed", "percent"] },
     { key: "commission_value", label: "Commission (R or %)", type: "number" },
     { key: "image_url", label: "Image URL", type: "string" },
@@ -118,11 +127,11 @@ export const INVENTORY_FIELDS: Record<InventoryType, FieldSpec[]> = {
 
 export function defaultsFor(type: InventoryType): Record<string, unknown> {
   switch (type) {
-    case "catalogue": return { price_unit: "fixed", active: true, commission_type: "fixed", commission_value: 0 };
-    case "rentals":   return { stock_total: 1, active: true, commission_type: "fixed", commission_value: 0 };
-    case "accommodation": return { sleeps: 2, active: true, commission_type: "fixed", commission_value: 0 };
+    case "catalogue": return { price_unit: "fixed", active: true, commission_type: "fixed", commission_value: 0, cost_treatment: "extra" };
+    case "rentals":   return { stock_total: 1, active: true, commission_type: "fixed", commission_value: 0, cost_treatment: "extra" };
+    case "accommodation": return { sleeps: 2, active: true, commission_type: "fixed", commission_value: 0, cost_treatment: "extra" };
     default:
-      if (isVendorType(type)) return { active: true, vendor_type: VENDOR_DB_VALUE[type], commission_type: "fixed", commission_value: 0 };
+      if (isVendorType(type)) return { active: true, vendor_type: VENDOR_DB_VALUE[type], commission_type: "fixed", commission_value: 0, cost_treatment: "extra" };
       return { active: true };
   }
 }
