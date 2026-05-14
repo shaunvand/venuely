@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { extractText, getDocumentProxy } from "unpdf";
 import Anthropic from "@anthropic-ai/sdk";
 import { INVENTORY_FIELDS, type InventoryType } from "@/lib/inventory/schemas";
+import { extractXlsxImages, type ExtractedImage } from "@/lib/imports/extract-images";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -117,7 +118,9 @@ export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
     const files = form.getAll("files") as File[];
+    const venueId = (form.get("venue_id") as string || "").trim();
     if (!files.length) return NextResponse.json({ error: "No files" }, { status: 400 });
+    if (!venueId) return NextResponse.json({ error: "Missing venue_id" }, { status: 400 });
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return NextResponse.json({ error: "ANTHROPIC_API_KEY not set" }, { status: 500 });
@@ -125,8 +128,24 @@ export async function POST(req: NextRequest) {
 
     const validCategories = new Set(Object.keys(INVENTORY_FIELDS)) as Set<InventoryType>;
 
-    // Extract every file in parallel.
-    const extracts = await Promise.all(files.filter((f) => f && typeof f !== "string").map(extractFile));
+    // Extract text from every file + pull embedded images from xlsx in parallel.
+    const filtered = files.filter((f) => f && typeof f !== "string");
+    const extracts = await Promise.all(filtered.map(extractFile));
+    const imageBatches = await Promise.all(filtered.map(async (f) => {
+      const ext = (f.name.toLowerCase().split(".").pop() || "");
+      if (ext !== "xlsx" && ext !== "xls") return [] as ExtractedImage[];
+      try {
+        const buf = Buffer.from(await f.arrayBuffer());
+        return await extractXlsxImages(buf, f.name, venueId);
+      } catch { return [] as ExtractedImage[]; }
+    }));
+    const allImages: ExtractedImage[] = imageBatches.flat();
+    const imagesByFile = new Map<string, ExtractedImage[]>();
+    allImages.forEach((img) => {
+      const list = imagesByFile.get(img.source_file) ?? [];
+      list.push(img);
+      imagesByFile.set(img.source_file, list);
+    });
 
     // Process files sequentially through Claude to avoid rate limits + token bursts.
     type FileReport = { filename: string; chars: number; items: number; status: string; error?: string };
@@ -144,9 +163,18 @@ export async function POST(req: NextRequest) {
       }
       try {
         const items = await parseWithClaude(client, ex.filename, ex.text);
-        const filtered = items.filter((it) => validCategories.has(it.category as InventoryType) && it.data?.name);
-        filtered.forEach((it) => allItems.push({ ...it, source_file: ex.filename }));
-        reports.push({ filename: ex.filename, chars: ex.chars, items: filtered.length, status: filtered.length ? "ok" : "nothing recognisable" });
+        const valid = items.filter((it) => validCategories.has(it.category as InventoryType) && it.data?.name);
+        const fileImages = imagesByFile.get(ex.filename) ?? [];
+        let imgIdx = 0;
+        valid.forEach((it) => {
+          if (!it.data.image_url && fileImages[imgIdx]) {
+            it.data.image_url = fileImages[imgIdx].url;
+            imgIdx++;
+          }
+          allItems.push({ ...it, source_file: ex.filename });
+        });
+        const imgNote = fileImages.length ? ` (+${fileImages.length} images)` : "";
+        reports.push({ filename: ex.filename, chars: ex.chars, items: valid.length, status: (valid.length ? "ok" : "nothing recognisable") + imgNote });
       } catch (e) {
         reports.push({ filename: ex.filename, chars: ex.chars, items: 0, status: "Claude error", error: e instanceof Error ? e.message : String(e) });
       }
@@ -168,6 +196,7 @@ export async function POST(req: NextRequest) {
       items,
       counts,
       files: reports,
+      images: allImages,
     });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });

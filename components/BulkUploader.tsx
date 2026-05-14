@@ -49,6 +49,7 @@ export function BulkUploader({ venueId }: { venueId: string }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
+  const [extractedImages, setExtractedImages] = useState<Array<{ url: string; source_file: string; ordinal: number }>>([]);
   const [fileReports, setFileReports] = useState<Array<{ filename: string; chars: number; items: number; status: string; error?: string }>>([]);
   const [filter, setFilter] = useState<string>("all");
   const [isPending, startTransition] = useTransition();
@@ -64,11 +65,13 @@ export function BulkUploader({ venueId }: { venueId: string }) {
     try {
       const fd = new FormData();
       files.forEach((f) => fd.append("files", f));
+      fd.append("venue_id", venueId);
       const res = await fetch("/api/venue/uploads/parse", { method: "POST", body: fd });
       const j = await res.json();
       if (!res.ok || !j.ok) { setMsg(`Failed: ${j.error ?? "unknown"}`); return; }
       setItems(j.items as Item[]);
       setFileReports(j.files ?? []);
+      setExtractedImages(j.images ?? []);
       const counts = Object.entries(j.counts as Record<string, number>).map(([k, v]) => `${v} ${CATEGORY_LABELS[k] ?? k}`).join(", ");
       setMsg(counts ? `Detected: ${counts}. Review below and confirm.` : "Nothing recognisable found — see per-file report below.");
     } catch (e) {
@@ -166,6 +169,20 @@ export function BulkUploader({ venueId }: { venueId: string }) {
         </details>
       )}
 
+      {extractedImages.length > 0 && (
+        <details className="border border-stone-200 rounded-lg p-3 bg-stone-50">
+          <summary className="cursor-pointer text-xs font-medium">{extractedImages.length} images extracted from your files (click to view)</summary>
+          <div className="mt-3 grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2">
+            {extractedImages.map((img) => (
+              <a key={img.url} href={img.url} target="_blank" rel="noopener noreferrer" title={`${img.source_file} #${img.ordinal + 1}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={img.url} alt="" className="aspect-square w-full object-cover rounded border border-stone-200 hover:border-stone-900 transition" />
+              </a>
+            ))}
+          </div>
+        </details>
+      )}
+
       {items.length > 0 && (
         <>
           <div className="flex gap-2 flex-wrap items-center border-t border-stone-200 pt-3">
@@ -186,6 +203,7 @@ export function BulkUploader({ venueId }: { venueId: string }) {
                 <tr>
                   <th className="px-2 py-2 w-8"></th>
                   <th className="px-2 py-2 text-left w-32">Category</th>
+                  <th className="px-2 py-2 text-left w-20">Image</th>
                   <th className="px-2 py-2 text-left">Fields</th>
                   <th className="px-2 py-2 text-left w-32">Source</th>
                 </tr>
@@ -204,6 +222,24 @@ export function BulkUploader({ venueId }: { venueId: string }) {
                           onChange={(e) => updateItem(it._id, { category: e.target.value })}
                           className="w-full border rounded-full px-2 py-1 text-xs">
                           {CATEGORY_LIST.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-2 py-2">
+                        {it.data.image_url ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={String(it.data.image_url)} alt="" className="h-14 w-14 rounded border border-stone-200 object-cover" />
+                        ) : (
+                          <div className="h-14 w-14 rounded border border-dashed border-stone-300 bg-stone-50 flex items-center justify-center text-stone-400 text-[10px]">none</div>
+                        )}
+                        <select value=""
+                          onChange={(e) => { if (e.target.value) updateField(it._id, "image_url", e.target.value); }}
+                          className="mt-1 w-20 border rounded-full px-1 py-0.5 text-[10px] bg-white">
+                          <option value="">pick…</option>
+                          {extractedImages.map((img) => (
+                            <option key={img.url} value={img.url}>
+                              {img.source_file.slice(0, 14)}…/#{img.ordinal + 1}
+                            </option>
+                          ))}
                         </select>
                       </td>
                       <td className="px-2 py-2">
