@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useTransition } from "react";
-import { bulkDelete, bulkSetActive, bulkSetPrice, updateItem, bulkInsert, addItem } from "@/app/venue/_inventory/actions";
+import { bulkDelete, bulkSetActive, bulkSetPrice, bulkSetCommission, bulkSetCostTreatment, updateItem, bulkInsert, addItem } from "@/app/venue/_inventory/actions";
 import type { InventoryType } from "@/lib/inventory/schemas";
 
 type Field = { key: string; label: string; type: "string" | "number" | "select"; options: string[] | null; required?: boolean };
@@ -36,6 +36,8 @@ export function InventoryManager({
   const [uploadingImg, setUploadingImg] = useState(false);
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
   const [bulkPrice, setBulkPrice] = useState("");
+  const [bulkCommission, setBulkCommission] = useState("");
+  const [bulkCommissionType, setBulkCommissionType] = useState<"fixed" | "percent">("percent");
   const [isPending, startTransition] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -126,6 +128,17 @@ export function InventoryManager({
     const ids = Array.from(selected);
     startTransition(async () => { await bulkSetPrice(type, ids, n); setBulkPrice(""); });
   }
+  function doBulkCommission() {
+    const n = Number(bulkCommission);
+    if (!Number.isFinite(n) || !selected.size) return;
+    const ids = Array.from(selected);
+    startTransition(async () => { await bulkSetCommission(type, ids, n, bulkCommissionType); setBulkCommission(""); });
+  }
+  function doBulkCostTreatment(treatment: "included" | "extra") {
+    if (!selected.size) return;
+    const ids = Array.from(selected);
+    startTransition(async () => { await bulkSetCostTreatment(type, ids, treatment); });
+  }
   async function deleteSingle(id: string) {
     if (!confirm("Delete this item?")) return;
     startTransition(async () => { await bulkDelete(type, [id]); });
@@ -209,6 +222,21 @@ export function InventoryManager({
               value={bulkPrice} onChange={(e) => setBulkPrice(e.target.value)}
               className="w-24 border rounded-full px-3 py-1.5 text-sm" />
             <button disabled={!bulkPrice || isPending} onClick={doBulkPrice} className={BUBBLE_SECONDARY}>Set price</button>
+          </div>
+          <div className="flex gap-1 items-center">
+            <input type="number" step="0.01" placeholder={bulkCommissionType === "percent" ? "%" : "R"}
+              value={bulkCommission} onChange={(e) => setBulkCommission(e.target.value)}
+              className="w-20 border rounded-full px-3 py-1.5 text-sm" />
+            <select value={bulkCommissionType} onChange={(e) => setBulkCommissionType(e.target.value as "fixed" | "percent")}
+              className="border rounded-full px-2 py-1.5 text-sm bg-white">
+              <option value="percent">%</option>
+              <option value="fixed">R fixed</option>
+            </select>
+            <button disabled={!bulkCommission || isPending} onClick={doBulkCommission} className={BUBBLE_SECONDARY}>Set commission</button>
+          </div>
+          <div className="flex gap-1 items-center">
+            <button disabled={isPending} onClick={() => doBulkCostTreatment("included")} className={BUBBLE_GHOST}>Mark included</button>
+            <button disabled={isPending} onClick={() => doBulkCostTreatment("extra")} className={BUBBLE_GHOST}>Mark extra</button>
           </div>
           <button disabled={isPending} onClick={doBulkDelete} className={BUBBLE_DANGER}>Delete</button>
           <button disabled={isPending} onClick={() => setSelected(new Set())} className={BUBBLE_GHOST}>Clear</button>

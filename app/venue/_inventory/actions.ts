@@ -32,6 +32,24 @@ export async function bulkSetPrice(type: InventoryType, ids: string[], price: nu
   revalidatePath(INVENTORY_PATHS[type]);
 }
 
+export async function bulkSetCommission(type: InventoryType, ids: string[], value: number, commissionType: "fixed" | "percent") {
+  if (!ids.length || !Number.isFinite(value)) return;
+  const supabase = await client();
+  await supabase.from(INVENTORY_TABLES[type])
+    .update({ commission_value: value, commission_type: commissionType })
+    .in("id", ids);
+  revalidatePath(INVENTORY_PATHS[type]);
+}
+
+export async function bulkSetCostTreatment(type: InventoryType, ids: string[], treatment: "included" | "extra") {
+  if (!ids.length) return;
+  const supabase = await client();
+  await supabase.from(INVENTORY_TABLES[type])
+    .update({ cost_treatment: treatment })
+    .in("id", ids);
+  revalidatePath(INVENTORY_PATHS[type]);
+}
+
 export async function updateItem(type: InventoryType, id: string, patch: Record<string, unknown>) {
   const supabase = await client();
   const safe: Record<string, unknown> = {};
