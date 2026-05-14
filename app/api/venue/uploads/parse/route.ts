@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
-import * as pdfParseModule from "pdf-parse";
+import { extractText, getDocumentProxy } from "unpdf";
 import Anthropic from "@anthropic-ai/sdk";
 import { INVENTORY_FIELDS, type InventoryType } from "@/lib/inventory/schemas";
-
-const pdfParse = (pdfParseModule as unknown as { default?: (b: Buffer) => Promise<{ text: string }> }).default
-  ?? (pdfParseModule as unknown as (b: Buffer) => Promise<{ text: string }>);
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -18,8 +15,10 @@ async function extractFile(file: File): Promise<Extract> {
   const buf = Buffer.from(await file.arrayBuffer());
   try {
     if (ext === "pdf") {
-      const out = await pdfParse(buf);
-      return { filename: name, kind: "pdf", text: out.text ?? "", chars: (out.text ?? "").length };
+      const pdf = await getDocumentProxy(new Uint8Array(buf));
+      const out = await extractText(pdf, { mergePages: true });
+      const text = Array.isArray(out.text) ? out.text.join("\n") : (out.text ?? "");
+      return { filename: name, kind: "pdf", text, chars: text.length };
     }
     if (ext === "xlsx" || ext === "xls") {
       const wb = XLSX.read(buf, { type: "buffer" });
