@@ -46,6 +46,8 @@ export async function createWedding(venueId: string, _venueSlug: string, formDat
   const slug = await uniqueSlug(supabase, base);
 
   const guestStr = formData.get("guest_count") as string;
+  const statusStr = (formData.get("status") as string)?.trim() || "inquiry";
+  const passwordStr = (formData.get("portal_password") as string)?.trim() || "";
   const { data, error } = await supabase
     .from("weddings")
     .insert({
@@ -54,6 +56,8 @@ export async function createWedding(venueId: string, _venueSlug: string, formDat
       couple_names: couples,
       wedding_date: (formData.get("wedding_date") as string) || null,
       guest_count: guestStr ? Number(guestStr) : null,
+      status: statusStr,
+      portal_password_hash: passwordStr ? hashPassword(passwordStr) : null,
     })
     .select("slug")
     .single();

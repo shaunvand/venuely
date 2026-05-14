@@ -45,7 +45,21 @@ export default async function VenueWeddings() {
           <label className="vy-label">Date</label>
           <input name="wedding_date" type="date" className="vy-input" />
         </div>
-        <div className="md:col-span-5 flex items-end">
+        <div className="md:col-span-2 space-y-1">
+          <label className="vy-label">Status</label>
+          <select name="status" defaultValue="inquiry" className="vy-select">
+            <option value="inquiry">inquiry</option>
+            <option value="provisional">provisional</option>
+            <option value="booked">booked</option>
+            <option value="completed">completed</option>
+            <option value="cancelled">cancelled</option>
+          </select>
+        </div>
+        <div className="md:col-span-3 space-y-1">
+          <label className="vy-label">Portal password (optional)</label>
+          <input name="portal_password" type="text" placeholder="Leave blank for Supabase login access" className="vy-input" autoComplete="off" />
+        </div>
+        <div className="md:col-span-6 flex justify-end">
           <button className="vy-btn vy-btn-primary">+ Add wedding</button>
         </div>
       </form>
