@@ -210,17 +210,21 @@ export async function POST(req: NextRequest) {
     const needSearch: number[] = [];
     allItems.forEach((it, i) => { if (!it.data.image_url) needSearch.push(i); });
     if (needSearch.length) {
-      const queries = needSearch.map((i) => {
+      // Build short, generic Unsplash queries — name first; fallback to category if no result.
+      const results = await mapWithConcurrency(needSearch, 4, async (i) => {
         const it = allItems[i];
-        const parts = [
-          String(it.data.name ?? ""),
-          String(it.data.description ?? ""),
-          it.category,
-          "wedding",
-        ].filter((s) => s && s.trim());
-        return parts.join(" ");
+        const name = String(it.data.name ?? "").trim().slice(0, 50);
+        if (name) {
+          const hit = await searchOneImage(name);
+          if (hit) return hit;
+        }
+        // Fall back to a generic category term ("rentals" → "wedding rentals", etc.)
+        const fallback = it.category === "accommodation" ? "wedding accommodation"
+          : it.category === "catalogue" ? "wedding catering"
+          : it.category === "rentals" ? "wedding decor"
+          : `wedding ${it.category}`;
+        return await searchOneImage(fallback);
       });
-      const results = await mapWithConcurrency(queries, 4, (q) => searchOneImage(q));
       results.forEach((url, k) => {
         if (!url) return;
         const it = allItems[needSearch[k]];

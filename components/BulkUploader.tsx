@@ -87,9 +87,9 @@ export function BulkUploader({ venueId }: { venueId: string }) {
   async function findOnline(itemId: number) {
     const it = items.find((x) => x._id === itemId);
     if (!it) return;
-    const name = String(it.data.name ?? "").trim();
-    const desc = String(it.data.description ?? "").trim();
-    const query = [name, desc].filter(Boolean).join(" ").slice(0, 120) || "wedding venue";
+    // Use just the item name — Unsplash works best with short generic terms.
+    // User can edit the query in the drawer if they want.
+    const query = String(it.data.name ?? "").trim().slice(0, 60) || "wedding venue";
     setSearchOpen({ itemId, query, results: [], busy: true, err: null });
     try {
       const res = await fetch("/api/venue/image-search", {
