@@ -51,7 +51,7 @@ export function BulkUploader({ venueId }: { venueId: string }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [extractedImages, setExtractedImages] = useState<Array<{ url: string; source_file: string; ordinal: number }>>([]);
-  const [searchOpen, setSearchOpen] = useState<{ itemId: number; query: string; results: Array<{ url: string; thumb: string; alt: string; attribution: string }>; busy: boolean; err: string | null } | null>(null);
+  const [searchOpen, setSearchOpen] = useState<{ itemId: number; query: string; results: Array<{ url: string; thumb: string; alt: string; photographer_name: string; photographer_profile_url: string; unsplash_url: string; download_location: string }>; busy: boolean; err: string | null } | null>(null);
   const [fileReports, setFileReports] = useState<Array<{ filename: string; chars: number; items: number; status: string; error?: string }>>([]);
   const [filter, setFilter] = useState<string>("all");
   const [isPending, startTransition] = useTransition();
@@ -356,18 +356,38 @@ export function BulkUploader({ venueId }: { venueId: string }) {
               )}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {searchOpen.results.map((r) => (
-                  <button key={r.url} onClick={() => {
-                    updateField(searchOpen.itemId, "image_url", r.url);
-                    setSearchOpen(null);
-                  }} className="text-left group">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={r.thumb} alt={r.alt} className="aspect-[4/3] w-full object-cover rounded-lg border border-stone-200 group-hover:border-stone-900 transition" />
-                    <div className="text-[10px] text-stone-500 mt-1 truncate">📷 {r.attribution}</div>
-                  </button>
+                  <div key={r.url} className="space-y-1">
+                    <button onClick={() => {
+                      updateField(searchOpen.itemId, "image_url", r.url);
+                      if (r.download_location) {
+                        fetch("/api/venue/image-track-download", {
+                          method: "POST",
+                          headers: { "content-type": "application/json" },
+                          body: JSON.stringify({ download_location: r.download_location }),
+                        }).catch(() => {});
+                      }
+                      setSearchOpen(null);
+                    }} className="block w-full text-left group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={r.thumb} alt={r.alt} className="aspect-[4/3] w-full object-cover rounded-lg border border-stone-200 group-hover:border-stone-900 transition" />
+                    </button>
+                    <div className="text-[10px] text-stone-500 leading-tight">
+                      Photo by{" "}
+                      <a href={r.photographer_profile_url} target="_blank" rel="noopener noreferrer" className="underline hover:text-stone-900">
+                        {r.photographer_name}
+                      </a>{" "}
+                      on{" "}
+                      <a href={r.unsplash_url} target="_blank" rel="noopener noreferrer" className="underline hover:text-stone-900">
+                        Unsplash
+                      </a>
+                    </div>
+                  </div>
                 ))}
               </div>
               <p className="text-[10px] text-stone-500 pt-2 border-t border-stone-200">
-                Images from Unsplash. Licence-free for commercial use. Attribution shown.
+                Images hotlinked from <a href="https://unsplash.com/?utm_source=venuely&utm_medium=referral" target="_blank" rel="noopener noreferrer" className="underline">Unsplash</a>.
+                Free for commercial use under the <a href="https://unsplash.com/license" target="_blank" rel="noopener noreferrer" className="underline">Unsplash License</a>.
+                Photographer attribution shown above each image.
               </p>
             </div>
           </div>

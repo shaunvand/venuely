@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-// Search Unsplash for an image matching the item's name + description.
-// Returns up to 8 candidate URLs. Falls back to a clear error if no key set.
+const UTM = "?utm_source=venuely&utm_medium=referral";
+
 export async function POST(req: NextRequest) {
   try {
     const { query } = await req.json();
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const key = process.env.UNSPLASH_ACCESS_KEY;
     if (!key) {
       return NextResponse.json({
-        error: "UNSPLASH_ACCESS_KEY not configured on Render. Sign up at https://unsplash.com/developers (free), then add the env var.",
+        error: "UNSPLASH_ACCESS_KEY not configured on Render.",
       }, { status: 503 });
     }
 
@@ -28,14 +28,25 @@ export async function POST(req: NextRequest) {
     });
     if (!res.ok) {
       const txt = await res.text();
-      return NextResponse.json({ error: `Unsplash ${res.status}: ${txt.slice(0, 200)}` }, { status: 502 });
+      return NextResponse.json({ error: `Unsplash ${res.status}: ${txt.slice(0, 200)}` }, { status: res.status === 403 ? 429 : 502 });
     }
     const data = await res.json();
-    const results = (data.results || []).map((r: { urls: { regular: string; thumb: string }; alt_description?: string; user: { name: string } }) => ({
+    const results = (data.results || []).map((r: {
+      id: string;
+      urls: { regular: string; thumb: string };
+      alt_description?: string;
+      links?: { html?: string; download_location?: string };
+      user: { name: string; username: string; links?: { html?: string } };
+    }) => ({
+      id: r.id,
       url: r.urls.regular,
       thumb: r.urls.thumb,
       alt: r.alt_description ?? "",
-      attribution: r.user?.name ?? "",
+      photographer_name: r.user.name,
+      photographer_username: r.user.username,
+      photographer_profile_url: `https://unsplash.com/@${r.user.username}${UTM}`,
+      unsplash_url: r.links?.html ? `${r.links.html}${UTM}` : `https://unsplash.com${UTM}`,
+      download_location: r.links?.download_location ?? "",
     }));
 
     return NextResponse.json({ ok: true, results });
