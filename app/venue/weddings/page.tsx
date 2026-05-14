@@ -1,14 +1,20 @@
-import Link from "next/link";
+import { headers } from "next/headers";
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
-import { createWedding } from "./actions";
+import { createWedding, setPortalPassword, markCouplePaid } from "./actions";
+import { WeddingRowActions } from "@/components/WeddingRowActions";
 
 export default async function VenueWeddings() {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
+  const h = await headers();
+  const host = h.get("host") ?? "venuely.co.za";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const base = `${proto}://${host}`;
+
   const { data: weddings } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, guest_count, status")
+    .select("id, slug, couple_names, wedding_date, guest_count, status, portal_password_hash, invoiced_at, couple_paid_at, platform_fee_owed, platform_fee_paid_at")
     .eq("venue_id", venue.id)
     .order("wedding_date", { ascending: false });
 
@@ -56,23 +62,39 @@ export default async function VenueWeddings() {
                 <th>Guests</th>
                 <th>Status</th>
                 <th>Portal URL</th>
-                <th></th>
+                <th>Fee</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {weddings.map((w) => (
-                <tr key={w.id}>
-                  <td><div className="font-medium">{w.couple_names}</div></td>
-                  <td>{w.wedding_date ?? "—"}</td>
-                  <td>{w.guest_count ?? "—"}</td>
-                  <td><span className="vy-tag vy-tag-soft">{w.status}</span></td>
-                  <td className="font-mono text-xs text-stone-500">/{w.slug}</td>
-                  <td className="text-right whitespace-nowrap">
-                    <Link href={`/venue/weddings/${w.slug}`} className="vy-btn vy-btn-secondary mr-1">Manage</Link>
-                    <Link href={`/${w.slug}`} className="vy-btn vy-btn-primary">Open portal →</Link>
-                  </td>
-                </tr>
-              ))}
+              {weddings.map((w) => {
+                const portalUrl = `${base}/${w.slug}`;
+                return (
+                  <tr key={w.id} className="align-top">
+                    <td><div className="font-medium">{w.couple_names}</div></td>
+                    <td>{w.wedding_date ?? "—"}</td>
+                    <td>{w.guest_count ?? "—"}</td>
+                    <td><span className="vy-tag vy-tag-soft">{w.status}</span></td>
+                    <td className="font-mono text-xs text-stone-500 max-w-[180px] truncate" title={portalUrl}>{portalUrl}</td>
+                    <td className="text-xs">
+                      {w.platform_fee_paid_at ? <span className="text-emerald-700">✓ settled</span>
+                        : w.platform_fee_owed ? <span className="text-amber-700">R{Number(w.platform_fee_owed).toLocaleString()}</span>
+                        : <span className="text-stone-400">—</span>}
+                    </td>
+                    <td className="text-right whitespace-nowrap">
+                      <WeddingRowActions
+                        portalUrl={portalUrl}
+                        slug={w.slug}
+                        passwordSet={!!w.portal_password_hash}
+                        invoicedAt={w.invoiced_at}
+                        couplePaidAt={w.couple_paid_at}
+                        setPasswordAction={setPortalPassword.bind(null, w.id, w.slug)}
+                        markCouplePaidAction={markCouplePaid.bind(null, w.id, w.slug)}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
