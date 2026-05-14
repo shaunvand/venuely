@@ -1,0 +1,218 @@
+"use client";
+
+import { useRef, useState, useTransition } from "react";
+
+type Item = {
+  _id: number;
+  _include: boolean;
+  category: string;
+  source_file: string | null;
+  data: Record<string, unknown>;
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  catalogue: "Catalogue",
+  rentals: "Rentals",
+  accommodation: "Accommodation",
+  caterers: "Caterers",
+  planners: "Planners",
+  florists: "Florists",
+  djs: "DJs",
+  photographers: "Photographers",
+  decor: "Decor",
+  bar: "Bar services",
+};
+
+const CATEGORY_LIST = Object.keys(CATEGORY_LABELS);
+
+const FIELDS_BY_CATEGORY: Record<string, string[]> = {
+  catalogue: ["category", "name", "description", "price", "price_unit"],
+  rentals: ["category", "name", "description", "price", "stock_total"],
+  accommodation: ["name", "room_type", "sleeps", "price_per_night", "description"],
+  caterers: ["name", "description", "price_from", "contact_email", "contact_phone", "website_url"],
+  planners: ["name", "description", "price_from", "contact_email", "contact_phone", "website_url"],
+  florists: ["name", "description", "price_from", "contact_email", "contact_phone", "website_url"],
+  djs: ["name", "description", "price_from", "contact_email", "contact_phone", "website_url"],
+  photographers: ["name", "description", "price_from", "contact_email", "contact_phone", "website_url"],
+  decor: ["name", "description", "price_from", "contact_email", "contact_phone", "website_url"],
+  bar: ["name", "description", "price_from", "contact_email", "contact_phone", "website_url"],
+};
+
+const BUBBLE = "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition";
+const BUBBLE_PRIMARY = `${BUBBLE} bg-stone-900 text-white hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed`;
+const BUBBLE_SECONDARY = `${BUBBLE} bg-white border border-stone-300 text-stone-800 hover:bg-stone-100`;
+const BUBBLE_GHOST = `${BUBBLE} text-stone-700 hover:bg-stone-100`;
+
+export function BulkUploader({ venueId }: { venueId: string }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
+  const [filter, setFilter] = useState<string>("all");
+  const [isPending, startTransition] = useTransition();
+
+  function pickFiles(list: FileList | null) {
+    if (!list) return;
+    setFiles(Array.from(list));
+  }
+
+  async function parse() {
+    if (!files.length) return;
+    setBusy(true); setMsg("Reading & extracting documents…"); setItems([]);
+    try {
+      const fd = new FormData();
+      files.forEach((f) => fd.append("files", f));
+      const res = await fetch("/api/venue/uploads/parse", { method: "POST", body: fd });
+      const j = await res.json();
+      if (!res.ok || !j.ok) { setMsg(`Failed: ${j.error ?? "unknown"}`); return; }
+      setItems(j.items as Item[]);
+      const counts = Object.entries(j.counts as Record<string, number>).map(([k, v]) => `${v} ${CATEGORY_LABELS[k] ?? k}`).join(", ");
+      setMsg(counts ? `Detected: ${counts}. Review below and confirm.` : "Nothing recognisable found in those files.");
+    } catch (e) {
+      setMsg(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally { setBusy(false); }
+  }
+
+  function updateItem(id: number, patch: Partial<Item>) {
+    setItems((curr) => curr.map((it) => it._id === id ? { ...it, ...patch } : it));
+  }
+  function updateField(id: number, key: string, value: string) {
+    setItems((curr) => curr.map((it) => it._id === id ? { ...it, data: { ...it.data, [key]: value } } : it));
+  }
+
+  function commit() {
+    const payload = items.filter((it) => it._include && it.data?.name).map((it) => ({
+      category: it.category,
+      data: Object.fromEntries(Object.entries(it.data).map(([k, v]) => {
+        const numeric = ["price", "price_per_night", "price_from", "stock_total", "sleeps"];
+        if (numeric.includes(k) && v !== "" && v != null) return [k, Number(v)];
+        return [k, v];
+      })),
+    }));
+    if (!payload.length) { setMsg("Nothing selected to import."); return; }
+    setMsg(`Importing ${payload.length} item(s)…`);
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/venue/uploads/commit", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ venue_id: venueId, items: payload }),
+        });
+        const j = await res.json();
+        if (!res.ok || !j.ok) { setMsg(`Failed: ${j.error ?? "unknown"}`); return; }
+        const lines = Object.entries(j.summary as Record<string, number>).map(([k, v]) => `${v} → ${CATEGORY_LABELS[k] ?? k}`);
+        setMsg(`Imported: ${lines.join(", ")}.`);
+        setItems([]); setFiles([]); if (fileRef.current) fileRef.current.value = "";
+      } catch (e) {
+        setMsg(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    });
+  }
+
+  const visible = filter === "all" ? items : items.filter((it) => it.category === filter);
+  const includedCount = items.filter((it) => it._include).length;
+
+  return (
+    <div className="vy-card space-y-4">
+      <div className="flex gap-2 items-center flex-wrap">
+        <label className={BUBBLE_SECONDARY + " cursor-pointer"}>
+          Choose files (PDF / Excel / CSV)
+          <input ref={fileRef} type="file" multiple accept=".pdf,.xlsx,.xls,.csv,.txt"
+            onChange={(e) => pickFiles(e.target.files)}
+            className="hidden" />
+        </label>
+        <button disabled={!files.length || busy} onClick={parse} className={BUBBLE_PRIMARY}>
+          {busy ? "Parsing…" : `Parse ${files.length || "no"} file${files.length === 1 ? "" : "s"}`}
+        </button>
+      </div>
+
+      {files.length > 0 && (
+        <div className="text-xs text-stone-600 flex gap-2 flex-wrap">
+          {files.map((f, i) => (
+            <span key={i} className="px-2 py-1 rounded-full bg-stone-100 border border-stone-200">{f.name} <span className="text-stone-400">· {(f.size/1024).toFixed(0)}kB</span></span>
+          ))}
+        </div>
+      )}
+
+      {busy && (
+        <div className="h-1.5 w-full overflow-hidden rounded bg-stone-200">
+          <div className="h-full w-1/3 animate-[vyImportBar_1.1s_ease-in-out_infinite] rounded bg-stone-900" />
+        </div>
+      )}
+
+      {msg && <p className="text-sm text-stone-700">{msg}</p>}
+
+      {items.length > 0 && (
+        <>
+          <div className="flex gap-2 flex-wrap items-center border-t border-stone-200 pt-3">
+            <button onClick={() => setFilter("all")} className={`${filter === "all" ? "bg-stone-900 text-white" : "bg-white border border-stone-300"} rounded-full px-3 py-1 text-xs`}>All ({items.length})</button>
+            {CATEGORY_LIST.filter((c) => items.some((i) => i.category === c)).map((c) => {
+              const n = items.filter((i) => i.category === c).length;
+              return (
+                <button key={c} onClick={() => setFilter(c)} className={`${filter === c ? "bg-stone-900 text-white" : "bg-white border border-stone-300"} rounded-full px-3 py-1 text-xs`}>
+                  {CATEGORY_LABELS[c]} ({n})
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="overflow-auto max-h-[60vh] border border-stone-200 rounded-lg">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-stone-50">
+                <tr>
+                  <th className="px-2 py-2 w-8"></th>
+                  <th className="px-2 py-2 text-left w-32">Category</th>
+                  <th className="px-2 py-2 text-left">Fields</th>
+                  <th className="px-2 py-2 text-left w-32">Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((it) => {
+                  const fields = FIELDS_BY_CATEGORY[it.category] ?? Object.keys(it.data);
+                  return (
+                    <tr key={it._id} className={`border-t ${it._include ? "" : "opacity-40"}`}>
+                      <td className="px-2 py-2">
+                        <input type="checkbox" checked={it._include}
+                          onChange={(e) => updateItem(it._id, { _include: e.target.checked })} />
+                      </td>
+                      <td className="px-2 py-2">
+                        <select value={it.category}
+                          onChange={(e) => updateItem(it._id, { category: e.target.value })}
+                          className="w-full border rounded-full px-2 py-1 text-xs">
+                          {CATEGORY_LIST.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className="grid grid-cols-2 gap-1">
+                          {fields.map((k) => (
+                            <input key={k}
+                              value={String(it.data[k] ?? "")}
+                              onChange={(e) => updateField(it._id, k, e.target.value)}
+                              placeholder={k}
+                              className="border rounded px-2 py-1 text-xs" />
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 text-stone-500 truncate max-w-[120px]" title={it.source_file ?? ""}>{it.source_file ?? "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <div className="flex gap-2">
+              <button onClick={() => setItems((c) => c.map((it) => ({ ...it, _include: true })))} className={BUBBLE_GHOST + " text-xs"}>Select all</button>
+              <button onClick={() => setItems((c) => c.map((it) => ({ ...it, _include: false })))} className={BUBBLE_GHOST + " text-xs"}>Select none</button>
+            </div>
+            <button disabled={isPending || !includedCount} onClick={commit} className={BUBBLE_PRIMARY}>
+              {isPending ? "Importing…" : `Import ${includedCount} item${includedCount === 1 ? "" : "s"}`}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
