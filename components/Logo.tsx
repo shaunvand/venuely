@@ -1,33 +1,16 @@
+// Venuely brand mark — "V." submark in a rounded square (Poppy on white,
+// or white on Poppy). Wordmark is "Venuely." with the signature period.
+
 export function Logo({ className = "" }: { className?: string }) {
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
-      <svg
-        width="28"
-        height="28"
-        viewBox="0 0 32 32"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
+      <LogoMark size={28} />
+      <span
+        className="text-xl font-bold tracking-tight"
+        style={{ color: "var(--poppy)", fontFamily: "'Cormorant Garamond', Georgia, serif" }}
       >
-        {/* Arch — animates in on first paint */}
-        <path
-          d="M5 28 L5 14 A11 11 0 0 1 27 14 L27 28"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          className="logo-arch"
-        />
-        {/* Two columns base */}
-        <circle cx="5" cy="28" r="1.6" fill="currentColor" />
-        <circle cx="27" cy="28" r="1.6" fill="currentColor" />
-        {/* Heart-leaf at the apex */}
-        <path
-          d="M16 11 C 14 8.5, 11 9, 11 11.5 C 11 13.5, 16 17, 16 17 C 16 17, 21 13.5, 21 11.5 C 21 9, 18 8.5, 16 11 Z"
-          fill="currentColor"
-          opacity="0.85"
-        />
-      </svg>
-      <span className="font-serif text-xl tracking-tight">Venuely</span>
+        Venuely<span style={{ color: "var(--poppy)" }}>.</span>
+      </span>
     </span>
   );
 }
@@ -37,25 +20,24 @@ export function LogoMark({ size = 64, className = "" }: { size?: number; classNa
     <svg
       width={size}
       height={size}
-      viewBox="0 0 32 32"
+      viewBox="0 0 64 64"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
-      aria-hidden="true"
+      aria-label="Venuely"
     >
-      <path
-        d="M5 28 L5 14 A11 11 0 0 1 27 14 L27 28"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <circle cx="5" cy="28" r="1.6" fill="currentColor" />
-      <circle cx="27" cy="28" r="1.6" fill="currentColor" />
-      <path
-        d="M16 11 C 14 8.5, 11 9, 11 11.5 C 11 13.5, 16 17, 16 17 C 16 17, 21 13.5, 21 11.5 C 21 9, 18 8.5, 16 11 Z"
-        fill="currentColor"
-        opacity="0.85"
-      />
+      <rect width="64" height="64" rx="16" fill="var(--poppy)" />
+      <text
+        x="32"
+        y="44"
+        textAnchor="middle"
+        fontFamily="'Cormorant Garamond', Georgia, serif"
+        fontSize="38"
+        fontWeight="700"
+        fill="#FFF6F0"
+      >
+        V.
+      </text>
     </svg>
   );
 }

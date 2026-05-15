@@ -1,21 +1,32 @@
 @import "tailwindcss";
 
 /* ────────────────────────────────────────────────────────────────────
-   Venuely design tokens — palette mirrors the original Pat Busch portal
-   (forest green / cream / gold) so admin + venue + couple surfaces all
-   feel like the same product family.
+   Venuely brand system — "Hosting, Handled."
+   Official palette: Poppy / Peach / Daisy / Sage / Leaf / Cream.
+   Applied to website + venue/admin dashboards. Couple portal keeps its
+   own custom templates and is intentionally NOT themed from here.
    ──────────────────────────────────────────────────────────────────── */
 :root {
-  --background: #fafaf9;
+  /* Brand palette */
+  --poppy:       #FA523C;   /* primary */
+  --poppy-deep:  #E03E28;   /* hover / pressed */
+  --peach:       #FFC6AD;
+  --daisy:       #FAF2E8;
+  --sage-2:      #D5DBCC;
+  --leaf:        #BFDAD3;
+  --cream:       #FFF6F0;
+
+  --background: #FFF6F0;
   --foreground: #1c1917;
 
-  --forest:      #2d4a3a;
-  --forest-deep: #1e3327;
-  --sage:        #5e7a6a;
-  --cream:       #f5efe6;
-  --gold:        #b8762a;
-  --gold-soft:   #c19a3b;
-  --bone:        #faf7f1;
+  /* Legacy token names remapped to the new brand so existing
+     vy-* classes and inline var() refs adopt the rebrand automatically. */
+  --forest:      #FA523C;   /* primary action / headings accent */
+  --forest-deep: #E03E28;
+  --sage:        #8a9a86;   /* readable sage for secondary text */
+  --gold:        #FA523C;   /* accent links → brand poppy */
+  --gold-soft:   #FFC6AD;
+  --bone:        #FFF6F0;
   --ink:         #1c1917;
   --ink-2:       #57534e;
   --line:        rgba(28, 25, 23, 0.10);
