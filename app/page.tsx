@@ -93,6 +93,7 @@ function Hero() {
       </div>
 
       <div className="relative z-10">
+        <LogoMark size={72} className="mx-auto mb-6 anim-fade-in" />
         <p className="text-xs uppercase tracking-[0.3em] text-stone-500 mb-6 anim-fade-in">
           For South African wedding venues
         </p>

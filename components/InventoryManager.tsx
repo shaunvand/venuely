@@ -297,14 +297,7 @@ export function InventoryManager({
                     <td className="py-2"><input type="checkbox" checked={selected.has(i.id)} onChange={(e) => toggle(i.id, e.target.checked)} /></td>
                     <td className="py-2">
                       {img ? (
-                        <button type="button" onClick={() => setZoomUrl(img)} className="relative block h-10 w-10">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={img}
-                            alt=""
-                            className="h-10 w-10 rounded border border-stone-200 object-cover origin-left transition-transform duration-200 hover:scale-[5] hover:z-50 hover:shadow-2xl hover:rounded-lg relative"
-                          />
-                        </button>
+                        <ZoomThumb img={img} onClick={() => setZoomUrl(img)} />
                       ) : (
                         <div className="h-10 w-10 rounded border border-dashed border-stone-300 bg-stone-50" />
                       )}
@@ -511,6 +504,32 @@ export function InventoryManager({
         </Lightbox>
       )}
     </div>
+  );
+}
+
+// 40×40 thumbnail. Hover state is driven by the FIXED-size wrapper, so the
+// enlarged (5×) image — which is pointer-events-none and overflows the cell —
+// never holds the hover open. Moving the pointer outside the original 40px
+// footprint collapses it instantly, even if still over the big image.
+function ZoomThumb({ img, onClick }: { img: string; onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="relative block h-10 w-10"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={img}
+        alt=""
+        className={`absolute left-0 top-0 h-10 w-10 rounded border border-stone-200 object-cover origin-left pointer-events-none transition-transform duration-200 ${
+          hovered ? "scale-[5] z-50 shadow-2xl rounded-lg" : "scale-100"
+        }`}
+      />
+    </button>
   );
 }
 
