@@ -807,7 +807,12 @@ function renderVenue() {
 
   const gallery = document.getElementById('venueGallery');
   const slots = 8;
-  let html = state.galleryImages.map((img, i) => `
+  const venueMedia = (window.VENUE_GALLERY || []);
+  let html = venueMedia.map(m => m.kind === 'video'
+    ? `<div class="gallery-slot"><video src="${m.src}" controls style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:2px 7px;border-radius:99px">${m.category || ''}</div></div>`
+    : `<div class="gallery-slot"><img src="${m.src}" alt=""><div style="position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:2px 7px;border-radius:99px">${m.category || ''}</div></div>`
+  ).join('');
+  html += state.galleryImages.map((img, i) => `
     <div class="gallery-slot">
       <img src="${img.src}" alt="">
       <div class="g-overlay">

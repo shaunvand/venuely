@@ -9,6 +9,7 @@ type Group = { label: string; items: Item[] };
 
 const TOP_LINKS: Item[] = [
   { href: "/venue", label: "Overview" },
+  { href: "/venue/your-venue", label: "Your Venue" },
   { href: "/venue/weddings", label: "Weddings" },
   { href: "/venue/uploads", label: "Smart Import" },
 ];

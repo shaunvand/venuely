@@ -139,11 +139,12 @@ export async function GET(
   const venueId = venue?.id;
 
   // Pull venue inventory in parallel.
-  const [{ data: catRaw }, { data: rentRaw }, { data: roomRaw }, { data: vendorRaw }] = await Promise.all([
+  const [{ data: catRaw }, { data: rentRaw }, { data: roomRaw }, { data: vendorRaw }, { data: galleryRaw }] = await Promise.all([
     supabase.from("catalogue_items").select("id, category, name, description, sort_order").eq("venue_id", venueId).eq("active", true).order("sort_order"),
     supabase.from("rental_items").select("id, category, name, description, price, stock_total, sort_order, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
     supabase.from("accommodation_rooms").select("id, name, room_type, sleeps, description, sort_order, price_per_night, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
     supabase.from("vendor_partners").select("id, vendor_type, name, description, contact_email, contact_phone, website_url, price_from, image_url, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
+    supabase.from("media_assets").select("url, label, kind, category, sort_order").eq("venue_id", venueId).eq("owner_type", "venue").in("kind", ["photo", "video", "hero"]).order("sort_order"),
   ]);
 
   const shaped = shapeForApp((catRaw ?? []) as Catalogue[], (rentRaw ?? []) as Rental[], (roomRaw ?? []) as Room[]);
@@ -169,6 +170,12 @@ export async function GET(
       price_from: vv.price_from == null ? null : applyMarkup(Number(vv.price_from), vv.commission_value as number | null, vv.commission_type as string | null),
     };
   }))};
+  window.VENUE_GALLERY = ${JSON.stringify(
+    (galleryRaw ?? []).map((g) => {
+      const gg = g as Record<string, unknown>;
+      return { src: gg.url, kind: gg.kind, category: gg.category ?? "Other", label: gg.label ?? "" };
+    })
+  )};
   window.WEDDING_INITIAL_STATE = ${JSON.stringify(wState)};
   window.WEDDING_USE_SERVER    = true;
 </script>
