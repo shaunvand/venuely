@@ -7,7 +7,7 @@ export function Logo({ className = "" }: { className?: string }) {
       <LogoMark size={28} />
       <span
         className="text-xl font-bold tracking-tight"
-        style={{ color: "var(--poppy)", fontFamily: "'Satoshi', -apple-system, sans-serif" }}
+        style={{ color: "var(--poppy)", fontFamily: "'Fraunces', Georgia, serif" }}
       >
         Venuely<span style={{ color: "var(--poppy)" }}>.</span>
       </span>
@@ -31,7 +31,7 @@ export function LogoMark({ size = 64, className = "" }: { size?: number; classNa
         x="32"
         y="44"
         textAnchor="middle"
-        fontFamily="'Satoshi', -apple-system, sans-serif"
+        fontFamily="'Fraunces', Georgia, serif"
         fontSize="38"
         fontWeight="700"
         fill="#FFF6F0"

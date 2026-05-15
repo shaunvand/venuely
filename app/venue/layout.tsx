@@ -10,7 +10,7 @@ export default async function VenueLayout({ children }: { children: React.ReactN
       <aside className="vy-sidebar w-64 p-5 flex flex-col">
         <Link href="/venue" className="flex items-center gap-2.5 mb-1.5">
           <LogoMark size={44} />
-          <span className="text-2xl font-bold tracking-tight" style={{ color: "var(--poppy)", fontFamily: "'Satoshi', -apple-system, sans-serif" }}>Venuely.</span>
+          <span className="text-2xl font-bold tracking-tight" style={{ color: "var(--poppy)", fontFamily: "'Fraunces', Georgia, serif" }}>Venuely.</span>
         </Link>
         <div className="text-[0.6rem] uppercase tracking-[0.22em] text-[color:var(--ink-2)] mb-5">Venue admin · Hosting, Handled.</div>
         <VenueSidebarNav />
