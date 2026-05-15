@@ -127,8 +127,36 @@ export async function extractXlsxImages(buf: Buffer, filename: string, venueId: 
   return out;
 }
 
-// PDF page-as-image rendering — defers heavy lifting. Returns empty array for now;
-// hook for future pdfjs-dist + @napi-rs/canvas integration.
-export async function extractPdfImages(_buf: Buffer, _filename: string, _venueId: string): Promise<ExtractedImage[]> {
-  return [];
+// Rasterise each PDF page to a PNG (layouts, maps, floor plans, venue photos)
+// and upload it so the smart importer can offer + auto-categorise them.
+const MAX_PDF_PAGES = 15;
+
+export async function extractPdfImages(buf: Buffer, filename: string, venueId: string): Promise<ExtractedImage[]> {
+  try {
+    const { getDocumentProxy, renderPageAsImage } = await import("unpdf");
+    const data = new Uint8Array(buf);
+    const pdf = await getDocumentProxy(data);
+    const pageCount = Math.min(pdf.numPages, MAX_PDF_PAGES);
+    const ad = admin();
+    const out: ExtractedImage[] = [];
+    for (let p = 1; p <= pageCount; p++) {
+      try {
+        const png = await renderPageAsImage(data, p, {
+          scale: 2,
+          canvasImport: () => import("@napi-rs/canvas") as never,
+        });
+        const pngBuf = Buffer.from(png);
+        if (pngBuf.length < 1000) continue; // blank page
+        const url = await uploadOne(ad, venueId, pngBuf, "png");
+        out.push({ url, source_file: filename, page: p, ordinal: p - 1 });
+      } catch (e) {
+        console.warn(`[image-extract] ${filename} p${p}: render failed — ${e instanceof Error ? e.message : e}`);
+      }
+    }
+    console.log(`[image-extract] ${filename}: rendered ${out.length}/${pdf.numPages} PDF pages`);
+    return out;
+  } catch (e) {
+    console.warn(`[image-extract] ${filename}: pdf render unavailable — ${e instanceof Error ? e.message : e}`);
+    return [];
+  }
 }
