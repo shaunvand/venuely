@@ -171,10 +171,12 @@ export async function GET(
     };
   }))};
   window.VENUE_GALLERY = ${JSON.stringify(
-    (galleryRaw ?? []).map((g) => {
-      const gg = g as Record<string, unknown>;
-      return { src: gg.url, kind: gg.kind, category: gg.category ?? "Other", label: gg.label ?? "" };
-    })
+    (galleryRaw ?? [])
+      .filter((g) => /\.(jpe?g|png|webp|gif|avif|heic|mp4|mov|webm|m4v)(\?|$)/i.test(String((g as Record<string, unknown>).url)))
+      .map((g) => {
+        const gg = g as Record<string, unknown>;
+        return { src: gg.url, kind: gg.kind, category: gg.category ?? "Other", label: gg.label ?? "" };
+      })
   )};
   window.WEDDING_INITIAL_STATE = ${JSON.stringify(wState)};
   window.WEDDING_USE_SERVER    = true;

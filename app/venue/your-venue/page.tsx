@@ -13,6 +13,9 @@ export default async function YourVenuePage() {
     .in("kind", ["photo", "video", "hero"])
     .order("sort_order");
 
+  const MEDIA_RE = /\.(jpe?g|png|webp|gif|avif|heic|mp4|mov|webm|m4v)(\?|$)/i;
+  const clean = (media ?? []).filter((m) => MEDIA_RE.test(String(m.url)));
+
   return (
     <div className="space-y-8">
       <header>
@@ -25,7 +28,7 @@ export default async function YourVenuePage() {
         </p>
       </header>
 
-      <YourVenueManager venueId={venue.id} items={(media ?? []) as never} />
+      <YourVenueManager venueId={venue.id} items={clean as never} />
     </div>
   );
 }

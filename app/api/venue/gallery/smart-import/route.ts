@@ -50,10 +50,11 @@ export async function POST(req: NextRequest) {
       .eq("owner_type", "venue");
     const have = new Set((existing ?? []).map((r) => r.url as string));
 
+    const IMG_RE = /\.(jpe?g|png|webp|gif|avif|heic)(\?|$)/i;
     const candidates = Array.from(
       new Map(
         (assets ?? [])
-          .filter((a) => a.url && !have.has(a.url as string))
+          .filter((a) => a.url && IMG_RE.test(a.url as string) && !have.has(a.url as string))
           .map((a) => [a.url as string, a])
       ).values()
     );
