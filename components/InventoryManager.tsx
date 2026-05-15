@@ -297,11 +297,15 @@ export function InventoryManager({
                     <td className="py-2"><input type="checkbox" checked={selected.has(i.id)} onChange={(e) => toggle(i.id, e.target.checked)} /></td>
                     <td className="py-2">
                       {img ? (
-                        <button type="button" onClick={() => setZoomUrl(img)} className="group relative block h-10 w-10">
+                        <button type="button" onClick={() => setZoomUrl(img)} className="group block h-10 w-10">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={img} alt="" className="h-10 w-10 rounded border border-stone-200 object-cover transition group-hover:scale-110 group-hover:shadow-md" />
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={img} alt="" className="hidden group-hover:block absolute left-12 top-1/2 -translate-y-1/2 h-40 w-40 rounded-lg border border-stone-200 object-cover shadow-xl z-20 bg-white" />
+                          <img src={img} alt="" className="h-10 w-10 rounded border border-stone-200 object-cover" />
+                          {/* Hover preview — fixed/centered so it escapes table clipping and never shifts other rows */}
+                          <span className="pointer-events-none fixed inset-0 z-50 hidden group-hover:flex items-center justify-center">
+                            <span className="absolute inset-0 bg-black/40" />
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={img} alt="" className="relative max-h-[80vh] max-w-[80vw] rounded-xl border border-white/20 object-contain shadow-2xl" />
+                          </span>
                         </button>
                       ) : (
                         <div className="h-10 w-10 rounded border border-dashed border-stone-300 bg-stone-50" />
