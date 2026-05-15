@@ -31,35 +31,41 @@ export default async function VenueRentals() {
         </p>
       </header>
 
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
+      <details open className="group">
+        <summary className="flex items-center gap-2 cursor-pointer list-none py-2">
+          <span className="text-[10px] transition-transform group-open:rotate-90">▶</span>
           <h2 className="text-lg font-semibold">Included in venue price</h2>
           <span className="vy-tag vy-tag-soft">{included.length}</span>
+        </summary>
+        <div className="mt-3">
+          <InventoryManager
+            type="rentals"
+            venueId={venue.id}
+            items={included}
+            fields={fields}
+            priceColumn="price"
+            showExtraColumns
+          />
         </div>
-        <InventoryManager
-          type="rentals"
-          venueId={venue.id}
-          items={included}
-          fields={fields}
-          priceColumn="price"
-          showExtraColumns
-        />
-      </section>
+      </details>
 
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
+      <details open className="group">
+        <summary className="flex items-center gap-2 cursor-pointer list-none py-2">
+          <span className="text-[10px] transition-transform group-open:rotate-90">▶</span>
           <h2 className="text-lg font-semibold">Paid extras</h2>
           <span className="vy-tag vy-tag-soft">{extras.length}</span>
+        </summary>
+        <div className="mt-3">
+          <InventoryManager
+            type="rentals"
+            venueId={venue.id}
+            items={extras}
+            fields={fields}
+            priceColumn="price"
+            showExtraColumns
+          />
         </div>
-        <InventoryManager
-          type="rentals"
-          venueId={venue.id}
-          items={extras}
-          fields={fields}
-          priceColumn="price"
-          showExtraColumns
-        />
-      </section>
+      </details>
     </div>
   );
 }

@@ -40,6 +40,18 @@ export function InventoryManager({
   const [bulkPrice, setBulkPrice] = useState("");
   const [bulkCommission, setBulkCommission] = useState("");
   const [bulkCommissionType, setBulkCommissionType] = useState<"fixed" | "percent">("percent");
+  const [query, setQuery] = useState("");
+
+  const displayed = query.trim()
+    ? items.filter((i) => {
+        const q = query.trim().toLowerCase();
+        return (
+          String(i.name ?? "").toLowerCase().includes(q) ||
+          String(i.category ?? "").toLowerCase().includes(q) ||
+          String(i.description ?? "").toLowerCase().includes(q)
+        );
+      })
+    : items;
   const [isPending, startTransition] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -198,9 +210,16 @@ export function InventoryManager({
       {/* Top action row */}
       <div className="flex gap-2 flex-wrap items-center justify-between">
         <div className="text-sm text-stone-600">
-          {items.length} item{items.length === 1 ? "" : "s"}
+          {query.trim() ? `${displayed.length} of ${items.length}` : items.length} item{items.length === 1 ? "" : "s"}
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search items…"
+            className="border rounded-full px-4 py-2 text-sm w-48 focus:w-64 transition-[width]"
+          />
           <button type="button" onClick={startAdd} className={BUBBLE_PRIMARY}>
             + Add item
           </button>
@@ -217,8 +236,8 @@ export function InventoryManager({
       {selected.size > 0 && (
         <div className="flex gap-2 flex-wrap items-center rounded-lg border border-stone-300 bg-stone-50 p-3">
           <span className="text-xs text-stone-700 font-medium">{selected.size} selected</span>
-          <button disabled={isPending} onClick={() => doBulkActive(true)} className={BUBBLE_GHOST}>Show</button>
-          <button disabled={isPending} onClick={() => doBulkActive(false)} className={BUBBLE_GHOST}>Hide</button>
+          <button disabled={isPending} onClick={() => doBulkActive(true)} className={BUBBLE_GHOST}>● Set active</button>
+          <button disabled={isPending} onClick={() => doBulkActive(false)} className={BUBBLE_GHOST}>○ Set not active</button>
           <div className="flex gap-1 items-center">
             <input type="number" step="0.01" placeholder="R"
               value={bulkPrice} onChange={(e) => setBulkPrice(e.target.value)}
@@ -248,6 +267,8 @@ export function InventoryManager({
       {/* Item list */}
       {items.length === 0 ? (
         <div className="vy-empty">Nothing here yet. Add your first above or use Smart import.</div>
+      ) : displayed.length === 0 ? (
+        <div className="vy-empty">No items match &ldquo;{query}&rdquo;.</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -269,7 +290,7 @@ export function InventoryManager({
               </tr>
             </thead>
             <tbody>
-              {items.map((i) => {
+              {displayed.map((i) => {
                 const img = i.image_url as string | undefined;
                 return (
                   <tr key={i.id} className="border-b border-stone-100 hover:bg-stone-50">
@@ -315,8 +336,15 @@ export function InventoryManager({
                       );
                     })()}
                     <td className="py-2">
-                      <button onClick={() => toggleActiveSingle(i.id, !i.active)} className={i.active ? "text-emerald-700 text-xs" : "text-stone-400 text-xs"}>
-                        {i.active ? "● Active" : "○ Hidden"}
+                      <button
+                        onClick={() => toggleActiveSingle(i.id, !i.active)}
+                        className={`rounded-full px-3 py-1 text-xs font-medium border transition ${
+                          i.active
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                            : "bg-stone-100 text-stone-500 border-stone-200 hover:bg-stone-200"
+                        }`}
+                      >
+                        {i.active ? "● Active" : "○ Not active"}
                       </button>
                     </td>
                     <td className="py-2 text-right">
