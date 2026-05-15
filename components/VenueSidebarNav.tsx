@@ -9,6 +9,13 @@ type Group = { label: string; items: Item[] };
 
 const GROUPS: Group[] = [
   {
+    label: "Get started",
+    items: [
+      { href: "/venue/weddings", label: "Weddings" },
+      { href: "/venue/uploads", label: "Smart Import" },
+    ],
+  },
+  {
     label: "Marketplace",
     items: [
       { href: "/venue/catalogue", label: "Catalogue" },
@@ -44,9 +51,13 @@ export function VenueSidebarNav() {
 
   return (
     <nav className="flex flex-col flex-1">
-      <Link href="/venue" className="vy-side-link">Overview</Link>
-      <Link href="/venue/weddings" className="vy-side-link">Weddings</Link>
-      <Link href="/venue/uploads" className="vy-side-link">Smart Import</Link>
+      <div className="vy-side-section">Overview</div>
+      <Link
+        href="/venue"
+        className={`vy-side-link ${pathname === "/venue" ? "font-semibold text-[color:var(--forest)]" : ""}`}
+      >
+        Overview
+      </Link>
 
       {GROUPS.map((g) => {
         const groupActive = g.items.some((i) => pathname === i.href || pathname.startsWith(i.href + "/"));
