@@ -270,7 +270,7 @@ export function InventoryManager({
       ) : displayed.length === 0 ? (
         <div className="vy-empty">No items match &ldquo;{query}&rdquo;.</div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-visible">
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-stone-500 border-b border-stone-200">
               <tr>
@@ -297,15 +297,13 @@ export function InventoryManager({
                     <td className="py-2"><input type="checkbox" checked={selected.has(i.id)} onChange={(e) => toggle(i.id, e.target.checked)} /></td>
                     <td className="py-2">
                       {img ? (
-                        <button type="button" onClick={() => setZoomUrl(img)} className="group block h-10 w-10">
+                        <button type="button" onClick={() => setZoomUrl(img)} className="relative block h-10 w-10">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={img} alt="" className="h-10 w-10 rounded border border-stone-200 object-cover" />
-                          {/* Hover preview — fixed/centered so it escapes table clipping and never shifts other rows */}
-                          <span className="pointer-events-none fixed inset-0 z-50 hidden group-hover:flex items-center justify-center">
-                            <span className="absolute inset-0 bg-black/40" />
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={img} alt="" className="relative max-h-[80vh] max-w-[80vw] rounded-xl border border-white/20 object-contain shadow-2xl" />
-                          </span>
+                          <img
+                            src={img}
+                            alt=""
+                            className="h-10 w-10 rounded border border-stone-200 object-cover origin-left transition-transform duration-200 hover:scale-[5] hover:z-50 hover:shadow-2xl hover:rounded-lg relative"
+                          />
                         </button>
                       ) : (
                         <div className="h-10 w-10 rounded border border-dashed border-stone-300 bg-stone-50" />
