@@ -1,25 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-type Item = { href: string; label: string };
+type Item = { href: string; label: string; children?: Item[] };
 type Group = { label: string; items: Item[] };
 
+const TOP_LINKS: Item[] = [
+  { href: "/venue", label: "Overview" },
+  { href: "/venue/weddings", label: "Weddings" },
+  { href: "/venue/uploads", label: "Smart Import" },
+];
+
 const GROUPS: Group[] = [
-  {
-    label: "Get started",
-    items: [
-      { href: "/venue/weddings", label: "Weddings" },
-      { href: "/venue/uploads", label: "Smart Import" },
-    ],
-  },
   {
     label: "Marketplace",
     items: [
       { href: "/venue/catalogue", label: "Catalogue" },
-      { href: "/venue/rentals", label: "Rentals" },
+      {
+        href: "/venue/rentals",
+        label: "Rentals",
+        children: [
+          { href: "/venue/rentals?view=included", label: "Included" },
+          { href: "/venue/rentals?view=extras", label: "Extras" },
+        ],
+      },
       { href: "/venue/accommodation", label: "Accommodation" },
       { href: "/venue/areas", label: "Areas" },
     ],
@@ -36,38 +42,43 @@ const GROUPS: Group[] = [
       { href: "/venue/marketplace/bar", label: "Bar services" },
     ],
   },
-  {
-    label: "Money",
-    items: [{ href: "/venue/payments", label: "Payments" }],
-  },
-  {
-    label: "Setup",
-    items: [{ href: "/venue/settings", label: "Settings" }],
-  },
+  { label: "Money", items: [{ href: "/venue/payments", label: "Payments" }] },
+  { label: "Setup", items: [{ href: "/venue/settings", label: "Settings" }] },
 ];
 
 export function VenueSidebarNav() {
   const pathname = usePathname();
+  const search = useSearchParams();
+  const view = search.get("view");
 
   return (
     <nav className="flex flex-col flex-1">
-      <div className="vy-side-section">Overview</div>
-      <Link
-        href="/venue"
-        className={`vy-side-link ${pathname === "/venue" ? "font-semibold text-[color:var(--forest)]" : ""}`}
-      >
-        Overview
-      </Link>
+      {TOP_LINKS.map((l) => {
+        const active = l.href === "/venue" ? pathname === "/venue" : pathname.startsWith(l.href);
+        return (
+          <Link
+            key={l.href}
+            href={l.href}
+            className={`vy-side-link ${active ? "font-semibold text-[color:var(--forest)]" : ""}`}
+          >
+            {l.label}
+          </Link>
+        );
+      })}
 
       {GROUPS.map((g) => {
-        const groupActive = g.items.some((i) => pathname === i.href || pathname.startsWith(i.href + "/"));
-        return <NavGroup key={g.label} group={g} defaultOpen={groupActive} pathname={pathname} />;
+        const groupActive = g.items.some(
+          (i) => pathname === i.href.split("?")[0] || pathname.startsWith(i.href.split("?")[0] + "/")
+        );
+        return <NavGroup key={g.label} group={g} defaultOpen={groupActive} pathname={pathname} view={view} />;
       })}
     </nav>
   );
 }
 
-function NavGroup({ group, defaultOpen, pathname }: { group: Group; defaultOpen: boolean; pathname: string }) {
+function NavGroup({
+  group, defaultOpen, pathname, view,
+}: { group: Group; defaultOpen: boolean; pathname: string; view: string | null }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="mt-3">
@@ -82,15 +93,36 @@ function NavGroup({ group, defaultOpen, pathname }: { group: Group; defaultOpen:
       {open && (
         <div className="flex flex-col">
           {group.items.map((i) => {
-            const active = pathname === i.href || pathname.startsWith(i.href + "/");
+            const base = i.href.split("?")[0];
+            const active = pathname === base || pathname.startsWith(base + "/");
             return (
-              <Link
-                key={i.href}
-                href={i.href}
-                className={`vy-side-link ${active ? "font-semibold text-[color:var(--forest)]" : ""}`}
-              >
-                {i.label}
-              </Link>
+              <div key={i.href}>
+                <Link
+                  href={i.href}
+                  className={`vy-side-link ${active && !i.children ? "font-semibold text-[color:var(--forest)]" : ""} ${
+                    active && i.children ? "font-semibold" : ""
+                  }`}
+                >
+                  {i.label}
+                </Link>
+                {i.children && active && (
+                  <div className="flex flex-col ml-3 border-l border-[color:var(--line)] pl-2">
+                    {i.children.map((c) => {
+                      const cv = new URL(c.href, "http://x").searchParams.get("view");
+                      const cActive = pathname === base && view === cv;
+                      return (
+                        <Link
+                          key={c.href}
+                          href={c.href}
+                          className={`vy-side-link text-sm ${cActive ? "font-semibold text-[color:var(--forest)]" : ""}`}
+                        >
+                          {c.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

@@ -3,7 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 import { InventoryManager } from "@/components/InventoryManager";
 import { INVENTORY_FIELDS } from "@/lib/inventory/schemas";
 
-export default async function VenueRentals() {
+export default async function VenueRentals({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
+  const { view } = await searchParams;
+  const showIncluded = view !== "extras";
+  const showExtras = view !== "included";
   const venue = await getCurrentVenue();
   const supabase = await createClient();
   const { data: items } = await supabase
@@ -31,41 +38,45 @@ export default async function VenueRentals() {
         </p>
       </header>
 
-      <details open className="group">
-        <summary className="flex items-center gap-2 cursor-pointer list-none py-2">
-          <span className="text-[10px] transition-transform group-open:rotate-90">▶</span>
-          <h2 className="text-lg font-semibold">Included in venue price</h2>
-          <span className="vy-tag vy-tag-soft">{included.length}</span>
-        </summary>
-        <div className="mt-3">
-          <InventoryManager
-            type="rentals"
-            venueId={venue.id}
-            items={included}
-            fields={fields}
-            priceColumn="price"
-            showExtraColumns
-          />
-        </div>
-      </details>
+      {showIncluded && (
+        <details open className="group">
+          <summary className="flex items-center gap-2 cursor-pointer list-none py-2">
+            <span className="text-[10px] transition-transform group-open:rotate-90">▶</span>
+            <h2 className="text-lg font-semibold">Included in venue price</h2>
+            <span className="vy-tag vy-tag-soft">{included.length}</span>
+          </summary>
+          <div className="mt-3">
+            <InventoryManager
+              type="rentals"
+              venueId={venue.id}
+              items={included}
+              fields={fields}
+              priceColumn="price"
+              showExtraColumns
+            />
+          </div>
+        </details>
+      )}
 
-      <details open className="group">
-        <summary className="flex items-center gap-2 cursor-pointer list-none py-2">
-          <span className="text-[10px] transition-transform group-open:rotate-90">▶</span>
-          <h2 className="text-lg font-semibold">Paid extras</h2>
-          <span className="vy-tag vy-tag-soft">{extras.length}</span>
-        </summary>
-        <div className="mt-3">
-          <InventoryManager
-            type="rentals"
-            venueId={venue.id}
-            items={extras}
-            fields={fields}
-            priceColumn="price"
-            showExtraColumns
-          />
-        </div>
-      </details>
+      {showExtras && (
+        <details open className="group">
+          <summary className="flex items-center gap-2 cursor-pointer list-none py-2">
+            <span className="text-[10px] transition-transform group-open:rotate-90">▶</span>
+            <h2 className="text-lg font-semibold">Paid extras</h2>
+            <span className="vy-tag vy-tag-soft">{extras.length}</span>
+          </summary>
+          <div className="mt-3">
+            <InventoryManager
+              type="rentals"
+              venueId={venue.id}
+              items={extras}
+              fields={fields}
+              priceColumn="price"
+              showExtraColumns
+            />
+          </div>
+        </details>
+      )}
     </div>
   );
 }
