@@ -20,12 +20,14 @@ export function InventoryManager({
   items,
   fields,
   priceColumn,
+  showExtraColumns = false,
 }: {
   type: InventoryType;
   venueId: string;
   items: Item[];
   fields: Field[];
   priceColumn: "price" | "price_per_night" | "price_from";
+  showExtraColumns?: boolean;
 }) {
   const [importOpen, setImportOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -259,6 +261,9 @@ export function InventoryManager({
                 {hasCategory && <th className="py-2">Category</th>}
                 <th className="py-2">Name</th>
                 <th className="py-2">Price</th>
+                {showExtraColumns && <th className="py-2">Commission</th>}
+                {showExtraColumns && <th className="py-2">Total</th>}
+                {showExtraColumns && <th className="py-2">Availability</th>}
                 <th className="py-2">Active</th>
                 <th className="py-2 text-right">Actions</th>
               </tr>
@@ -287,6 +292,28 @@ export function InventoryManager({
                       {i.description ? <div className="text-xs text-stone-500 mt-0.5 max-w-md truncate">{String(i.description)}</div> : null}
                     </td>
                     <td className="py-2">R{Number(i[priceColumn] ?? 0).toLocaleString()}</td>
+                    {showExtraColumns && (() => {
+                      const base = Number(i[priceColumn] ?? 0);
+                      const cv = Number(i.commission_value ?? 0);
+                      const ct = String(i.commission_type ?? "fixed");
+                      const commissionAmt = ct === "percent" ? Math.round(base * cv) / 100 * 100 / 100 : cv;
+                      const total = ct === "percent" ? Math.round(base * (1 + cv / 100) * 100) / 100 : Math.round((base + cv) * 100) / 100;
+                      const stock = Number(i.stock_total ?? 0);
+                      return (
+                        <>
+                          <td className="py-2 text-xs">
+                            {cv ? (ct === "percent" ? `${cv}%` : `R${cv.toLocaleString()}`) : <span className="text-stone-400">—</span>}
+                            {cv ? <span className="text-stone-400"> (R{commissionAmt.toLocaleString()})</span> : null}
+                          </td>
+                          <td className="py-2 font-medium">R{total.toLocaleString()}</td>
+                          <td className="py-2 text-xs">
+                            {stock > 0
+                              ? <span className="text-emerald-700">● {stock} available</span>
+                              : <span className="text-amber-700">○ on request</span>}
+                          </td>
+                        </>
+                      );
+                    })()}
                     <td className="py-2">
                       <button onClick={() => toggleActiveSingle(i.id, !i.active)} className={i.active ? "text-emerald-700 text-xs" : "text-stone-400 text-xs"}>
                         {i.active ? "● Active" : "○ Hidden"}

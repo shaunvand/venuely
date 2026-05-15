@@ -87,9 +87,14 @@ export function BulkUploader({ venueId }: { venueId: string }) {
   async function findOnline(itemId: number) {
     const it = items.find((x) => x._id === itemId);
     if (!it) return;
-    // Use just the item name — Unsplash works best with short generic terms.
-    // User can edit the query in the drawer if they want.
-    const query = String(it.data.name ?? "").trim().slice(0, 60) || "wedding venue";
+    // Simplify: drop codes/quantities/parentheticals so Unsplash gets a clean term.
+    const query = String(it.data.name ?? "")
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/\b[FR]\d+\s*[-–]?\s*[FR]?\d*\b/gi, " ")
+      .replace(/\b\d{1,4}\b/g, " ")
+      .replace(/[^a-zA-Z\s&]/g, " ")
+      .replace(/\b(set|sets|of|the|a|an|various|sundry|incl|etc|x)\b/gi, " ")
+      .replace(/\s+/g, " ").trim().split(" ").slice(0, 4).join(" ") || "wedding decor";
     setSearchOpen({ itemId, query, results: [], busy: true, err: null });
     try {
       const res = await fetch("/api/venue/image-search", {

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/require-role";
 import { LogoMark } from "@/components/Logo";
+import { VenueSidebarNav } from "@/components/VenueSidebarNav";
 
 export default async function VenueLayout({ children }: { children: React.ReactNode }) {
   await requireRole(["venue_admin", "owner"]);
@@ -12,28 +13,7 @@ export default async function VenueLayout({ children }: { children: React.ReactN
           <span className="font-serif text-xl">Venuely</span>
         </Link>
         <div className="vy-eyebrow mb-5">Venue admin</div>
-        <nav className="flex flex-col flex-1">
-          <Link href="/venue" className="vy-side-link">Overview</Link>
-          <Link href="/venue/weddings" className="vy-side-link">Weddings</Link>
-          <Link href="/venue/uploads" className="vy-side-link">Smart Import</Link>
-          <div className="vy-side-section">Marketplace</div>
-          <Link href="/venue/catalogue" className="vy-side-link">Catalogue</Link>
-          <Link href="/venue/rentals" className="vy-side-link">Rentals</Link>
-          <Link href="/venue/accommodation" className="vy-side-link">Accommodation</Link>
-          <Link href="/venue/areas" className="vy-side-link">Areas</Link>
-          <div className="vy-side-section">Partner vendors</div>
-          <Link href="/venue/marketplace/caterers" className="vy-side-link">Caterers</Link>
-          <Link href="/venue/marketplace/planners" className="vy-side-link">Planners</Link>
-          <Link href="/venue/marketplace/florists" className="vy-side-link">Florists</Link>
-          <Link href="/venue/marketplace/djs" className="vy-side-link">DJs</Link>
-          <Link href="/venue/marketplace/photographers" className="vy-side-link">Photographers</Link>
-          <Link href="/venue/marketplace/decor" className="vy-side-link">Decor</Link>
-          <Link href="/venue/marketplace/bar" className="vy-side-link">Bar services</Link>
-          <div className="vy-side-section">Money</div>
-          <Link href="/venue/payments" className="vy-side-link">Payments</Link>
-          <div className="vy-side-section">Setup</div>
-          <Link href="/venue/settings" className="vy-side-link">Settings</Link>
-        </nav>
+        <VenueSidebarNav />
         <form action="/auth/signout" method="post" className="pt-4 border-t border-[color:var(--line)] mt-4">
           <button className="vy-btn vy-btn-ghost w-full justify-start">Sign out</button>
         </form>

@@ -99,7 +99,15 @@ EXTRACTION RULES — extract everything that *could* plausibly be a marketplace 
 
 If you are unsure whether something qualifies, INCLUDE it — the user reviews and edits before commit.`;
 
-  const userMsg = `Source filename: ${filename}
+  const fnameLower = filename.toLowerCase();
+  const filenameHint =
+    /free|complimentary|included|in[-\s]?package/.test(fnameLower)
+      ? `\n\nIMPORTANT FILENAME SIGNAL: the filename "${filename}" indicates these are COMPLIMENTARY / INCLUDED items. Set cost_treatment:"included" for every item unless an item is explicitly marked as a paid extra.`
+      : /rental|extra|optional|hire|paid|add[-\s]?on/.test(fnameLower)
+      ? `\n\nIMPORTANT FILENAME SIGNAL: the filename "${filename}" indicates these are PAID EXTRA / RENTAL items. Set cost_treatment:"extra" for every item unless an item is explicitly marked as complimentary.`
+      : "";
+
+  const userMsg = `Source filename: ${filename}${filenameHint}
 
 Document content:
 ${text.slice(0, 90000)}
@@ -132,6 +140,30 @@ Return the JSON now.`;
   }
   console.log(`[smart-import] ${filename}: parsed ${items.length} items from JSONL`);
   return items;
+}
+
+// Hard filename signal — wins over Claude's guess when the filename is explicit.
+function filenameCostTreatment(filename: string): "included" | "extra" | null {
+  const f = filename.toLowerCase();
+  if (/free|complimentary|included|in[-\s]?package/.test(f)) return "included";
+  if (/rental|extra|optional|hire|paid|add[-\s]?on/.test(f)) return "extra";
+  return null;
+}
+
+// Strip codes / quantities / parentheticals so Unsplash gets a clean search term.
+// "F1 - F4 200 Champagne Flutes (universal superior...)" → "Champagne Flutes"
+function simplifyForSearch(name: string): string {
+  return String(name)
+    .replace(/\([^)]*\)/g, " ")                 // drop parentheticals
+    .replace(/\b[FR]\d+\s*[-–]?\s*[FR]?\d*\b/gi, " ") // drop F1, R12, F1-F4 codes
+    .replace(/\b\d{1,4}\b/g, " ")               // drop bare quantities
+    .replace(/[^a-zA-Z\s&]/g, " ")
+    .replace(/\b(set|sets|of|the|a|an|various|sundry|incl|etc|x)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .slice(0, 4)
+    .join(" ");
 }
 
 export async function POST(req: NextRequest) {
@@ -184,9 +216,12 @@ export async function POST(req: NextRequest) {
       try {
         const items = await parseWithClaude(client, ex.filename, ex.text);
         const valid = items.filter((it) => validCategories.has(it.category as InventoryType) && it.data?.name);
+        const fnameOverride = filenameCostTreatment(ex.filename);
         const fileImages = imagesByFile.get(ex.filename) ?? [];
         let imgIdx = 0;
         valid.forEach((it) => {
+          // Filename signal wins over Claude's per-item guess.
+          if (fnameOverride) it.data.cost_treatment = fnameOverride;
           let image_source: "embedded" | "online" | "none" = "none";
           if (!it.data.image_url && fileImages[imgIdx]) {
             it.data.image_url = fileImages[imgIdx].url;
@@ -213,9 +248,9 @@ export async function POST(req: NextRequest) {
       // Build short, generic Unsplash queries — name first; fallback to category if no result.
       const results = await mapWithConcurrency(needSearch, 4, async (i) => {
         const it = allItems[i];
-        const name = String(it.data.name ?? "").trim().slice(0, 50);
-        if (name) {
-          const hit = await searchOneImage(name);
+        const simple = simplifyForSearch(String(it.data.name ?? ""));
+        if (simple) {
+          const hit = await searchOneImage(simple);
           if (hit) return hit;
         }
         // Fall back to a generic category term ("rentals" → "wedding rentals", etc.)
