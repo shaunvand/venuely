@@ -8,11 +8,11 @@ export default async function VenueLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-screen flex bg-[color:var(--bone)]">
       <aside className="vy-sidebar w-64 p-5 flex flex-col">
-        <Link href="/venue" className="flex items-center gap-2 mb-1">
-          <LogoMark size={28} />
-          <span className="text-xl font-bold tracking-tight" style={{ color: "var(--poppy)", fontFamily: "'Cormorant Garamond', Georgia, serif" }}>Venuely.</span>
+        <Link href="/venue" className="flex items-center gap-2.5 mb-1.5">
+          <LogoMark size={44} />
+          <span className="text-2xl font-bold tracking-tight" style={{ color: "var(--poppy)", fontFamily: "'Satoshi', -apple-system, sans-serif" }}>Venuely.</span>
         </Link>
-        <div className="vy-eyebrow mb-5">Venue admin · Hosting, Handled.</div>
+        <div className="text-[0.6rem] uppercase tracking-[0.22em] text-[color:var(--ink-2)] mb-5">Venue admin · Hosting, Handled.</div>
         <VenueSidebarNav />
         <form action="/auth/signout" method="post" className="pt-4 border-t border-[color:var(--line)] mt-4">
           <button className="vy-btn vy-btn-ghost w-full justify-start">Sign out</button>

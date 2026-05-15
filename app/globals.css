@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Satoshi — free for commercial use, served from Fontshare's official CDN.
+   Used for body + (temporarily) headings until the Groovy Baby licence lands. */
+@import url("https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap");
 
 /* ────────────────────────────────────────────────────────────────────
    Venuely brand system — "Hosting, Handled."
@@ -37,20 +40,24 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-serif: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-weight: 500;
   -webkit-font-smoothing: antialiased;
 }
 
+/* Headings / wordmark — Satoshi heavy until Groovy Baby is licensed.
+   Swap the font-family here (and in components/Logo.tsx) to 'Groovy Baby'
+   once the font files are added to /public/fonts + an @font-face block. */
 .font-serif {
-  font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.02em;
 }
 
 /* ── Animations ─────────────────────────────────────────────────── */
@@ -130,7 +137,7 @@ body {
   color: var(--ink-2);
 }
 .vy-h1 {
-  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-family: 'Satoshi', -apple-system, sans-serif;
   font-weight: 500;
   font-size: 2.25rem;
   line-height: 1.1;
@@ -138,7 +145,7 @@ body {
   color: var(--ink);
 }
 .vy-h2 {
-  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-family: 'Satoshi', -apple-system, sans-serif;
   font-weight: 500;
   font-size: 1.4rem;
   color: var(--ink);
@@ -147,7 +154,7 @@ body {
   display: flex;
   align-items: baseline;
   gap: 0.55rem;
-  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-family: 'Satoshi', -apple-system, sans-serif;
   font-weight: 500;
   font-size: 1.3rem;
   color: var(--forest);
@@ -188,7 +195,7 @@ body {
   color: var(--ink-2);
 }
 .vy-stat-value {
-  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-family: 'Satoshi', -apple-system, sans-serif;
   font-weight: 500;
   font-size: 2.1rem;
   color: var(--ink);
