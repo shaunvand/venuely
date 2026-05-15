@@ -12,7 +12,7 @@ export default async function VenueLayout({ children }: { children: React.ReactN
           <LogoMark size={44} />
           <span className="text-2xl font-bold tracking-tight" style={{ color: "var(--poppy)", fontFamily: "'Fraunces', Georgia, serif" }}>Venuely.</span>
         </Link>
-        <div className="mb-5 text-sm italic text-[color:var(--ink-2)]" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>Every wedding, beautifully handled.</div>
+        <div className="mb-5 text-sm italic text-[color:var(--ink-2)]" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>Everything wedding, handled.</div>
         <VenueSidebarNav />
         <form action="/auth/signout" method="post" className="pt-4 border-t border-[color:var(--line)] mt-4">
           <button className="vy-btn vy-btn-ghost w-full justify-start">Sign out</button>
