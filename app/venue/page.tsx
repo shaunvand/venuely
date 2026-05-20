@@ -149,7 +149,11 @@ export default async function VenueOverview() {
     });
   }
 
+  // Nudge if the setup checklist isn't complete OR they haven't run Smart Import yet
+  // (empty catalogue + rentals + rooms = no import has happened). The modal itself
+  // applies a 24-hour cooldown so it isn't shown on every page view.
   const venueEmpty = counts.catalogue === 0 && counts.rentals === 0 && counts.rooms === 0;
+  const showWelcome = pct < 100 || venueEmpty;
 
   const stats = [
     { label: "Upcoming weddings", value: (upcoming?.length ?? 0).toString(), sub: `${counts.weddings} total`, href: "/venue/weddings", accent: "var(--poppy)" },
@@ -165,7 +169,7 @@ export default async function VenueOverview() {
 
   return (
     <div className="space-y-10">
-      {venueEmpty && <WelcomeImportModal venueId={venue.id} venueName={venue.name} />}
+      {showWelcome && <WelcomeImportModal venueId={venue.id} venueName={venue.name} />}
 
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>

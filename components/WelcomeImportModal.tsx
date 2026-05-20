@@ -10,15 +10,18 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const key = `vy_welcome_dismissed_${venueId}`;
-    if (typeof window !== "undefined" && !window.localStorage.getItem(key)) {
+    if (typeof window === "undefined") return;
+    const key = `vy_welcome_dismissed_at_${venueId}`;
+    const last = Number(window.localStorage.getItem(key) || 0);
+    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+    if (!last || Date.now() - last > TWENTY_FOUR_HOURS) {
       setOpen(true);
     }
   }, [venueId]);
 
   function dismiss(goToChecklist: boolean) {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(`vy_welcome_dismissed_${venueId}`, "1");
+      window.localStorage.setItem(`vy_welcome_dismissed_at_${venueId}`, String(Date.now()));
     }
     setOpen(false);
     if (goToChecklist) router.push("/venue/setup");
@@ -50,10 +53,11 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
               Venuely.
             </span>
           </div>
-          <h2 className="font-serif text-3xl">Welcome to {venueName}</h2>
+          <h2 className="font-serif text-3xl">Get {venueName} set up in minutes</h2>
           <p className="mt-2 text-sm text-stone-600 max-w-2xl">
-            Drop your existing catalogue, rentals, accommodation and supplier lists in any format — PDF, Excel, brochure, you name it.
-            Smart Import will read them and pre-fill your venue in seconds. You can review before anything saves.
+            Drop in the files you already send couples — quote PDFs, stock lists, brochures, rooming
+            spreadsheets, supplier directories. Smart Import reads them and pre-fills your catalogue,
+            rentals, accommodation and partner vendors. You review before anything saves.
           </p>
         </header>
 
@@ -63,11 +67,11 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
 
         <footer className="px-8 py-5 border-t flex items-center justify-between gap-4" style={{ borderColor: "var(--line)" }}>
           <span className="text-xs text-stone-500">
-            You can run Smart Import again anytime from the sidebar.
+            We&apos;ll only nudge you about this once every 24 hours.
           </span>
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => dismiss(false)} className="vy-btn vy-btn-ghost">
-              Skip for now
+              Remind me tomorrow
             </button>
             <button type="button" onClick={() => dismiss(true)} className="vy-btn vy-btn-primary">
               Continue to setup checklist →
