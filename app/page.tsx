@@ -25,9 +25,9 @@ export default async function Home({
     <div className="min-h-screen overflow-x-hidden" style={{ background: "var(--cream)", color: "var(--ink)" }}>
       <Nav signedIn={!!user} />
       <Hero />
-      <Logos />
       <Features />
       <ForCouples />
+      <TrustedBy />
       <Pricing />
       <FAQ />
       <FinalCTA />
@@ -142,7 +142,7 @@ function Hero() {
           <span style={{ fontWeight: 600, color: "var(--ink-2)" }}>Without the hotel software.</span>
         </h1>
         <p className="mt-7 text-base leading-relaxed max-w-md" style={{ color: "var(--ink-2)" }}>
-          Venuely gives wedding venues a branded portal for every couple, a clean dashboard for
+          Venuely gives every couple their own branded dashboard, plus a clean admin for
           your team, and accommodation, catalogue and rentals tracking — all priced in rand and
           built for how venues actually work.
         </p>
@@ -162,18 +162,8 @@ function Hero() {
             Book a Demo
           </a>
         </div>
-        <div className="mt-8 flex flex-wrap gap-x-8 gap-y-3 text-sm" style={{ color: "var(--ink-2)" }}>
-          {["No credit card required", "Setup in minutes", "Cancel anytime"].map((t) => (
-            <span key={t} className="flex items-center gap-2.5">
-              <span
-                className="w-7 h-7 rounded-full flex items-center justify-center text-[11px]"
-                style={{ background: "var(--peach)", color: "var(--poppy-deep)" }}
-              >
-                ✓
-              </span>
-              {t}
-            </span>
-          ))}
+        <div className="mt-8">
+          <TrustChips />
         </div>
       </div>
 
@@ -242,17 +232,20 @@ function Hero() {
   );
 }
 
-/* ── Venue logos strip ──────────────────────────────────────────────── */
+/* ── Trusted-by strip ───────────────────────────────────────────────── */
 
-function Logos() {
+function TrustedBy() {
   const venues = ["THE GLASSHOUSE", "RIVERSTONE ESTATE", "OAK & IVY VENUE", "THE GATHERING", "Serenity"];
   return (
-    <section className="border-t" style={{ borderColor: "var(--line)", background: "var(--daisy)" }}>
-      <div className="max-w-7xl mx-auto px-6 lg:px-10 py-10 text-center">
-        <p className="text-sm mb-6" style={{ color: "var(--ink-2)" }}>
-          Loved by venues across South Africa
+    <section className="relative border-y" style={{ borderColor: "var(--line)", background: "var(--cream)" }}>
+      <div className="max-w-7xl mx-auto px-6 lg:px-10 py-14 text-center">
+        <p className="text-xs uppercase tracking-[0.32em] mb-2" style={{ color: "var(--sage)" }}>
+          Trusted by
         </p>
-        <div className="flex flex-wrap items-center justify-center gap-x-14 gap-y-4 font-serif text-lg" style={{ color: "var(--sage)" }}>
+        <h3 className="font-serif text-2xl sm:text-3xl mb-8" style={{ fontWeight: 900 }}>
+          Wedding venues across South Africa
+        </h3>
+        <div className="flex flex-wrap items-center justify-center gap-x-14 gap-y-5 font-serif text-lg" style={{ color: "var(--sage)" }}>
           {venues.map((v) => (
             <span key={v} className="tracking-[0.15em]">{v}</span>
           ))}
@@ -320,9 +313,57 @@ function FeatureIcon({ name }: { name: "portal" | "catalogue" | "bed" | "users" 
   }
 }
 
+function TrustChips() {
+  const chips: { icon: React.ReactNode; label: string }[] = [
+    {
+      label: "No credit card required",
+      icon: (
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--poppy-deep)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="6" width="18" height="12" rx="2" />
+          <path d="M3 10h18" />
+          <path d="M7 15h3" />
+        </svg>
+      ),
+    },
+    {
+      label: "Setup in minutes",
+      icon: (
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--poppy-deep)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M12 7.5V12l3 2" />
+        </svg>
+      ),
+    },
+    {
+      label: "Cancel anytime",
+      icon: (
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--poppy-deep)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M8.5 12.5l2.4 2.4 4.6-5.2" />
+        </svg>
+      ),
+    },
+  ];
+  return (
+    <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm" style={{ color: "var(--ink-2)" }}>
+      {chips.map((c) => (
+        <span key={c.label} className="flex items-center gap-2.5">
+          <span
+            className="w-8 h-8 rounded-full flex items-center justify-center"
+            style={{ background: "var(--peach)" }}
+          >
+            {c.icon}
+          </span>
+          {c.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function Features() {
   const items: { icon: "portal" | "catalogue" | "bed" | "users" | "card" | "chat"; title: string; desc: string }[] = [
-    { icon: "portal", title: "A portal for every couple", desc: "Each wedding gets its own branded URL with a guest list, supplier directory, day-of timeline, budget tracker and checklist. Your venue, your colours." },
+    { icon: "portal", title: "A dashboard for every couple", desc: "Each wedding gets its own branded URL with a guest list, supplier directory, day-of timeline, budget tracker and checklist. Your venue, your colours." },
     { icon: "catalogue", title: "Catalogue & rentals at your fingertips", desc: "List every item you own — décor, tables, fairy lights, the lot. Couples browse and pick. You see who reserved what, when, and avoid double-bookings on busy weekends." },
     { icon: "bed", title: "Accommodation, properly tracked", desc: "Cottages, suites, tents. Multi-night, multi-room. No more colour-coded spreadsheets or last-minute panic over who's sleeping where." },
     { icon: "users", title: "Suppliers in one place", desc: "Your preferred photographers, florists, caterers and coordinators — already populated. Couples see your trusted list, not a random Google search." },
@@ -385,7 +426,7 @@ function ForCouples() {
               For your couples
             </p>
             <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl leading-tight">
-              A portal they&apos;ll
+              A dashboard they&apos;ll
               <br />
               <span style={{ color: "var(--poppy)" }}>actually</span> use
             </h2>
@@ -412,6 +453,9 @@ function ForCouples() {
                 </li>
               ))}
             </ul>
+            <div className="mt-8">
+              <TrustChips />
+            </div>
           </div>
         </Reveal>
 
@@ -424,7 +468,7 @@ function ForCouples() {
               <span className="ml-3 text-[11px]" style={{ color: "var(--ink-2)" }}>browser</span>
             </div>
             <div className="px-4 py-2 text-xs border-b" style={{ borderColor: "var(--line)", color: "var(--ink-2)" }}>
-              venuely.co.za/portal/<span style={{ color: "var(--poppy)" }}>your-venue</span>/<span style={{ color: "var(--poppy)" }}>smith-jones</span>
+              venuely.co.za/<span style={{ color: "var(--poppy)" }}>your-venue</span>/<span style={{ color: "var(--poppy)" }}>smith-jones</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] min-h-[340px]">
               <div className="p-3 space-y-1 border-r text-[11px]" style={{ borderColor: "var(--line)" }}>
@@ -503,7 +547,7 @@ function ForCouples() {
 function Pricing() {
   const left = [
     "Unlimited weddings per year",
-    "Branded couple portals",
+    "Branded couple dashboards",
     "Catalogue, rentals & accommodation tracking",
     "Partner-vendor marketplace with your commission built in",
   ];
@@ -590,10 +634,10 @@ function FAQ() {
   const qs: { icon: string; q: string; a: string }[] = [
     { icon: "👥", q: "Who is this for?", a: "South African wedding venues — wine farms, lodges, country estates, beach venues — that host more than a handful of weddings a year. If you currently run on spreadsheets, WhatsApp groups and PDFs, Venuely is built for you." },
     { icon: "🔁", q: "How is this different from HoneyBook or Aisle Planner?", a: "Those are built for US/UK planners and bill in USD. Venuely is built for venues, billed in rand, with accommodation and rentals tracking baked in. ZA-specific from day one." },
-    { icon: "📞", q: "Can my couples use it on their phone?", a: "Yes. The whole portal is responsive — couples open it on a phone the morning of the wedding to check the timeline. No app to install." },
-    { icon: "📅", q: "What if I have 3 weddings on the same Saturday?", a: "Each wedding is its own portal with its own data. Rentals are tracked per weekend so the same 50 chairs can't get booked twice. Accommodation bookings are tied to date ranges." },
+    { icon: "📞", q: "Can my couples use it on their phone?", a: "Yes. The whole dashboard is responsive — couples open it on a phone the morning of the wedding to check the timeline. No app to install." },
+    { icon: "📅", q: "What if I have 3 weddings on the same Saturday?", a: "Each wedding is its own dashboard with its own data. Rentals are tracked per weekend so the same 50 chairs can't get booked twice. Accommodation bookings are tied to date ranges." },
     { icon: "☁", q: "Do I need to import my catalogue manually?", a: "You can add items in the admin one by one, or use Smart Import — send us your existing list or document pack and it bulk-imports automatically." },
-    { icon: "💳", q: "What about payment processing?", a: "Couples pay you directly — we don't sit between you and your money. Venuely tracks who's paid what. In-portal payment integration is on the roadmap if you want it." },
+    { icon: "💳", q: "What about payment processing?", a: "Couples pay you directly — we don't sit between you and your money. Venuely tracks who's paid what. In-dashboard payment integration is on the roadmap if you want it." },
   ];
   return (
     <section id="faq" className="relative overflow-hidden" style={{ background: "var(--daisy)" }}>
