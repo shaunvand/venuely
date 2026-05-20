@@ -630,14 +630,71 @@ function Pricing() {
 
 /* ── FAQ ────────────────────────────────────────────────────────────── */
 
+function FaqIcon({ name }: { name: "who" | "compare" | "phone" | "calendar" | "cloud" | "card" }) {
+  const s = "var(--ink)";
+  const w = 1.6;
+  const p = { fill: "none", stroke: s, strokeWidth: w, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  switch (name) {
+    case "who":
+      return (
+        <svg viewBox="0 0 24 24" width="20" height="20" {...p}>
+          <circle cx="9" cy="9.5" r="2.6" />
+          <path d="M3.5 18c.8-2.4 2.8-3.6 5.5-3.6s4.7 1.2 5.5 3.6" />
+          <circle cx="16.5" cy="8" r="2" />
+          <path d="M15 13.6c2.6-.2 4.6 1 5.5 2.9" />
+        </svg>
+      );
+    case "compare":
+      return (
+        <svg viewBox="0 0 24 24" width="20" height="20" {...p}>
+          <rect x="3.5" y="4" width="9" height="13" rx="1.6" />
+          <path d="M11.5 19l3-2.3" />
+          <path d="M14.5 7l2-1.6" />
+          <rect x="13.5" y="9" width="7" height="11" rx="1.4" />
+        </svg>
+      );
+    case "phone":
+      return (
+        <svg viewBox="0 0 24 24" width="20" height="20" {...p}>
+          <rect x="7" y="3" width="10" height="18" rx="2.2" />
+          <path d="M11 18h2" />
+        </svg>
+      );
+    case "calendar":
+      return (
+        <svg viewBox="0 0 24 24" width="20" height="20" {...p}>
+          <rect x="3.5" y="5" width="17" height="15" rx="2" />
+          <path d="M3.5 10h17" />
+          <path d="M8 3.5v3M16 3.5v3" />
+          <path d="M8 14h2M13 14h3M8 17h2" />
+        </svg>
+      );
+    case "cloud":
+      return (
+        <svg viewBox="0 0 24 24" width="20" height="20" {...p}>
+          <path d="M7 17h10a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.7-1.2A3.6 3.6 0 0 0 7 17z" />
+          <path d="M12 14V9.5M9.7 11.5L12 9.2l2.3 2.3" />
+        </svg>
+      );
+    case "card":
+      return (
+        <svg viewBox="0 0 24 24" width="20" height="20" {...p}>
+          <rect x="3" y="6" width="18" height="12" rx="2" />
+          <path d="M3 10h18" />
+          <path d="M7 15h3" />
+        </svg>
+      );
+  }
+}
+
 function FAQ() {
-  const qs: { icon: string; q: string; a: string }[] = [
-    { icon: "👥", q: "Who is this for?", a: "South African wedding venues — wine farms, lodges, country estates, beach venues — that host more than a handful of weddings a year. If you currently run on spreadsheets, WhatsApp groups and PDFs, Venuely is built for you." },
-    { icon: "🔁", q: "How is this different from HoneyBook or Aisle Planner?", a: "Those are built for US/UK planners and bill in USD. Venuely is built for venues, billed in rand, with accommodation and rentals tracking baked in. ZA-specific from day one." },
-    { icon: "📞", q: "Can my couples use it on their phone?", a: "Yes. The whole dashboard is responsive — couples open it on a phone the morning of the wedding to check the timeline. No app to install." },
-    { icon: "📅", q: "What if I have 3 weddings on the same Saturday?", a: "Each wedding is its own dashboard with its own data. Rentals are tracked per weekend so the same 50 chairs can't get booked twice. Accommodation bookings are tied to date ranges." },
-    { icon: "☁", q: "Do I need to import my catalogue manually?", a: "You can add items in the admin one by one, or use Smart Import — send us your existing list or document pack and it bulk-imports automatically." },
-    { icon: "💳", q: "What about payment processing?", a: "Couples pay you directly — we don't sit between you and your money. Venuely tracks who's paid what. In-dashboard payment integration is on the roadmap if you want it." },
+  const qs: { icon: "who" | "compare" | "phone" | "calendar" | "cloud" | "card"; q: string; a: string }[] = [
+    { icon: "who", q: "Who is this for?", a: "South African wedding venues — wine farms, lodges, country estates, beach venues — that host more than a handful of weddings a year. If you currently run on spreadsheets, WhatsApp groups and PDFs, Venuely is built for you." },
+    { icon: "compare", q: "How is this different from HoneyBook or Aisle Planner?", a: "Those are built for US/UK planners and bill in USD. Venuely is built for venues, billed in rand, with accommodation and rentals tracking baked in. ZA-specific from day one." },
+    { icon: "phone", q: "Can my couples use it on their phone?", a: "Yes. The whole dashboard is responsive — couples open it on a phone the morning of the wedding to check the timeline. No app to install." },
+    { icon: "calendar", q: "What if I have 3 weddings on the same Saturday?", a: "Each wedding is its own dashboard with its own data. Rentals are tracked per weekend so the same 50 chairs can't get booked twice. Accommodation bookings are tied to date ranges." },
+    { icon: "cloud", q: "Do I need to import my catalogue manually?", a: "You can add items in the admin one by one, or use Smart Import — send us your existing list or document pack and it bulk-imports automatically." },
+    { icon: "card", q: "What about payment processing?", a: "Couples pay you directly — we don't sit between you and your money. Venuely tracks who's paid what. In-dashboard payment integration is on the roadmap if you want it." },
   ];
   return (
     <section id="faq" className="relative overflow-hidden" style={{ background: "var(--daisy)" }}>
@@ -655,23 +712,26 @@ function FAQ() {
         <div className="space-y-4">
           {qs.map(({ icon, q, a }, i) => (
             <Reveal key={q} delay={i * 50}>
-              <details className="group bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid var(--line)" }}>
+              <details
+                className="group bg-white rounded-2xl overflow-hidden relative transition-colors open:bg-[color:var(--cream)] open:shadow-[inset_4px_0_0_0_var(--poppy)]"
+                style={{ border: "1px solid var(--line)" }}
+              >
                 <summary className="cursor-pointer list-none flex items-center gap-4 px-6 py-5">
                   <span
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-sm flex-shrink-0"
+                    className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                     style={{ background: i % 2 ? "var(--sage-2)" : "var(--peach)" }}
                   >
-                    {icon}
+                    <FaqIcon name={icon} />
                   </span>
                   <span className="flex-1 font-semibold text-[15px]">{q}</span>
                   <span
-                    className="text-xl transition-transform group-open:rotate-45"
+                    className="text-2xl leading-none transition-transform group-open:rotate-45"
                     style={{ color: "var(--poppy)" }}
                   >
                     +
                   </span>
                 </summary>
-                <p className="px-6 pb-6 pl-[4.75rem] text-sm leading-relaxed" style={{ color: "var(--ink-2)" }}>
+                <p className="px-6 pb-6 pl-[5rem] text-sm leading-relaxed" style={{ color: "var(--ink-2)" }}>
                   {a}
                 </p>
               </details>
