@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Reveal } from "@/components/Reveal";
+import { LogoMark } from "@/components/Logo";
 
 export default async function Home({
   searchParams,
@@ -82,12 +83,14 @@ function Nav({ signedIn }: { signedIn: boolean }) {
   return (
     <header className="sticky top-0 z-30 backdrop-blur-sm" style={{ background: "rgba(255,246,240,0.85)" }}>
       <div className="max-w-7xl mx-auto px-6 lg:px-10 py-5 flex items-center justify-between">
-        <Link
-          href="/"
-          className="font-serif text-2xl"
-          style={{ color: "var(--poppy)", fontWeight: 900, letterSpacing: "-0.03em" }}
-        >
-          Venuely.
+        <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+          <LogoMark size={52} />
+          <span
+            className="font-serif text-3xl"
+            style={{ color: "var(--poppy)", fontWeight: 900, letterSpacing: "-0.03em" }}
+          >
+            Venuely.
+          </span>
         </Link>
         <nav className="hidden md:flex items-center gap-8 text-sm" style={{ color: "var(--ink)" }}>
           {links.map((l) => (
