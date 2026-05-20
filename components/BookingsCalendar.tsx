@@ -2,10 +2,9 @@ import Link from "next/link";
 
 type Booking = { slug: string; couple_names: string; wedding_date: string };
 
-const MONTHS_TO_SHOW = 6;
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
-export function BookingsCalendar({ bookings }: { bookings: Booking[] }) {
+export function BookingsCalendar({ bookings, months: monthsToShow = 6 }: { bookings: Booking[]; months?: number }) {
   // Group bookings by ISO date (yyyy-mm-dd).
   const byDate = new Map<string, Booking[]>();
   for (const b of bookings) {
@@ -19,7 +18,7 @@ export function BookingsCalendar({ bookings }: { bookings: Booking[] }) {
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   const months: { year: number; month: number; label: string }[] = [];
-  for (let i = 0; i < MONTHS_TO_SHOW; i++) {
+  for (let i = 0; i < monthsToShow; i++) {
     const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
     months.push({
       year: d.getFullYear(),
@@ -48,7 +47,11 @@ export function BookingsCalendar({ bookings }: { bookings: Booking[] }) {
       <div className="flex flex-wrap items-baseline justify-between gap-3 mb-5">
         <div>
           <div className="vy-eyebrow">Bookings calendar</div>
-          <h2 className="vy-h2 mt-1">Next {MONTHS_TO_SHOW} months</h2>
+          <h2 className="vy-h2 mt-1">
+            {monthsToShow === 1
+              ? months[0]?.label ?? "This month"
+              : `Next ${monthsToShow} months`}
+          </h2>
         </div>
         <div className="flex items-center gap-4 text-xs" style={{ color: "var(--ink-2)" }}>
           <span className="flex items-center gap-1.5">

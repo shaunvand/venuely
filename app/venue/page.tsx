@@ -201,9 +201,29 @@ export default async function VenueOverview() {
         </Link>
       </header>
 
-      {/* Stats grid */}
+      {/* Top row — current-month calendar on the left, headline stats stacked on the right */}
+      <div className="grid lg:grid-cols-2 gap-4 items-stretch">
+        <div>
+          <BookingsCalendar
+            bookings={(allWeddings ?? []) as { slug: string; couple_names: string; wedding_date: string }[]}
+            months={1}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4 content-start">
+          {stats.slice(0, 4).map((s) => (
+            <Link key={s.label} href={s.href} className="vy-stat hover:shadow-md transition-shadow relative overflow-hidden">
+              <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: s.accent }} />
+              <div className="vy-stat-label">{s.label}</div>
+              <div className="vy-stat-value" style={{ color: s.accent }}>{s.value}</div>
+              <div className="text-xs mt-1" style={{ color: "var(--ink-2)" }}>{s.sub}</div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Remaining stats — secondary row */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {stats.map((s) => (
+        {stats.slice(4).map((s) => (
           <Link key={s.label} href={s.href} className="vy-stat hover:shadow-md transition-shadow relative overflow-hidden">
             <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: s.accent }} />
             <div className="vy-stat-label">{s.label}</div>
