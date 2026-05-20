@@ -264,14 +264,70 @@ function Logos() {
 
 /* ── Features ───────────────────────────────────────────────────────── */
 
+function FeatureIcon({ name }: { name: "portal" | "catalogue" | "bed" | "users" | "card" | "chat" }) {
+  const stroke = "var(--ink)";
+  const sw = 1.6;
+  switch (name) {
+    case "portal":
+      return (
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="12" cy="10" r="2.6" />
+          <path d="M6.5 18c1.2-2.4 3.2-3.6 5.5-3.6s4.3 1.2 5.5 3.6" />
+        </svg>
+      );
+    case "catalogue":
+      return (
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+          <rect x="5" y="3.5" width="14" height="17" rx="1.6" />
+          <path d="M9 3.5v2.2h6V3.5" />
+          <path d="M8.5 10h7M8.5 13h7M8.5 16h4" />
+        </svg>
+      );
+    case "bed":
+      return (
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 18v-7h18v7" />
+          <path d="M3 18v2M21 18v2" />
+          <path d="M3 14h18" />
+          <path d="M7 11V8.5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 13 8.5V11" />
+        </svg>
+      );
+    case "users":
+      return (
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="9" cy="9.5" r="2.6" />
+          <path d="M3.5 18c.8-2.4 2.8-3.6 5.5-3.6s4.7 1.2 5.5 3.6" />
+          <circle cx="16.5" cy="8" r="2" />
+          <path d="M15 13.6c2.6-.2 4.6 1 5.5 2.9" />
+        </svg>
+      );
+    case "card":
+      return (
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="6" width="18" height="12" rx="2" />
+          <path d="M3 10h18" />
+          <path d="M7 15h3" />
+        </svg>
+      );
+    case "chat":
+      return (
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 5h16v11H9.5L5 19.5V16H4z" />
+          <path d="M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01" />
+        </svg>
+      );
+  }
+}
+
 function Features() {
-  const items = [
-    { icon: "👤", title: "A portal for every couple", desc: "Each wedding gets its own branded URL with a guest list, supplier directory, day-of timeline, budget tracker and checklist. Your venue, your colours." },
-    { icon: "📋", title: "Catalogue & rentals at your fingertips", desc: "List every item you own — décor, tables, fairy lights, the lot. Couples browse and pick. You see who reserved what, when, and avoid double-bookings on busy weekends." },
-    { icon: "🛏", title: "Accommodation, properly tracked", desc: "Cottages, suites, tents. Multi-night, multi-room. No more colour-coded spreadsheets or last-minute panic over who's sleeping where." },
-    { icon: "👥", title: "Suppliers in one place", desc: "Your preferred photographers, florists, caterers and coordinators — already populated. Couples see your trusted list, not a random Google search." },
-    { icon: "💳", title: "Payments tracked, not chased", desc: "Track deposits and final payments per wedding. Mark them paid, see who's overdue, attach invoices. One screen, all your weekends." },
-    { icon: "💬", title: "WhatsApp-first, not email-only", desc: "Coming soon: nudge couples on WhatsApp when payments are due, when their guest list is sparse, when their timeline is empty. Because nobody reads SaaS emails." },
+  const items: { icon: "portal" | "catalogue" | "bed" | "users" | "card" | "chat"; title: string; desc: string }[] = [
+    { icon: "portal", title: "A portal for every couple", desc: "Each wedding gets its own branded URL with a guest list, supplier directory, day-of timeline, budget tracker and checklist. Your venue, your colours." },
+    { icon: "catalogue", title: "Catalogue & rentals at your fingertips", desc: "List every item you own — décor, tables, fairy lights, the lot. Couples browse and pick. You see who reserved what, when, and avoid double-bookings on busy weekends." },
+    { icon: "bed", title: "Accommodation, properly tracked", desc: "Cottages, suites, tents. Multi-night, multi-room. No more colour-coded spreadsheets or last-minute panic over who's sleeping where." },
+    { icon: "users", title: "Suppliers in one place", desc: "Your preferred photographers, florists, caterers and coordinators — already populated. Couples see your trusted list, not a random Google search." },
+    { icon: "card", title: "Payments tracked, not chased", desc: "Track deposits and final payments per wedding. Mark them paid, see who's overdue, attach invoices. One screen, all your weekends." },
+    { icon: "chat", title: "WhatsApp-first, not email-only", desc: "Coming soon: nudge couples on WhatsApp when payments are due, when their guest list is sparse, when their timeline is empty. Because nobody reads SaaS emails." },
   ];
   return (
     <section id="features" className="relative max-w-7xl mx-auto px-6 lg:px-10 py-24">
@@ -297,10 +353,10 @@ function Features() {
             <div className="relative bg-white rounded-2xl p-7 h-full overflow-hidden lift" style={{ border: "1px solid var(--line)" }}>
               <DotGrid className="absolute right-2 bottom-2 w-16 h-16 opacity-50" />
               <span
-                className="w-12 h-12 rounded-full flex items-center justify-center text-lg mb-5"
+                className="w-12 h-12 rounded-full flex items-center justify-center mb-5"
                 style={{ background: i % 2 ? "var(--sage-2)" : "var(--peach)" }}
               >
-                {it.icon}
+                <FeatureIcon name={it.icon} />
               </span>
               <h3 className="font-serif text-xl leading-snug">{it.title}</h3>
               <p className="mt-3 text-sm leading-relaxed relative z-10" style={{ color: "var(--ink-2)" }}>
