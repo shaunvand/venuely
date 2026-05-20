@@ -8,9 +8,11 @@ import { LogoMark } from "@/components/Logo";
 export function WelcomeImportModal({ venueId, venueName }: { venueId: string; venueName: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [neverShow, setNeverShow] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (window.localStorage.getItem(`vy_welcome_never_${venueId}`) === "1") return;
     const key = `vy_welcome_dismissed_at_${venueId}`;
     const last = Number(window.localStorage.getItem(key) || 0);
     const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
@@ -22,6 +24,7 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
   function dismiss(goToChecklist: boolean) {
     if (typeof window !== "undefined") {
       window.localStorage.setItem(`vy_welcome_dismissed_at_${venueId}`, String(Date.now()));
+      if (neverShow) window.localStorage.setItem(`vy_welcome_never_${venueId}`, "1");
     }
     setOpen(false);
     if (goToChecklist) router.push("/venue/setup");
@@ -65,11 +68,21 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
           <BulkUploader venueId={venueId} />
         </div>
 
-        <footer className="px-8 py-5 border-t flex items-center justify-between gap-4" style={{ borderColor: "var(--line)" }}>
+        <footer className="px-8 py-5 border-t flex flex-wrap items-center justify-between gap-4" style={{ borderColor: "var(--line)" }}>
           <span className="text-xs text-stone-500">
             We&apos;ll only nudge you about this once every 24 hours.
           </span>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4 ml-auto">
+            <label className="flex items-center gap-2 text-xs cursor-pointer select-none" style={{ color: "var(--ink-2)" }}>
+              <input
+                type="checkbox"
+                checked={neverShow}
+                onChange={(e) => setNeverShow(e.target.checked)}
+                className="w-4 h-4 rounded cursor-pointer"
+                style={{ accentColor: "var(--poppy)" }}
+              />
+              Don&apos;t show this again
+            </label>
             <button type="button" onClick={() => dismiss(false)} className="vy-btn vy-btn-ghost">
               Remind me tomorrow
             </button>
