@@ -121,31 +121,24 @@ function Nav({ signedIn }: { signedIn: boolean }) {
 
 function Hero() {
   const cards = [
-    { icon: "🛏", label: "Guest Accommodation", value: "18", sub: "rooms booked", ring: "72%" },
-    { icon: "📅", label: "Weekend Overview", value: "12 – 14 Dec 2025", sub: "", chart: true },
-    { icon: "🪑", label: "Décor & Rentals", value: "47", sub: "items reserved" },
-    { icon: "🧾", label: "Budget Tracker", value: "R145,000", sub: "of R210,000 spent", ring: "69%" },
-    { icon: "💳", label: "Payments Collected", value: "R86,400", sub: "paid of R145,000" },
+    { icon: "📅", label: "Weekend Overview", value: "12 – 14 Dec 2025", sub: "3 weddings · fully booked", chart: true },
+    { icon: "💳", label: "Payments Collected", value: "R86,400", sub: "of R145,000 invoiced", ring: "60%" },
   ];
   return (
     <section className="relative max-w-7xl mx-auto px-6 lg:px-10 pt-10 pb-16 grid lg:grid-cols-2 gap-12 items-center">
       <Blob className="w-[420px] h-[420px] -right-32 top-0 opacity-90" color="var(--sage-2)" />
       <Blob className="w-64 h-64 right-10 -bottom-10 opacity-70" color="var(--peach)" />
-      <DotGrid className="absolute left-[44%] top-1/2 -translate-y-1/2 opacity-60 hidden lg:block" />
-      <Leaf className="absolute -left-6 bottom-0 opacity-40 hidden lg:block" />
 
       <div className="relative z-10">
         <p className="text-xs uppercase tracking-[0.32em] mb-6" style={{ color: "var(--sage)" }}>
           For South African wedding venues
         </p>
-        <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl leading-[1.02]">
+        <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl leading-[1.02]" style={{ fontWeight: 900 }}>
           Run your venue
           <br />
-          like a hotel.
+          like a <span style={{ color: "var(--poppy)" }}>hotel.</span>
           <br />
-          <span style={{ color: "var(--sage)" }}>Without the hotel</span>
-          <br />
-          <span style={{ color: "var(--poppy)" }}>software.</span>
+          <span style={{ fontWeight: 600, color: "var(--ink-2)" }}>Without the hotel software.</span>
         </h1>
         <p className="mt-7 text-base leading-relaxed max-w-md" style={{ color: "var(--ink-2)" }}>
           Venuely gives wedding venues a branded portal for every couple, a clean dashboard for
@@ -281,8 +274,6 @@ function Features() {
   ];
   return (
     <section id="features" className="relative max-w-7xl mx-auto px-6 lg:px-10 py-24">
-      <Blob className="w-72 h-72 -left-40 top-20 opacity-70" color="var(--sage-2)" />
-      <Blob className="w-72 h-72 -right-32 -top-6 opacity-60" color="var(--peach)" />
       <Leaf className="absolute right-2 top-24 opacity-40 hidden lg:block" />
 
       <Reveal>
@@ -329,8 +320,6 @@ function ForCouples() {
   return (
     <section id="for-couples" className="relative overflow-hidden" style={{ background: "var(--daisy)" }}>
       <Blob className="w-[460px] h-[460px] -right-40 -top-20 opacity-80" color="var(--sage-2)" />
-      <Blob className="w-72 h-72 right-20 bottom-0 opacity-60" color="var(--peach)" />
-      <Leaf className="absolute -left-4 bottom-4 opacity-40 hidden lg:block" />
 
       <div className="max-w-7xl mx-auto px-6 lg:px-10 py-24 grid lg:grid-cols-2 gap-14 items-center relative z-10">
         <Reveal>
@@ -393,26 +382,55 @@ function ForCouples() {
                 ))}
               </div>
               <div className="p-5">
-                <div className="font-serif text-lg">Hi Sarah &amp; James</div>
-                <div className="text-[11px] mb-4" style={{ color: "var(--ink-2)" }}>12 Dec 2025 · Riverstone Estate</div>
-                <div className="rounded-xl px-4 py-3 mb-3" style={{ background: "var(--cream)" }}>
-                  <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--ink-2)" }}>Wedding Countdown</div>
-                  <div className="font-serif text-2xl">128 <span className="text-xs font-sans" style={{ color: "var(--ink-2)" }}>days to go</span></div>
+                <div className="flex items-baseline justify-between">
+                  <div>
+                    <div className="font-serif text-lg">Hi Sarah &amp; James</div>
+                    <div className="text-[11px]" style={{ color: "var(--ink-2)" }}>12 Dec 2025 · Riverstone Estate</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--ink-2)" }}>Countdown</div>
+                    <div className="font-serif text-xl leading-tight">128<span className="text-[10px] font-sans ml-1" style={{ color: "var(--ink-2)" }}>days</span></div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5 mt-3">
                   {[
-                    { l: "Budget Overview", v: "R86,400", s: "of R120,000", w: "72%" },
-                    { l: "Payments Made", v: "R24,000", s: "paid to suppliers", w: "40%" },
+                    { l: "Budget", v: "R86,400", s: "of R120,000", w: "72%" },
+                    { l: "Paid out", v: "R24,000", s: "8 suppliers", w: "40%" },
                   ].map((b) => (
-                    <div key={b.l} className="rounded-xl px-3 py-3" style={{ border: "1px solid var(--line)" }}>
-                      <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--ink-2)" }}>{b.l}</div>
-                      <div className="font-serif text-lg">{b.v}</div>
-                      <div className="text-[10px]" style={{ color: "var(--ink-2)" }}>{b.s}</div>
-                      <div className="h-1.5 rounded-full mt-2" style={{ background: "var(--daisy)" }}>
+                    <div key={b.l} className="rounded-xl px-3 py-2.5" style={{ border: "1px solid var(--line)" }}>
+                      <div className="text-[9px] uppercase tracking-wider" style={{ color: "var(--ink-2)" }}>{b.l}</div>
+                      <div className="font-serif text-base">{b.v}</div>
+                      <div className="text-[9px]" style={{ color: "var(--ink-2)" }}>{b.s}</div>
+                      <div className="h-1 rounded-full mt-1.5" style={{ background: "var(--daisy)" }}>
                         <div className="h-full rounded-full" style={{ width: b.w, background: "var(--poppy)" }} />
                       </div>
                     </div>
                   ))}
+                </div>
+                <div className="mt-3">
+                  <div className="text-[9px] uppercase tracking-wider mb-1.5" style={{ color: "var(--ink-2)" }}>Suppliers · 12 confirmed</div>
+                  <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--line)" }}>
+                    {[
+                      { n: "Joubert Photography", t: "Photo", s: "Paid", c: "var(--leaf)" },
+                      { n: "Petal & Stem", t: "Florist", s: "Deposit", c: "var(--peach)" },
+                      { n: "Cape Catering Co.", t: "Catering", s: "Due 28 Nov", c: "var(--daisy)" },
+                    ].map((r, i, a) => (
+                      <div key={r.n} className="flex items-center justify-between px-3 py-1.5 text-[10px]" style={i < a.length - 1 ? { borderBottom: "1px solid var(--line)" } : {}}>
+                        <div className="flex-1 truncate">
+                          <span style={{ color: "var(--ink)" }}>{r.n}</span>
+                          <span className="ml-1.5" style={{ color: "var(--ink-2)" }}>· {r.t}</span>
+                        </div>
+                        <span className="px-1.5 py-0.5 rounded-full text-[9px]" style={{ background: r.c, color: "var(--ink)" }}>{r.s}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2.5 rounded-xl px-3 py-2" style={{ background: "var(--cream)" }}>
+                  <span className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] flex-shrink-0" style={{ background: "var(--peach)" }}>→</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] font-medium leading-tight">Next up · Menu tasting with caterer</div>
+                    <div className="text-[9px]" style={{ color: "var(--ink-2)" }}>Sat 24 Aug · 11:00 · Riverstone Estate</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -439,9 +457,6 @@ function Pricing() {
   ];
   return (
     <section id="pricing" className="relative max-w-4xl mx-auto px-6 py-24">
-      <Blob className="w-72 h-72 -left-40 top-0 opacity-70" color="var(--peach)" />
-      <Blob className="w-72 h-72 -right-36 bottom-10 opacity-60" color="var(--sage-2)" />
-      <Leaf className="absolute -left-6 top-10 opacity-40 hidden lg:block" />
       <DotGrid className="absolute right-0 top-2 opacity-50 hidden lg:block" />
 
       <Reveal>
@@ -492,8 +507,8 @@ function Pricing() {
               🌿
             </span>
             <span>
-              Example: couple spends R120,000 through the portal → we invoice you R1,200.{" "}
-              <span style={{ color: "var(--poppy)", fontWeight: 600 }}>You keep R118,800.</span>
+              <span className="block mb-1">Example: couple spends R120,000 → we invoice you R1,200. <span style={{ color: "var(--poppy)", fontWeight: 600 }}>You keep R118,800.</span></span>
+              <span className="block text-[12px]">40 weddings/year × R120k avg = R48k a year — paid only when revenue lands, never a fixed bill at the end of the month.</span>
             </span>
           </div>
 
@@ -526,8 +541,6 @@ function FAQ() {
   return (
     <section id="faq" className="relative overflow-hidden" style={{ background: "var(--daisy)" }}>
       <Blob className="w-72 h-72 -right-36 -bottom-10 opacity-70" color="var(--sage-2)" />
-      <Leaf className="absolute -left-4 top-10 opacity-40 hidden lg:block" />
-      <DotGrid className="absolute left-[28%] top-10 opacity-50 hidden lg:block" />
 
       <div className="max-w-3xl mx-auto px-6 py-24 relative z-10">
         <Reveal>
