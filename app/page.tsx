@@ -379,7 +379,7 @@ function Features() {
           <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl leading-tight">
             Everything a wedding
             <br />
-            venue <span style={{ color: "var(--poppy)" }}>actually</span> needs
+            venue <span style={{ color: "var(--poppy)", fontStyle: "italic" }}>actually</span> needs
           </h2>
           <p className="mt-5 text-base" style={{ color: "var(--ink-2)" }}>
             Built from the ground up for ZA venues, not a US platform
@@ -428,7 +428,7 @@ function ForCouples() {
             <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl leading-tight">
               A dashboard they&apos;ll
               <br />
-              <span style={{ color: "var(--poppy)" }}>actually</span> use
+              <span style={{ color: "var(--poppy)", fontStyle: "italic" }}>actually</span> use
             </h2>
             <p className="mt-6 text-base leading-relaxed max-w-md" style={{ color: "var(--ink-2)" }}>
               No more PDFs that go out of date the moment you save them. No more group WhatsApp
