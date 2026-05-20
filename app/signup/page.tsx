@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/Logo";
 
@@ -10,8 +11,8 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,11 +31,10 @@ export default function SignupPage() {
 
     if (error) {
       setMsg(error.message);
+      setLoading(false);
     } else if (data.user) {
-      setOk(true);
-      setMsg("Check your inbox to confirm your email. Once confirmed you'll land in your new venue dashboard.");
+      router.push(`/signup/check-email?email=${encodeURIComponent(email)}`);
     }
-    setLoading(false);
   }
 
   return (
@@ -88,15 +88,13 @@ export default function SignupPage() {
 
         <button
           type="submit"
-          disabled={loading || ok}
+          disabled={loading}
           className="w-full bg-stone-900 text-white rounded py-2.5 font-medium disabled:opacity-50"
         >
-          {loading ? "..." : ok ? "Check your email" : "Get started"}
+          {loading ? "..." : "Get started"}
         </button>
 
-        {msg && (
-          <p className={`text-sm ${ok ? "text-emerald-700" : "text-red-600"}`}>{msg}</p>
-        )}
+        {msg && <p className="text-sm text-red-600">{msg}</p>}
 
         <p className="text-sm text-stone-500">
           Already have a Venuely account? <Link href="/login" className="underline">Sign in</Link>
