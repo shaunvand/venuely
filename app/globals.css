@@ -2,7 +2,7 @@
 /* Satoshi (body) — Fontshare CDN, free commercial use.
    Fraunces (headings / "Venuely." wordmark) — free Recoleta lookalike, Google Fonts. */
 @import url("https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,600;1,9..144,700;1,9..144,900&display=swap");
 
 /* ────────────────────────────────────────────────────────────────────
    Venuely brand system — "Hosting, Handled."
