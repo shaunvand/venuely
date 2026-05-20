@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { computeSetupSteps } from "@/lib/venue/setup";
 import { applyMarkup } from "@/lib/billing/compute";
 import { WelcomeImportModal } from "@/components/WelcomeImportModal";
+import { BookingsCalendar } from "@/components/BookingsCalendar";
 
 type Commish = { commission_value: number | null; commission_type: string | null };
 type Priced = { price?: number | string | null; price_per_night?: number | string | null; price_from?: number | string | null } & Commish & { active?: boolean | null };
@@ -37,7 +38,7 @@ export default async function VenueOverview() {
   ] = await Promise.all([
     supabase.from("weddings").select("id, slug, couple_names, wedding_date").eq("venue_id", venue.id).gte("wedding_date", todayIso).order("wedding_date").limit(5),
     supabase.from("weddings").select("id, slug, couple_names, wedding_date").eq("venue_id", venue.id).order("created_at", { ascending: false }).limit(5),
-    supabase.from("weddings").select("wedding_date").eq("venue_id", venue.id),
+    supabase.from("weddings").select("slug, couple_names, wedding_date").eq("venue_id", venue.id),
     supabase.from("payments").select("amount, status, due_date, paid_date, wedding:weddings!inner(id, slug, couple_names, venue_id)").eq("wedding.venue_id", venue.id),
     supabase.from("rental_items").select("price, commission_value, commission_type, active, stock_total").eq("venue_id", venue.id),
     supabase.from("accommodation_rooms").select("price_per_night, commission_value, commission_type, active").eq("venue_id", venue.id),
@@ -338,6 +339,9 @@ export default async function VenueOverview() {
           </div>
         </section>
       </div>
+
+      {/* Bookings calendar — booked dates highlighted, hover shows couple name */}
+      <BookingsCalendar bookings={(allWeddings ?? []) as { slug: string; couple_names: string; wedding_date: string }[]} />
 
       {/* Upcoming weddings list */}
       <section>
