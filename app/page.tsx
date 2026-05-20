@@ -30,6 +30,7 @@ export default async function Home({
       <ForCouples />
       <Pricing />
       <FAQ />
+      <FinalCTA />
       <Footer />
     </div>
   );
@@ -576,6 +577,53 @@ function FAQ() {
               </details>
             </Reveal>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Final CTA ──────────────────────────────────────────────────────── */
+
+function FinalCTA() {
+  return (
+    <section className="relative overflow-hidden" style={{ background: "var(--daisy)" }}>
+      <Blob className="w-[420px] h-[420px] -left-32 -top-20 opacity-70" color="var(--peach)" />
+      <div className="max-w-7xl mx-auto px-6 lg:px-10 py-20 grid lg:grid-cols-2 gap-12 items-center relative z-10">
+        <div>
+          <p className="text-xs uppercase tracking-[0.32em] mb-5" style={{ color: "var(--sage)" }}>
+            Ready when you are
+          </p>
+          <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl leading-tight" style={{ fontWeight: 900 }}>
+            See your venue
+            <br />
+            run like a <span style={{ color: "var(--poppy)" }}>hotel.</span>
+          </h2>
+          <p className="mt-5 text-base leading-relaxed max-w-md" style={{ color: "var(--ink-2)" }}>
+            Drop in your existing PDFs, brochures and rooming lists — Smart Import builds your
+            dashboard for you. No credit card. Free until your first booking lands.
+          </p>
+          <div className="mt-9 flex flex-wrap items-center gap-4">
+            <Link
+              href="/signup"
+              className="px-8 py-4 rounded-lg font-medium text-white transition-all hover:scale-[1.03] active:scale-[0.98] text-base"
+              style={{ background: "var(--poppy)" }}
+            >
+              Sign up for free
+            </Link>
+            <span className="text-sm" style={{ color: "var(--ink-2)" }}>
+              Setup in minutes · Cancel anytime
+            </span>
+          </div>
+        </div>
+        <div className="relative">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/cta-hero.jpeg"
+            alt="A preview of the Venuely venue dashboard"
+            className="w-full h-auto rounded-2xl shadow-[0_30px_60px_-20px_rgba(28,25,23,0.35)]"
+            style={{ border: "1px solid var(--line)" }}
+          />
         </div>
       </div>
     </section>
