@@ -44,7 +44,7 @@ const GROUPS: Group[] = [
     ],
   },
   { label: "Money", items: [{ href: "/venue/payments", label: "Payments" }] },
-  { label: "Setup", items: [{ href: "/venue/settings", label: "Settings" }] },
+  { label: "Setup", items: [{ href: "/venue/setup", label: "Checklist" }, { href: "/venue/settings", label: "Settings" }] },
 ];
 
 export function VenueSidebarNav() {

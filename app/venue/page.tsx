@@ -1,172 +1,182 @@
 import Link from "next/link";
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
-
-type Step = {
-  key: string;
-  title: string;
-  description: string;
-  href: string;
-  cta: string;
-  done: boolean;
-  count?: number | null;
-  hint?: string;
-};
+import { computeSetupSteps } from "@/lib/venue/setup";
+import { WelcomeImportModal } from "@/components/WelcomeImportModal";
 
 export default async function VenueOverview() {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
+  const { doneCount, totalCount, pct, counts } = await computeSetupSteps(supabase, venue);
 
+  // Pull a few headline data points for the stats grid.
+  const todayIso = new Date().toISOString().slice(0, 10);
   const [
-    { count: weddingsCount },
-    { count: catalogueCount },
-    { count: rentalsCount },
-    { count: roomsCount },
-    { count: paymentsCount },
-    { count: suppliersCount },
+    { data: upcoming },
+    { data: recentWeddings },
+    { data: paySum },
   ] = await Promise.all([
-    supabase.from("weddings").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
-    supabase.from("catalogue_items").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
-    supabase.from("rental_items").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
-    supabase.from("accommodation_rooms").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
-    supabase.from("payments").select("*, wedding:weddings!inner(venue_id)", { count: "exact", head: true }).eq("wedding.venue_id", venue.id),
-    supabase.from("suppliers").select("*, wedding:weddings!inner(venue_id)", { count: "exact", head: true }).eq("wedding.venue_id", venue.id),
+    supabase
+      .from("weddings")
+      .select("id, slug, couple_names, wedding_date")
+      .eq("venue_id", venue.id)
+      .gte("wedding_date", todayIso)
+      .order("wedding_date")
+      .limit(5),
+    supabase
+      .from("weddings")
+      .select("id, slug, couple_names, wedding_date")
+      .eq("venue_id", venue.id)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("payments")
+      .select("amount, status, wedding:weddings!inner(venue_id)")
+      .eq("wedding.venue_id", venue.id),
   ]);
 
-  const venueDetailsDone = Boolean(venue.address || venue.region);
+  const payments = (paySum ?? []) as Array<{ amount: number | string; status: string | null }>;
+  const collected = payments
+    .filter((p) => p.status === "paid")
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const invoiced = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
-  const steps: Step[] = [
+  const venueEmpty =
+    counts.catalogue === 0 && counts.rentals === 0 && counts.rooms === 0;
+
+  const stats = [
     {
-      key: "venue",
-      title: "Confirm your venue details",
-      description: "Address (Google Places), branding colour, contact details. The address shows on every couple portal.",
-      href: "/venue/settings",
-      cta: venueDetailsDone ? "Edit details" : "Add details",
-      done: venueDetailsDone,
-      hint: venue.address ?? venue.region ?? undefined,
+      label: "Upcoming weddings",
+      value: (upcoming?.length ?? 0).toString(),
+      sub: counts.weddings ? `${counts.weddings} total` : "No bookings yet",
+      href: "/venue/weddings",
     },
     {
-      key: "catalogue",
-      title: "Add your catalogue items",
-      description: "Everything included with the booking — décor, tableware, furniture. Couples tick which days they need each item.",
-      href: "/venue/catalogue",
-      cta: "Open catalogue",
-      done: (catalogueCount ?? 0) > 0,
-      count: catalogueCount,
-    },
-    {
-      key: "rentals",
-      title: "Add rentals (paid extras)",
-      description: "Items with a price per day and a stock limit. Couples select quantity + days — totals tally automatically.",
-      href: "/venue/rentals",
-      cta: "Open rentals",
-      done: (rentalsCount ?? 0) > 0,
-      count: rentalsCount,
-    },
-    {
-      key: "accommodation",
-      title: "Add accommodation rooms",
-      description: "Cottages, suites, tents — anything on-site. Couples can assign guests to rooms.",
+      label: "Accommodation rooms",
+      value: counts.rooms.toString(),
+      sub: counts.rooms ? "Active rooms" : "Add your first room",
       href: "/venue/accommodation",
-      cta: "Open accommodation",
-      done: (roomsCount ?? 0) > 0,
-      count: roomsCount,
     },
     {
-      key: "weddings",
-      title: "Create your first wedding",
-      description: "Add a booked couple. Their portal URL is auto-generated as e.g. AlexAndSamWedding.",
-      href: "/venue/weddings",
-      cta: "Add wedding",
-      done: (weddingsCount ?? 0) > 0,
-      count: weddingsCount,
+      label: "Catalogue items",
+      value: counts.catalogue.toString(),
+      sub: counts.rentals ? `+ ${counts.rentals} rentals` : "Included extras",
+      href: "/venue/catalogue",
     },
     {
-      key: "suppliers",
-      title: "Recommend suppliers",
-      description: "Photographers, florists, caterers you trust. Couples browse your list instead of guessing.",
-      href: "/venue/weddings",
-      cta: "Per-wedding suppliers →",
-      done: (suppliersCount ?? 0) > 0,
-      count: suppliersCount,
-      hint: "Add suppliers from a wedding's detail page.",
-    },
-    {
-      key: "payments",
-      title: "Track payments + invoices",
-      description: "Deposits + final balances per wedding. Mark paid, see overdue, attach invoices.",
+      label: "Payments collected",
+      value: collected ? `R${collected.toLocaleString("en-ZA")}` : "R0",
+      sub: invoiced ? `of R${invoiced.toLocaleString("en-ZA")} invoiced` : "No invoices yet",
       href: "/venue/payments",
-      cta: "Open payments",
-      done: (paymentsCount ?? 0) > 0,
-      count: paymentsCount,
-    },
-    {
-      key: "photos",
-      title: "Upload venue photos",
-      description: "Hero gallery on the Our Venue tab of every couple portal. Coming soon — currently shown from seeded images.",
-      href: "/venue/settings",
-      cta: "Photo upload (soon)",
-      done: false,
-      hint: "Available in next update.",
     },
   ];
 
-  const doneCount = steps.filter((s) => s.done).length;
-  const totalCount = steps.length;
-  const pct = Math.round((doneCount / totalCount) * 100);
-
   return (
     <div className="space-y-10">
-      <header>
-        <div className="vy-eyebrow">Welcome to Venuely</div>
-        <h1 className="vy-h1 mt-1">{venue.name}</h1>
-        {(venue.address || venue.region) && (
-          <p className="text-stone-600 text-sm mt-1">
-            {venue.address ?? venue.region}
-            {venue.google_maps_url && (
-              <a href={venue.google_maps_url} target="_blank" rel="noopener noreferrer" className="text-[color:var(--forest)] hover:underline ml-2">↗ Google Maps</a>
-            )}
-          </p>
-        )}
+      {venueEmpty && <WelcomeImportModal venueId={venue.id} venueName={venue.name} />}
+
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div className="vy-eyebrow">Welcome to Venuely</div>
+          <h1 className="vy-h1 mt-1">{venue.name}</h1>
+          {(venue.address || venue.region) && (
+            <p className="text-stone-600 text-sm mt-1">
+              {venue.address ?? venue.region}
+              {venue.google_maps_url && (
+                <a href={venue.google_maps_url} target="_blank" rel="noopener noreferrer" className="ml-2 hover:underline" style={{ color: "var(--poppy)" }}>↗ Google Maps</a>
+              )}
+            </p>
+          )}
+        </div>
+
+        <Link
+          href="/venue/setup"
+          className="vy-card flex items-center gap-3 hover:shadow-md transition-shadow"
+          style={{ padding: "0.55rem 0.9rem" }}
+        >
+          <div className="relative w-9 h-9">
+            <svg viewBox="0 0 36 36" className="w-9 h-9 -rotate-90">
+              <circle cx="18" cy="18" r="15" fill="none" stroke="var(--line)" strokeWidth="3" />
+              <circle
+                cx="18" cy="18" r="15" fill="none"
+                stroke="var(--poppy)" strokeWidth="3" strokeLinecap="round"
+                strokeDasharray={`${(pct / 100) * 2 * Math.PI * 15} ${2 * Math.PI * 15}`}
+              />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold tabular-nums">{pct}%</span>
+          </div>
+          <div className="text-left">
+            <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--ink-2)" }}>Setup checklist</div>
+            <div className="text-sm font-medium">{doneCount} of {totalCount} done →</div>
+          </div>
+        </Link>
       </header>
 
-      <section className="vy-card-hero">
+      {/* Stats grid */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((s) => (
+          <Link key={s.label} href={s.href} className="vy-stat hover:shadow-md transition-shadow">
+            <div className="vy-stat-label">{s.label}</div>
+            <div className="vy-stat-value">{s.value}</div>
+            <div className="text-xs mt-1" style={{ color: "var(--ink-2)" }}>{s.sub}</div>
+          </Link>
+        ))}
+      </div>
+
+      {/* Upcoming weddings */}
+      <section>
         <div className="flex items-baseline justify-between mb-3">
-          <div>
-            <div className="vy-eyebrow">Setup progress</div>
-            <h2 className="vy-h2 mt-1">{doneCount} of {totalCount} steps complete</h2>
+          <h2 className="vy-h2">Upcoming weddings</h2>
+          <Link href="/venue/weddings" className="text-sm hover:underline" style={{ color: "var(--poppy)" }}>
+            View all →
+          </Link>
+        </div>
+        {upcoming && upcoming.length > 0 ? (
+          <div className="vy-card divide-y" style={{ padding: 0 }}>
+            {upcoming.map((w) => (
+              <Link
+                key={w.id}
+                href={`/venue/weddings/${w.slug}`}
+                className="flex items-center justify-between px-4 py-3 hover:bg-[color:var(--cream)] transition-colors"
+              >
+                <div>
+                  <div className="font-medium text-[15px]">{w.couple_names}</div>
+                  <div className="text-xs" style={{ color: "var(--ink-2)" }}>
+                    {new Date(w.wedding_date).toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "long", year: "numeric" })}
+                  </div>
+                </div>
+                <span style={{ color: "var(--poppy)" }}>→</span>
+              </Link>
+            ))}
           </div>
-          <div className="font-serif text-4xl tabular-nums text-[color:var(--forest)]">{pct}%</div>
-        </div>
-        <div className="w-full h-2 rounded-full bg-stone-100 overflow-hidden">
-          <div className="h-full bg-[color:var(--forest)] transition-all" style={{ width: `${pct}%` }} />
-        </div>
+        ) : (
+          <div className="vy-empty">
+            No upcoming weddings.{" "}
+            <Link href="/venue/weddings" className="underline" style={{ color: "var(--poppy)" }}>Add one</Link>.
+          </div>
+        )}
       </section>
 
-      <ol className="space-y-3">
-        {steps.map((s, i) => (
-          <li key={s.key} className={`vy-card flex gap-4 ${s.done ? "border-[color:var(--sage)]/40 bg-[color:var(--cream)]/40" : ""}`}>
-            <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center font-medium text-sm ${s.done ? "bg-[color:var(--forest)] text-white" : "bg-stone-100 text-stone-500"}`}>
-              {s.done ? "✓" : i + 1}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                <h3 className="font-semibold text-[15px]">{s.title}</h3>
-                {typeof s.count === "number" && (
-                  <span className="vy-tag vy-tag-soft">{s.count} item{s.count === 1 ? "" : "s"}</span>
-                )}
-              </div>
-              <p className="text-sm text-stone-600 mt-1">{s.description}</p>
-              {s.hint && <p className="text-xs text-stone-500 mt-1 italic">{s.hint}</p>}
-            </div>
-            <div className="flex-shrink-0 flex items-center">
-              <Link href={s.href} className={`vy-btn ${s.done ? "vy-btn-secondary" : "vy-btn-primary"} whitespace-nowrap`}>
-                {s.cta}
+      {/* Recently added */}
+      {recentWeddings && recentWeddings.length > 0 && counts.weddings > (upcoming?.length ?? 0) && (
+        <section>
+          <h2 className="vy-h2 mb-3">Recently added</h2>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {recentWeddings.slice(0, 4).map((w) => (
+              <Link
+                key={w.id}
+                href={`/venue/weddings/${w.slug}`}
+                className="vy-card hover:shadow-md transition-shadow"
+              >
+                <div className="font-medium text-[15px]">{w.couple_names}</div>
+                <div className="text-xs mt-0.5" style={{ color: "var(--ink-2)" }}>
+                  {new Date(w.wedding_date).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}
+                </div>
               </Link>
-            </div>
-          </li>
-        ))}
-      </ol>
+            ))}
+          </div>
+        </section>
+      )}
 
       <p className="text-sm text-stone-600 pt-4 border-t border-[color:var(--line)]">
         Tip — each couple sees their portal at{" "}
