@@ -672,8 +672,8 @@ function FaqIcon({ name }: { name: "who" | "compare" | "phone" | "calendar" | "c
     case "cloud":
       return (
         <svg viewBox="0 0 24 24" width="20" height="20" {...p}>
-          <path d="M7 17h10a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.7-1.2A3.6 3.6 0 0 0 7 17z" />
-          <path d="M12 14V9.5M9.7 11.5L12 9.2l2.3 2.3" />
+          <path d="M7 16h10a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.7-1.2A3.6 3.6 0 0 0 7 16z" />
+          <path d="M12 12v5M9.7 14.7L12 17l2.3-2.3" />
         </svg>
       );
     case "card":
@@ -697,46 +697,77 @@ function FAQ() {
     { icon: "card", q: "What about payment processing?", a: "Couples pay you directly — we don't sit between you and your money. Venuely tracks who's paid what. In-dashboard payment integration is on the roadmap if you want it." },
   ];
   return (
-    <section id="faq" className="relative overflow-hidden" style={{ background: "var(--daisy)" }}>
-      <Blob className="w-72 h-72 -right-36 -bottom-10 opacity-70" color="var(--sage-2)" />
+    <section id="faq" className="relative overflow-hidden" style={{ background: "var(--cream)" }}>
+      {/* Decorations — ration to one per zone (top-left botanical, bottom-right blob + dots). */}
+      <Leaf className="absolute -top-4 -left-4 opacity-50 hidden lg:block" />
+      <Blob className="w-72 h-72 -right-32 -bottom-12 opacity-70" color="var(--sage-2)" />
+      <DotGrid className="absolute right-16 bottom-10 opacity-40 hidden lg:block" />
 
-      <div className="max-w-3xl mx-auto px-6 py-24 relative z-10">
-        <Reveal>
-          <div className="text-center mb-12">
-            <h2 className="font-serif text-5xl sm:text-6xl">Questions</h2>
-            <p className="mt-3 text-base" style={{ color: "var(--ink-2)" }}>
-              Everything you need to know about Venuely.
-            </p>
+      <div className="max-w-7xl mx-auto px-6 lg:px-10 py-24 grid lg:grid-cols-[340px_1fr] gap-10 lg:gap-16 items-start relative z-10">
+        {/* Left arch — decorative venue interior, matches hero treatment, smaller. */}
+        <div className="hidden lg:block relative">
+          <div
+            className="w-full h-[460px] overflow-hidden p-2.5"
+            style={{ background: "var(--poppy)", borderRadius: "9999px 9999px 14px 14px" }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=700&q=80"
+              alt=""
+              className="w-full h-full object-cover"
+              style={{ borderRadius: "9999px 9999px 8px 8px" }}
+            />
           </div>
-        </Reveal>
-        <div className="space-y-4">
-          {qs.map(({ icon, q, a }, i) => (
-            <Reveal key={q} delay={i * 50}>
-              <details
-                className="group bg-white rounded-2xl overflow-hidden relative transition-colors open:bg-[color:var(--cream)] open:shadow-[inset_4px_0_0_0_var(--poppy)]"
-                style={{ border: "1px solid var(--line)" }}
-              >
-                <summary className="cursor-pointer list-none flex items-center gap-4 px-6 py-5">
+        </div>
+
+        {/* Right column: heading + accordion */}
+        <div>
+          <Reveal>
+            <div className="mb-10">
+              <h2 className="font-serif text-5xl sm:text-6xl text-center lg:text-left" style={{ fontWeight: 900 }}>
+                Questions
+              </h2>
+              <p className="mt-2 text-base text-center lg:text-left" style={{ color: "var(--ink-2)" }}>
+                Everything you need to know about Venuely.
+              </p>
+            </div>
+          </Reveal>
+
+          <div className="space-y-3.5">
+            {qs.map(({ icon, q, a }, i) => (
+              <Reveal key={q} delay={i * 50}>
+                <details
+                  className="group bg-white rounded-2xl overflow-hidden relative transition-colors open:bg-[color:var(--cream)]"
+                  style={{ border: "1px solid var(--line)" }}
+                >
+                  {/* Left poppy border accent on open */}
                   <span
-                    className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background: i % 2 ? "var(--sage-2)" : "var(--peach)" }}
-                  >
-                    <FaqIcon name={icon} />
-                  </span>
-                  <span className="flex-1 font-semibold text-[15px]">{q}</span>
-                  <span
-                    className="text-2xl leading-none transition-transform group-open:rotate-45"
-                    style={{ color: "var(--poppy)" }}
-                  >
-                    +
-                  </span>
-                </summary>
-                <p className="px-6 pb-6 pl-[5rem] text-sm leading-relaxed" style={{ color: "var(--ink-2)" }}>
-                  {a}
-                </p>
-              </details>
-            </Reveal>
-          ))}
+                    aria-hidden
+                    className="absolute left-0 top-0 bottom-0 w-1 opacity-0 group-open:opacity-100 transition-opacity"
+                    style={{ background: "var(--poppy)" }}
+                  />
+                  <summary className="cursor-pointer list-none flex items-center gap-4 px-6 py-5">
+                    <span
+                      className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: i % 2 ? "var(--sage-2)" : "var(--peach)" }}
+                    >
+                      <FaqIcon name={icon} />
+                    </span>
+                    <span className="flex-1 font-semibold text-[15px]">{q}</span>
+                    <span
+                      className="font-light leading-none transition-transform group-open:rotate-45"
+                      style={{ color: "var(--poppy)", fontSize: "1.5rem" }}
+                    >
+                      +
+                    </span>
+                  </summary>
+                  <p className="px-6 pb-6 pl-[5rem] text-sm leading-relaxed" style={{ color: "var(--ink-2)" }}>
+                    {a}
+                  </p>
+                </details>
+              </Reveal>
+            ))}
+          </div>
         </div>
       </div>
     </section>
