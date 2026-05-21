@@ -118,13 +118,132 @@ function Nav({ signedIn }: { signedIn: boolean }) {
   );
 }
 
+/* ── Dashboard mockup (hero right panel) ────────────────────────────── */
+
+function DashboardMockup() {
+  const navIcons = [
+    /* home */
+    <svg key="home" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><path d="M2 7l6-5 6 5v7H2z" /><path d="M6 14v-4h4v4" /></svg>,
+    /* users */
+    <svg key="users" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="2.2" /><path d="M2 13c.6-2 2.2-3 4-3s3.4 1 4 3" /><circle cx="11.5" cy="5" r="1.6" /><path d="M10.5 10c1.8-.2 3.1.8 3.5 2.5" /></svg>,
+    /* bed */
+    <svg key="bed" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><path d="M2 11.5v-5h12v5" /><path d="M2 9.5h12" /><path d="M5 7V5.5A.5.5 0 0 1 5.5 5h2a.5.5 0 0 1 .5.5V7" /></svg>,
+    /* box */
+    <svg key="box" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2l5 2.5v7L8 14 3 11.5v-7z" /><path d="M8 2v12M3 4.5l5 2.5 5-2.5" /></svg>,
+    /* clock */
+    <svg key="clock" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"><circle cx="8" cy="8" r="5.5" /><path d="M8 5v3l2 1.5" /></svg>,
+    /* settings */
+    <svg key="settings" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="2" /><path d="M8 2v1.5M8 12.5V14M2 8h1.5M12.5 8H14M3.5 3.5l1 1M11.5 11.5l1 1M3.5 12.5l1-1M11.5 4.5l1-1" /></svg>,
+  ];
+
+  return (
+    <div className="w-full h-full flex" style={{ background: "var(--cream)" }}>
+      {/* Sidebar */}
+      <div
+        className="flex-shrink-0 flex flex-col items-center py-5 gap-4"
+        style={{ width: 44, background: "#fff", borderRight: "1px solid var(--line)" }}
+      >
+        <div
+          className="w-7 h-7 rounded-lg flex items-center justify-center mb-1"
+          style={{ background: "var(--poppy)" }}
+        >
+          <span style={{ color: "#fff", fontFamily: "'Fraunces', serif", fontWeight: 900, fontSize: 9 }}>V.</span>
+        </div>
+        {navIcons.map((icon, i) => (
+          <div
+            key={i}
+            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ color: i === 0 ? "var(--poppy)" : "var(--ink-2)", background: i === 0 ? "var(--cream)" : "transparent" }}
+          >
+            {icon}
+          </div>
+        ))}
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 p-2.5 flex flex-col gap-2 overflow-hidden">
+        {/* Weekend Overview */}
+        <div className="bg-white rounded-xl p-2.5" style={{ border: "1px solid var(--line)" }}>
+          <div className="flex items-start justify-between">
+            <div
+              className="text-[7.5px] uppercase tracking-wider"
+              style={{ color: "var(--ink-2)", letterSpacing: "0.18em" }}
+            >
+              Weekend Overview
+            </div>
+            <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: "var(--cream)" }}>
+              <svg viewBox="0 0 14 14" width="10" height="10" fill="none" stroke="var(--ink-2)" strokeWidth="1.2" strokeLinecap="round"><rect x="1.5" y="2" width="11" height="10" rx="1.5" /><path d="M1.5 5.5h11" /><path d="M4.5 1v2M9.5 1v2" /></svg>
+            </div>
+          </div>
+          <div className="font-serif text-sm font-bold leading-snug mt-0.5" style={{ color: "var(--ink)" }}>
+            12 – 14 Dec 2025
+          </div>
+          <div className="text-[8.5px] mt-0.5 mb-2" style={{ color: "var(--ink-2)" }}>
+            3 weddings · fully booked
+          </div>
+          <div className="flex items-end gap-0.5 h-5">
+            {[3, 5, 4, 7, 5, 9, 6].map((h, k) => (
+              <div
+                key={k}
+                className="flex-1 rounded-sm"
+                style={{ height: `${h * 2.2}px`, background: k === 5 ? "var(--poppy)" : "var(--sage-2)" }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Payments Collected */}
+        <div className="bg-white rounded-xl p-2.5" style={{ border: "1px solid var(--line)" }}>
+          <div className="text-[7.5px] uppercase tracking-wider mb-1.5" style={{ color: "var(--ink-2)", letterSpacing: "0.18em" }}>
+            Payments Collected
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-serif text-base leading-tight" style={{ color: "var(--ink)" }}>R86,400</div>
+              <div className="text-[8.5px]" style={{ color: "var(--ink-2)" }}>of R145,000 invoiced</div>
+            </div>
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0"
+              style={{ border: "3px solid var(--poppy)", color: "var(--poppy)" }}
+            >
+              60%
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom row */}
+        <div className="grid grid-cols-2 gap-2 flex-1">
+          {[
+            { label: "Accommodation", value: "32 / 40", sub: "rooms booked", w: "80%",
+              icon: <svg viewBox="0 0 14 14" width="10" height="10" fill="none" stroke="var(--ink-2)" strokeWidth="1.2" strokeLinecap="round"><path d="M2 10v-4h10v4" /><path d="M2 8h10" /><path d="M4.5 6V4.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5V6" /></svg> },
+            { label: "Rentals Tracked", value: "128", sub: "items reserved", w: "60%",
+              icon: <svg viewBox="0 0 14 14" width="10" height="10" fill="none" stroke="var(--ink-2)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 3h6v5H4z" /><path d="M2.5 11h9" /><path d="M5.5 8v3M8.5 8v3" /></svg> },
+          ].map(({ label, value, sub, w, icon }) => (
+            <div key={label} className="bg-white rounded-xl p-2 flex flex-col justify-between" style={{ border: "1px solid var(--line)" }}>
+              <div>
+                <div className="text-[7px] uppercase tracking-wider" style={{ color: "var(--ink-2)", letterSpacing: "0.15em" }}>{label}</div>
+                <div className="font-serif text-sm mt-0.5 leading-tight" style={{ color: "var(--ink)" }}>{value}</div>
+                <div className="text-[8px]" style={{ color: "var(--ink-2)" }}>{sub}</div>
+                <div className="h-0.5 rounded-full mt-1.5" style={{ background: "var(--line)" }}>
+                  <div className="h-full rounded-full" style={{ width: w, background: "var(--poppy)" }} />
+                </div>
+              </div>
+              <div className="flex justify-end mt-1">
+                <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: "var(--cream)" }}>
+                  {icon}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Hero ───────────────────────────────────────────────────────────── */
 
 function Hero() {
-  const cards = [
-    { icon: "📅", label: "Weekend Overview", value: "12 – 14 Dec 2025", sub: "3 weddings · fully booked", chart: true },
-    { icon: "💳", label: "Payments Collected", value: "R86,400", sub: "of R145,000 invoiced", ring: "60%" },
-  ];
   return (
     <section className="relative max-w-7xl mx-auto px-6 lg:px-10 pt-10 pb-16 grid lg:grid-cols-2 gap-12 items-center">
       <Blob className="w-[420px] h-[420px] -right-32 top-0 opacity-90" color="var(--sage-2)" />
@@ -167,64 +286,18 @@ function Hero() {
         </div>
       </div>
 
-      {/* Arched photo + floating stat cards */}
+      {/* Arched dashboard mockup */}
       <div className="relative z-10 flex justify-center lg:justify-end">
-        <div className="relative">
+        <DotGrid className="absolute -left-4 top-1/3 opacity-20 hidden lg:block" />
+        <div
+          className="w-[300px] sm:w-[380px] h-[460px] sm:h-[520px] overflow-hidden p-3"
+          style={{ background: "var(--poppy)", borderRadius: "9999px 9999px 18px 18px" }}
+        >
           <div
-            className="w-[300px] sm:w-[360px] h-[460px] sm:h-[520px] overflow-hidden p-3"
-            style={{ background: "var(--poppy)", borderRadius: "9999px 9999px 18px 18px" }}
+            className="w-full h-full overflow-hidden"
+            style={{ borderRadius: "9999px 9999px 10px 10px" }}
           >
-            <img
-              src="https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=900&q=80"
-              alt="A wedding reception set inside a warm venue"
-              className="w-full h-full object-cover"
-              style={{ borderRadius: "9999px 9999px 10px 10px" }}
-            />
-          </div>
-
-          <div className="absolute -right-6 sm:-right-16 top-6 space-y-3 w-[210px]">
-            {cards.map((c, i) => (
-              <Reveal key={c.label} delay={i * 90}>
-                <div
-                  className="bg-white rounded-2xl px-4 py-3 flex items-center gap-3 shadow-[0_10px_30px_-12px_rgba(28,25,23,0.22)]"
-                >
-                  <span
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-sm flex-shrink-0"
-                    style={{ background: i % 2 ? "var(--leaf)" : "var(--peach)" }}
-                  >
-                    {c.icon}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[10px] uppercase tracking-wider truncate" style={{ color: "var(--ink-2)" }}>
-                      {c.label}
-                    </div>
-                    <div className="font-serif text-lg leading-tight" style={{ color: "var(--ink)" }}>
-                      {c.value}
-                    </div>
-                    {c.sub && <div className="text-[10px]" style={{ color: "var(--ink-2)" }}>{c.sub}</div>}
-                    {c.chart && (
-                      <div className="flex items-end gap-0.5 h-5 mt-1">
-                        {[5, 8, 6, 11, 7, 13, 9].map((h, k) => (
-                          <span
-                            key={k}
-                            className="w-1.5 rounded-sm"
-                            style={{ height: `${h * 1.4}px`, background: k === 5 ? "var(--poppy)" : "var(--sage-2)" }}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {c.ring && (
-                    <span
-                      className="text-[10px] font-semibold flex-shrink-0"
-                      style={{ color: "var(--poppy)" }}
-                    >
-                      {c.ring}
-                    </span>
-                  )}
-                </div>
-              </Reveal>
-            ))}
+            <DashboardMockup />
           </div>
         </div>
       </div>
