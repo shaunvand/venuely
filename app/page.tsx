@@ -292,7 +292,7 @@ function Hero() {
         <img
           src="/hero-arch.png"
           alt="Venuely dashboard overview"
-          className="w-[300px] sm:w-[420px] h-auto"
+          className="w-[300px] sm:w-[520px] h-auto"
         />
       </div>
     </section>
