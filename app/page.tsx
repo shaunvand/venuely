@@ -26,11 +26,16 @@ export default async function Home({
       <Nav signedIn={!!user} />
       <Hero />
       <Features />
+      <SectionFade from="var(--cream)" to="var(--daisy)" />
       <ForCouples />
+      <SectionFade from="var(--daisy)" to="var(--cream)" />
       <TrustedBy />
       <Pricing />
+      <SectionFade from="var(--cream)" to="var(--daisy)" />
       <FAQ />
+      <SectionFade from="var(--cream)" to="var(--daisy)" />
       <FinalCTA />
+      <SectionFade from="var(--daisy)" to="var(--cream)" />
       <Footer />
     </div>
   );
@@ -425,6 +430,15 @@ function TrustChips() {
         </span>
       ))}
     </div>
+  );
+}
+
+function SectionFade({ from, to }: { from: string; to: string }) {
+  return (
+    <div
+      className="h-20 w-full -mt-1"
+      style={{ background: `linear-gradient(to bottom, ${from}, ${to})` }}
+    />
   );
 }
 
