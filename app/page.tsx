@@ -854,7 +854,7 @@ function FinalCTA() {
           <span style={{ color: "var(--poppy)", fontStyle: "italic" }}>next</span>{" "}
           wedding.
         </h2>
-        <p className="mt-5 text-lg" style={{ color: "var(--ink-2)" }}>
+        <p className="mt-5 text-sm" style={{ color: "var(--ink-2)" }}>
           Free until a couple books. Then we take 1% — never more.
         </p>
         <p className="mt-6 text-base leading-relaxed max-w-lg mx-auto" style={{ color: "var(--ink-2)" }}>
