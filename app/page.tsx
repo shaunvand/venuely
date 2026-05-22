@@ -286,20 +286,14 @@ function Hero() {
         </div>
       </div>
 
-      {/* Arched dashboard mockup */}
+      {/* Arch illustration */}
       <div className="relative z-10 flex justify-center lg:justify-end">
-        <DotGrid className="absolute -left-4 top-1/3 opacity-20 hidden lg:block" />
-        <div
-          className="w-[300px] sm:w-[380px] h-[460px] sm:h-[520px] overflow-hidden p-3"
-          style={{ background: "var(--poppy)", borderRadius: "9999px 9999px 18px 18px" }}
-        >
-          <div
-            className="w-full h-full overflow-hidden"
-            style={{ borderRadius: "9999px 9999px 10px 10px" }}
-          >
-            <DashboardMockup />
-          </div>
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/hero-arch.png"
+          alt="Venuely dashboard overview"
+          className="w-[300px] sm:w-[420px] h-auto"
+        />
       </div>
     </section>
   );
@@ -779,17 +773,12 @@ function FAQ() {
       <div className="max-w-7xl mx-auto px-6 lg:px-10 py-24 grid lg:grid-cols-[340px_1fr] gap-10 lg:gap-16 items-start relative z-10">
         {/* Left arch — decorative venue interior, matches hero treatment, smaller. */}
         <div className="hidden lg:block relative">
-          <div
-            className="w-full h-[460px] overflow-hidden p-2.5"
-            style={{ background: "var(--poppy)", borderRadius: "9999px 9999px 14px 14px" }}
-          >
-            <div
-              className="w-full h-full overflow-hidden"
-              style={{ borderRadius: "9999px 9999px 8px 8px" }}
-            >
-              <DashboardMockup />
-            </div>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/hero-arch.png"
+            alt="Venuely dashboard overview"
+            className="w-full h-auto"
+          />
         </div>
 
         {/* Right column: heading + accordion */}
