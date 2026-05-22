@@ -497,7 +497,7 @@ function Features() {
 function ForCouples() {
   const tabs = ["Overview", "Our Wedding", "Guest List", "Accommodation", "Catalogue", "Budget", "Payments", "Timeline", "Travel Info"];
   return (
-    <section id="for-couples" className="relative overflow-hidden" style={{ background: "var(--daisy)" }}>
+    <section id="for-couples" className="relative" style={{ background: "var(--daisy)" }}>
       <Blob className="w-[460px] h-[460px] -right-40 -top-20 opacity-80" color="var(--sage-2)" />
 
       <div className="max-w-7xl mx-auto px-6 lg:px-10 py-24 grid lg:grid-cols-2 gap-14 items-center relative z-10">
@@ -778,7 +778,7 @@ function FAQ() {
     { icon: "card", q: "What about payment processing?", a: "Couples pay you directly — we don't sit between you and your money. Venuely tracks who's paid what. In-dashboard payment integration is on the roadmap if you want it." },
   ];
   return (
-    <section id="faq" className="relative overflow-hidden" style={{ background: "var(--cream)" }}>
+    <section id="faq" className="relative" style={{ background: "var(--cream)" }}>
       {/* Decorations — ration to one per zone (top-left botanical, bottom-right blob + dots). */}
       <Leaf className="absolute -top-4 -left-4 opacity-50 hidden lg:block" />
       <Blob className="w-72 h-72 -right-32 -bottom-12 opacity-70" color="var(--sage-2)" />
@@ -854,7 +854,7 @@ function FAQ() {
 
 function FinalCTA() {
   return (
-    <section className="relative overflow-hidden" style={{ background: "var(--daisy)" }}>
+    <section className="relative" style={{ background: "var(--daisy)" }}>
       <Blob className="w-[420px] h-[420px] -left-32 -top-20 opacity-70" color="var(--peach)" />
       <Blob className="w-[320px] h-[320px] -right-20 top-10 opacity-50" color="var(--sage-2)" />
       <div className="max-w-2xl mx-auto px-6 lg:px-10 py-24 text-center relative z-10">
