@@ -783,13 +783,12 @@ function FAQ() {
             className="w-full h-[460px] overflow-hidden p-2.5"
             style={{ background: "var(--poppy)", borderRadius: "9999px 9999px 14px 14px" }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=700&q=80"
-              alt=""
-              className="w-full h-full object-cover"
+            <div
+              className="w-full h-full overflow-hidden"
               style={{ borderRadius: "9999px 9999px 8px 8px" }}
-            />
+            >
+              <DashboardMockup />
+            </div>
           </div>
         </div>
 
