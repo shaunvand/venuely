@@ -849,7 +849,7 @@ function FinalCTA() {
         <div className="flex justify-center mb-8">
           <LogoMark size={64} />
         </div>
-        <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl leading-tight" style={{ fontWeight: 900 }}>
+        <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl leading-tight whitespace-nowrap" style={{ fontWeight: 900 }}>
           Try it on your{" "}
           <span style={{ color: "var(--poppy)", fontStyle: "italic" }}>next</span>{" "}
           wedding.
