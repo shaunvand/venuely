@@ -798,6 +798,7 @@ function FAQ() {
             {qs.map(({ icon, q, a }, i) => (
               <Reveal key={q} delay={i * 50}>
                 <details
+                  open={i === 0}
                   className="group bg-white rounded-2xl overflow-hidden relative transition-colors open:bg-[color:var(--cream)]"
                   style={{ border: "1px solid var(--line)" }}
                 >
