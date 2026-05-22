@@ -841,20 +841,23 @@ function FinalCTA() {
   return (
     <section className="relative overflow-hidden" style={{ background: "var(--daisy)" }}>
       <Blob className="w-[420px] h-[420px] -left-32 -top-20 opacity-70" color="var(--peach)" />
-      <div className="max-w-5xl mx-auto px-6 lg:px-10 py-20 text-center relative z-10">
-        <p className="text-xs uppercase tracking-[0.32em] mb-6" style={{ color: "var(--sage)" }}>
+      <Blob className="w-[320px] h-[320px] -right-20 top-10 opacity-50" color="var(--sage-2)" />
+      <div className="max-w-2xl mx-auto px-6 lg:px-10 py-24 text-center relative z-10">
+        <p className="text-xs uppercase tracking-[0.32em] mb-8" style={{ color: "var(--sage)" }}>
           Ready when you are
         </p>
-        <div className="relative mx-auto max-w-4xl">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/cta-hero.jpeg"
-            alt="A preview of the Venuely venue dashboard"
-            className="w-full h-auto rounded-2xl shadow-[0_30px_60px_-20px_rgba(28,25,23,0.35)]"
-            style={{ border: "1px solid var(--line)" }}
-          />
+        <div className="flex justify-center mb-8">
+          <LogoMark size={64} />
         </div>
-        <p className="mt-10 text-base leading-relaxed max-w-xl mx-auto" style={{ color: "var(--ink-2)" }}>
+        <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl leading-tight" style={{ fontWeight: 900 }}>
+          Try it on your{" "}
+          <span style={{ color: "var(--poppy)", fontStyle: "italic" }}>next</span>{" "}
+          wedding.
+        </h2>
+        <p className="mt-5 text-lg" style={{ color: "var(--ink-2)" }}>
+          Free until a couple books. Then we take 1% — never more.
+        </p>
+        <p className="mt-6 text-base leading-relaxed max-w-lg mx-auto" style={{ color: "var(--ink-2)" }}>
           Drop in your existing PDFs, brochures and rooming lists — Smart Import builds your
           dashboard for you. No credit card. Free until your first booking lands.
         </p>
