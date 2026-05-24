@@ -259,9 +259,7 @@ function Hero() {
           For South African wedding venues
         </p>
         <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl leading-[1.02]" style={{ fontWeight: 900 }}>
-          Run weddings <span style={{ color: "var(--poppy)" }}>beautifully.</span>
-          <br />
-          <span style={{ fontWeight: 600, color: "var(--ink-2)" }}>Without the spreadsheets.</span>
+          Run your wedding venue <span style={{ color: "var(--poppy)", fontStyle: "italic" }}>seamlessly.</span>
         </h1>
         <p className="mt-7 text-base leading-relaxed max-w-md" style={{ color: "var(--ink-2)" }}>
           Venuely gives every couple their own branded dashboard, plus a clean admin for
