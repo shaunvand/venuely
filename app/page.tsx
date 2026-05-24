@@ -256,7 +256,7 @@ function Hero() {
 
       <div className="relative z-10">
         <p className="text-xs uppercase tracking-[0.32em] mb-6" style={{ color: "var(--sage)" }}>
-          For South African wedding venues
+          Built for wedding venues.
         </p>
         <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl leading-[1.02]" style={{ fontWeight: 900 }}>
           Run your wedding venue <span style={{ color: "var(--poppy)", fontStyle: "italic" }}>seamlessly.</span>
@@ -909,7 +909,7 @@ function Footer() {
         </div>
       </div>
       <div className="max-w-7xl mx-auto px-6 lg:px-10 pb-8 text-xs" style={{ color: "var(--ink-2)" }}>
-        © {new Date().getFullYear()} Venuely · Everything wedding, handled.
+        © {new Date().getFullYear()} Venuely · Built for wedding venues.
       </div>
     </footer>
   );
