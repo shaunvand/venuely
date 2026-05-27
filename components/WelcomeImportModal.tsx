@@ -68,6 +68,12 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
           <BulkUploader venueId={venueId} />
         </div>
 
+        <div className="px-8 py-4 border-t text-sm flex items-start gap-3" style={{ borderColor: "var(--line)", background: "var(--cream)", color: "var(--ink-2)" }}>
+          <span className="text-base leading-none mt-0.5">👆</span>
+          <span>
+            <strong style={{ color: "var(--ink)" }}>Three quick steps:</strong> Upload your files · Read &amp; detect · Import. You&apos;ll see a green confirmation banner when the import lands — don&apos;t leave this window until you see it.
+          </span>
+        </div>
         <footer className="px-8 py-5 border-t flex flex-wrap items-center justify-between gap-4" style={{ borderColor: "var(--line)" }}>
           <span className="text-xs text-stone-500">
             We&apos;ll only nudge you about this once every 24 hours.
@@ -87,7 +93,7 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
               Remind me tomorrow
             </button>
             <button type="button" onClick={() => dismiss(true)} className="vy-btn vy-btn-primary">
-              Continue to setup checklist →
+              Skip — go to checklist →
             </button>
           </div>
         </footer>

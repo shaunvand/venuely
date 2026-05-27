@@ -49,6 +49,8 @@ export function BulkUploader({ venueId }: { venueId: string }) {
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ tone: "info" | "success" | "error"; text: string } | null>(null);
+  const [imported, setImported] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [extractedImages, setExtractedImages] = useState<Array<{ url: string; source_file: string; ordinal: number }>>([]);
   const [searchOpen, setSearchOpen] = useState<{ itemId: number; query: string; results: Array<{ url: string; thumb: string; alt: string; photographer_name: string; photographer_profile_url: string; unsplash_url: string; download_location: string }>; busy: boolean; err: string | null } | null>(null);
@@ -63,21 +65,25 @@ export function BulkUploader({ venueId }: { venueId: string }) {
 
   async function parse() {
     if (!files.length) return;
-    setBusy(true); setMsg("Reading & extracting documents…"); setItems([]);
+    setBusy(true); setStatus({ tone: "info", text: `Reading ${files.length} file${files.length === 1 ? "" : "s"} — this can take 30-60 seconds for large PDFs.` }); setMsg(null); setItems([]); setImported(false);
     try {
       const fd = new FormData();
       files.forEach((f) => fd.append("files", f));
       fd.append("venue_id", venueId);
       const res = await fetch("/api/venue/uploads/parse", { method: "POST", body: fd });
       const j = await res.json();
-      if (!res.ok || !j.ok) { setMsg(`Failed: ${j.error ?? "unknown"}`); return; }
+      if (!res.ok || !j.ok) { setStatus({ tone: "error", text: `Reading failed: ${j.error ?? "unknown error"}` }); return; }
       setItems(j.items as Item[]);
       setFileReports(j.files ?? []);
       setExtractedImages(j.images ?? []);
       const counts = Object.entries(j.counts as Record<string, number>).map(([k, v]) => `${v} ${CATEGORY_LABELS[k] ?? k}`).join(", ");
-      setMsg(counts ? `Detected: ${counts}. Review below and confirm.` : "Nothing recognisable found — see per-file report below.");
+      if (counts) {
+        setStatus({ tone: "success", text: `Found: ${counts}. Now review below and click "Import" to save into your dashboard.` });
+      } else {
+        setStatus({ tone: "error", text: "Nothing recognisable found — see per-file report below." });
+      }
     } catch (e) {
-      setMsg(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      setStatus({ tone: "error", text: `Error: ${e instanceof Error ? e.message : String(e)}` });
     } finally { setBusy(false); }
   }
 
@@ -146,8 +152,9 @@ export function BulkUploader({ venueId }: { venueId: string }) {
         return [k, v];
       })),
     }));
-    if (!payload.length) { setMsg("Nothing selected to import."); return; }
-    setMsg(`Importing ${payload.length} item(s)…`);
+    if (!payload.length) { setStatus({ tone: "error", text: "Nothing selected to import." }); return; }
+    setStatus({ tone: "info", text: `Importing ${payload.length} item${payload.length === 1 ? "" : "s"} — please wait, this can take 10-30 seconds.` });
+    setMsg(null);
     startTransition(async () => {
       try {
         const res = await fetch("/api/venue/uploads/commit", {
@@ -156,12 +163,20 @@ export function BulkUploader({ venueId }: { venueId: string }) {
           body: JSON.stringify({ venue_id: venueId, items: payload }),
         });
         const j = await res.json();
-        if (!res.ok || !j.ok) { setMsg(`Failed: ${j.error ?? "unknown"}`); return; }
-        const lines = Object.entries(j.summary as Record<string, number>).map(([k, v]) => `${v} → ${CATEGORY_LABELS[k] ?? k}`);
-        setMsg(`Imported: ${lines.join(", ")}.`);
+        if (!res.ok || !j.ok) {
+          setStatus({ tone: "error", text: `Import failed: ${j.error ?? "unknown error"}. Nothing was saved — please try again or contact support.` });
+          return;
+        }
+        const lines = Object.entries(j.summary as Record<string, number>).map(([k, v]) => `${v} ${CATEGORY_LABELS[k] ?? k}`);
+        const skipped = (j.skipped ?? []).length;
+        setStatus({
+          tone: "success",
+          text: `Imported successfully: ${lines.join(", ")}.${skipped ? ` (${skipped} skipped — missing required fields.)` : ""} Your dashboard is ready.`,
+        });
+        setImported(true);
         setItems([]); setFiles([]); if (fileRef.current) fileRef.current.value = "";
       } catch (e) {
-        setMsg(`Error: ${e instanceof Error ? e.message : String(e)}`);
+        setStatus({ tone: "error", text: `Import error: ${e instanceof Error ? e.message : String(e)}. Nothing was saved.` });
       }
     });
   }
@@ -169,18 +184,72 @@ export function BulkUploader({ venueId }: { venueId: string }) {
   const visible = filter === "all" ? items : items.filter((it) => it.category === filter);
   const includedCount = items.filter((it) => it._include).length;
 
+  const stage: 1 | 2 | 3 = imported ? 3 : items.length > 0 ? 3 : files.length > 0 ? 2 : 1;
+  const stepperSteps: { n: 1 | 2 | 3; label: string }[] = [
+    { n: 1, label: "Upload files" },
+    { n: 2, label: "Read & detect" },
+    { n: 3, label: "Import to dashboard" },
+  ];
+  const statusStyles = {
+    info:    { bg: "var(--peach)",    fg: "var(--poppy-deep)", icon: "⏳" },
+    success: { bg: "var(--leaf)",     fg: "#1f5d3e",           icon: "✓"  },
+    error:   { bg: "#fde2dd",         fg: "#a3210e",           icon: "⚠"  },
+  } as const;
+
   return (
     <div className="vy-card space-y-4">
+      {/* 3-step header so users always know where they are */}
+      <ol className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm" aria-label="Smart Import progress">
+        {stepperSteps.map((s, i) => {
+          const active = s.n === stage;
+          const done = s.n < stage || (imported && s.n <= 3);
+          return (
+            <li key={s.n} className="flex items-center gap-2 sm:gap-3 flex-1">
+              <span
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full font-medium whitespace-nowrap ${done ? "" : active ? "" : "opacity-60"}`}
+                style={{
+                  background: done ? "var(--leaf)" : active ? "var(--peach)" : "var(--bone)",
+                  color: done ? "#1f5d3e" : active ? "var(--poppy-deep)" : "var(--ink-2)",
+                  border: "1px solid var(--line)",
+                }}
+              >
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-semibold" style={{ background: "rgba(255,255,255,0.7)" }}>
+                  {done ? "✓" : s.n}
+                </span>
+                {s.label}
+              </span>
+              {i < stepperSteps.length - 1 && <span className="flex-1 h-px" style={{ background: "var(--line)" }} />}
+            </li>
+          );
+        })}
+      </ol>
+
+      {/* Prominent status banner — success / failure / in-progress */}
+      {status && (
+        <div
+          role={status.tone === "error" ? "alert" : "status"}
+          aria-live="polite"
+          className="flex items-start gap-3 rounded-xl px-4 py-3 text-sm"
+          style={{ background: statusStyles[status.tone].bg, color: statusStyles[status.tone].fg, border: "1px solid var(--line)" }}
+        >
+          <span className="text-lg leading-none flex-shrink-0 mt-0.5">{statusStyles[status.tone].icon}</span>
+          <span className="flex-1 leading-relaxed">{status.text}</span>
+        </div>
+      )}
+
       <div className="flex gap-2 items-center flex-wrap">
         <label className={BUBBLE_SECONDARY + " cursor-pointer"}>
-          Choose files (PDF / Excel / CSV)
+          {files.length ? "Change files" : "Choose files (PDF / Excel / CSV)"}
           <input ref={fileRef} type="file" multiple accept=".pdf,.xlsx,.xls,.csv,.txt"
             onChange={(e) => pickFiles(e.target.files)}
             className="hidden" />
         </label>
         <button disabled={!files.length || busy} onClick={parse} className={BUBBLE_PRIMARY}>
-          {busy ? "Parsing…" : `Parse ${files.length || "no"} file${files.length === 1 ? "" : "s"}`}
+          {busy ? "Reading your files…" : `Read ${files.length || "no"} file${files.length === 1 ? "" : "s"}`}
         </button>
+        {!files.length && !items.length && (
+          <span className="text-xs text-stone-500">Drop in the same docs you send couples — quotes, brochures, stock lists, rooming spreadsheets.</span>
+        )}
       </div>
 
       {files.length > 0 && (
@@ -330,7 +399,14 @@ export function BulkUploader({ venueId }: { venueId: string }) {
               <button onClick={() => setItems((c) => c.map((it) => ({ ...it, _include: false })))} className={BUBBLE_GHOST + " text-xs"}>Select none</button>
             </div>
             <button disabled={isPending || !includedCount} onClick={commit} className={BUBBLE_PRIMARY}>
-              {isPending ? "Importing…" : `Import ${includedCount} item${includedCount === 1 ? "" : "s"}`}
+              {isPending ? (
+                <>
+                  <span className="inline-block w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  Importing — don&apos;t close this tab…
+                </>
+              ) : (
+                `Import ${includedCount} item${includedCount === 1 ? "" : "s"} →`
+              )}
             </button>
           </div>
         </>
