@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BulkUploader } from "@/components/BulkUploader";
+import { BulkUploader, type BulkUploaderHandle } from "@/components/BulkUploader";
 import { LogoMark } from "@/components/Logo";
 
 export function WelcomeImportModal({ venueId, venueName }: { venueId: string; venueName: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [neverShow, setNeverShow] = useState(false);
+  const uploaderRef = useRef<BulkUploaderHandle>(null);
+  const [uploaderState, setUploaderState] = useState({ includedCount: 0, isImporting: false, imported: false, hasItems: false });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -30,7 +32,14 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
     if (goToChecklist) router.push("/venue/setup");
   }
 
+  function runImport() {
+    uploaderRef.current?.commit();
+  }
+
   if (!open) return null;
+
+  const { includedCount, isImporting, imported, hasItems } = uploaderState;
+  const canImport = hasItems && includedCount > 0 && !isImporting && !imported;
 
   return (
     <div
@@ -65,15 +74,21 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
         </header>
 
         <div className="p-6">
-          <BulkUploader venueId={venueId} />
+          <BulkUploader
+            ref={uploaderRef}
+            venueId={venueId}
+            embedded
+            onStateChange={setUploaderState}
+          />
         </div>
 
         <div className="px-8 py-4 border-t text-sm flex items-start gap-3" style={{ borderColor: "var(--line)", background: "var(--cream)", color: "var(--ink-2)" }}>
           <span className="text-base leading-none mt-0.5">👆</span>
           <span>
-            <strong style={{ color: "var(--ink)" }}>Three quick steps:</strong> Upload your files · Read &amp; detect · Import. You&apos;ll see a green confirmation banner when the import lands — don&apos;t leave this window until you see it.
+            <strong style={{ color: "var(--ink)" }}>Three quick steps:</strong> Upload your files · Read &amp; detect · Import. The big poppy button below stays disabled until your files are ready — you&apos;ll see a green confirmation banner when the import lands.
           </span>
         </div>
+
         <footer className="px-8 py-5 border-t flex flex-wrap items-center justify-between gap-4" style={{ borderColor: "var(--line)" }}>
           <span className="text-xs text-stone-500">
             We&apos;ll only nudge you about this once every 24 hours.
@@ -92,11 +107,52 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
             <button type="button" onClick={() => dismiss(false)} className="vy-btn vy-btn-ghost">
               Remind me tomorrow
             </button>
-            <button type="button" onClick={() => dismiss(true)} className="vy-btn vy-btn-primary">
-              Skip — go to checklist →
+            <button type="button" onClick={() => dismiss(imported)} className="vy-btn vy-btn-secondary">
+              {imported ? "Continue to setup checklist →" : "Skip — go to checklist →"}
             </button>
           </div>
         </footer>
+
+        {/* Prominent bottom CTA — the import action lives here, below Skip/Continue */}
+        <div
+          className="px-8 py-6 rounded-b-2xl"
+          style={{ borderTop: "1px solid var(--line)", background: "var(--cream)" }}
+        >
+          {imported ? (
+            <button
+              type="button"
+              onClick={() => dismiss(true)}
+              className="w-full py-4 rounded-xl text-white font-semibold text-base transition hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
+              style={{ background: "var(--poppy)" }}
+            >
+              ✓ Import complete — open your setup checklist →
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={runImport}
+              disabled={!canImport}
+              className="w-full py-4 rounded-xl text-white font-semibold text-base transition hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              style={{ background: "var(--poppy)" }}
+            >
+              {isImporting ? (
+                <>
+                  <span className="inline-block w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  Importing — don&apos;t close this window…
+                </>
+              ) : hasItems && includedCount > 0 ? (
+                <>👉 Click to Import {includedCount} item{includedCount === 1 ? "" : "s"} →</>
+              ) : (
+                <>Click to Import (upload &amp; read your files first)</>
+              )}
+            </button>
+          )}
+          {!imported && (
+            <p className="text-center text-[11px] mt-2" style={{ color: "var(--ink-2)" }}>
+              The button activates once Smart Import has read your files. Review the cards above, then click to save them into your dashboard.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,13 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, useTransition } from "react";
+
+export type BulkUploaderHandle = {
+  commit: () => void;
+  includedCount: number;
+  isImporting: boolean;
+  imported: boolean;
+};
 
 type Item = {
   _id: number;
@@ -44,7 +51,16 @@ const BUBBLE_PRIMARY = `${BUBBLE} bg-stone-900 text-white hover:bg-stone-700 dis
 const BUBBLE_SECONDARY = `${BUBBLE} bg-white border border-stone-300 text-stone-800 hover:bg-stone-100`;
 const BUBBLE_GHOST = `${BUBBLE} text-stone-700 hover:bg-stone-100`;
 
-export function BulkUploader({ venueId }: { venueId: string }) {
+type BulkUploaderProps = {
+  venueId: string;
+  embedded?: boolean;
+  onStateChange?: (s: { includedCount: number; isImporting: boolean; imported: boolean; hasItems: boolean }) => void;
+};
+
+export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(function BulkUploader(
+  { venueId, embedded = false, onStateChange },
+  ref,
+) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
@@ -62,6 +78,19 @@ export function BulkUploader({ venueId }: { venueId: string }) {
     if (!list) return;
     setFiles(Array.from(list));
   }
+
+  const includedCount = items.filter((it) => it._include).length;
+
+  useImperativeHandle(ref, () => ({
+    commit: () => commit(),
+    includedCount,
+    isImporting: isPending,
+    imported,
+  }), [includedCount, isPending, imported]);
+
+  useEffect(() => {
+    onStateChange?.({ includedCount, isImporting: isPending, imported, hasItems: items.length > 0 });
+  }, [includedCount, isPending, imported, items.length, onStateChange]);
 
   async function parse() {
     if (!files.length) return;
@@ -182,7 +211,6 @@ export function BulkUploader({ venueId }: { venueId: string }) {
   }
 
   const visible = filter === "all" ? items : items.filter((it) => it.category === filter);
-  const includedCount = items.filter((it) => it._include).length;
 
   const stage: 1 | 2 | 3 = imported ? 3 : items.length > 0 ? 3 : files.length > 0 ? 2 : 1;
   const stepperSteps: { n: 1 | 2 | 3; label: string }[] = [
@@ -305,109 +333,221 @@ export function BulkUploader({ venueId }: { venueId: string }) {
 
       {items.length > 0 && (
         <>
-          <div className="flex gap-2 flex-wrap items-center border-t border-stone-200 pt-3">
-            <button onClick={() => setFilter("all")} className={`${filter === "all" ? "bg-stone-900 text-white" : "bg-white border border-stone-300"} rounded-full px-3 py-1 text-xs`}>All ({items.length})</button>
+          {/* Category filter pills — matches Vendor Tracker styling */}
+          <div className="flex gap-2 flex-wrap items-center border-t pt-4" style={{ borderColor: "var(--line)" }}>
+            <button
+              onClick={() => setFilter("all")}
+              className="rounded-full px-4 py-1.5 text-xs font-medium transition"
+              style={
+                filter === "all"
+                  ? { background: "var(--ink)", color: "#fff" }
+                  : { background: "#fff", color: "var(--ink)", border: "1px solid var(--line)" }
+              }
+            >
+              All ({items.length})
+            </button>
             {CATEGORY_LIST.filter((c) => items.some((i) => i.category === c)).map((c) => {
               const n = items.filter((i) => i.category === c).length;
+              const active = filter === c;
               return (
-                <button key={c} onClick={() => setFilter(c)} className={`${filter === c ? "bg-stone-900 text-white" : "bg-white border border-stone-300"} rounded-full px-3 py-1 text-xs`}>
+                <button
+                  key={c}
+                  onClick={() => setFilter(c)}
+                  className="rounded-full px-4 py-1.5 text-xs font-medium transition"
+                  style={
+                    active
+                      ? { background: "var(--ink)", color: "#fff" }
+                      : { background: "#fff", color: "var(--ink)", border: "1px solid var(--line)" }
+                  }
+                >
                   {CATEGORY_LABELS[c]} ({n})
                 </button>
               );
             })}
           </div>
 
-          <div className="overflow-auto max-h-[60vh] border border-stone-200 rounded-lg">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-stone-50">
-                <tr>
-                  <th className="px-2 py-2 w-8"></th>
-                  <th className="px-2 py-2 text-left w-32">Category</th>
-                  <th className="px-2 py-2 text-left w-20">Image</th>
-                  <th className="px-2 py-2 text-left">Fields</th>
-                  <th className="px-2 py-2 text-left w-32">Source</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((it) => {
-                  const fields = FIELDS_BY_CATEGORY[it.category] ?? Object.keys(it.data);
-                  return (
-                    <tr key={it._id} className={`border-t ${it._include ? "" : "opacity-40"}`}>
-                      <td className="px-2 py-2">
-                        <input type="checkbox" checked={it._include}
-                          onChange={(e) => updateItem(it._id, { _include: e.target.checked })} />
-                      </td>
-                      <td className="px-2 py-2">
-                        <select value={it.category}
-                          onChange={(e) => updateItem(it._id, { category: e.target.value })}
-                          className="w-full border rounded-full px-2 py-1 text-xs">
-                          {CATEGORY_LIST.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-2 py-2">
+          {/* Card grid review — modelled on the Vendor Tracker layout */}
+          <div className="overflow-auto max-h-[55vh] pr-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {visible.map((it) => {
+                const fields = FIELDS_BY_CATEGORY[it.category] ?? Object.keys(it.data);
+                const name = String(it.data.name ?? "Untitled item");
+                const priceKeys = ["price", "price_per_night", "price_from"] as const;
+                const priceKey = priceKeys.find((k) => it.data[k] != null && it.data[k] !== "");
+                const priceVal = priceKey ? Number(it.data[priceKey]) : null;
+                const description = String(it.data.description ?? "");
+                const contactEmail = String(it.data.contact_email ?? "");
+                const contactPhone = String(it.data.contact_phone ?? "");
+                const includedSource = it.image_source;
+                return (
+                  <div
+                    key={it._id}
+                    className="relative rounded-xl bg-white overflow-hidden transition"
+                    style={{
+                      border: "1px solid var(--line)",
+                      opacity: it._include ? 1 : 0.55,
+                    }}
+                  >
+                    {/* Left accent bar */}
+                    <span
+                      aria-hidden
+                      className="absolute left-0 top-0 bottom-0 w-1"
+                      style={{ background: it._include ? "var(--poppy)" : "var(--line)" }}
+                    />
+                    <div className="p-4 pl-5 space-y-2.5">
+                      {/* Category badge */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className="inline-block text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md"
+                          style={{ background: "var(--cream)", color: "var(--poppy-deep)" }}
+                        >
+                          {CATEGORY_LABELS[it.category] ?? it.category}
+                        </span>
+                        <label className="flex items-center gap-1.5 text-[10px] cursor-pointer select-none" style={{ color: "var(--ink-2)" }}>
+                          <input
+                            type="checkbox"
+                            checked={it._include}
+                            onChange={(e) => updateItem(it._id, { _include: e.target.checked })}
+                            style={{ accentColor: "var(--poppy)" }}
+                          />
+                          Include
+                        </label>
+                      </div>
+
+                      {/* Item name */}
+                      <h3 className="font-serif text-lg leading-tight" style={{ fontWeight: 700 }}>{name}</h3>
+
+                      {/* Image strip */}
+                      <div className="flex items-center gap-2">
                         {it.data.image_url ? (
-                          <div className="relative">
+                          <div className="relative flex-shrink-0">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={String(it.data.image_url)} alt="" className="h-14 w-14 rounded border border-stone-200 object-cover" />
-                            {it.image_source === "online" && (
-                              <span className="absolute -bottom-1 -right-1 bg-amber-100 text-amber-800 text-[9px] px-1 rounded-full border border-amber-200" title="Auto-fetched from Unsplash">🌐</span>
+                            <img src={String(it.data.image_url)} alt="" className="h-14 w-14 rounded object-cover" style={{ border: "1px solid var(--line)" }} />
+                            {includedSource === "online" && (
+                              <span className="absolute -bottom-1 -right-1 text-[9px] px-1 rounded-full" style={{ background: "var(--peach)", color: "var(--poppy-deep)" }} title="Unsplash">🌐</span>
                             )}
-                            {it.image_source === "embedded" && (
-                              <span className="absolute -bottom-1 -right-1 bg-emerald-100 text-emerald-800 text-[9px] px-1 rounded-full border border-emerald-200" title="From your file">📎</span>
+                            {includedSource === "embedded" && (
+                              <span className="absolute -bottom-1 -right-1 text-[9px] px-1 rounded-full" style={{ background: "var(--leaf)", color: "#1f5d3e" }} title="From your file">📎</span>
                             )}
                           </div>
                         ) : (
-                          <div className="h-14 w-14 rounded border border-dashed border-stone-300 bg-stone-50 flex items-center justify-center text-stone-400 text-[10px]">none</div>
+                          <div className="h-14 w-14 rounded flex items-center justify-center text-[10px] flex-shrink-0" style={{ border: "1px dashed var(--line)", background: "var(--bone)", color: "var(--ink-2)" }}>
+                            no image
+                          </div>
                         )}
-                        <select value=""
-                          onChange={(e) => { if (e.target.value) updateField(it._id, "image_url", e.target.value); }}
-                          className="mt-1 w-20 border rounded-full px-1 py-0.5 text-[10px] bg-white">
-                          <option value="">pick…</option>
-                          {extractedImages.map((img) => (
-                            <option key={img.url} value={img.url}>
-                              {img.source_file.slice(0, 14)}…/#{img.ordinal + 1}
-                            </option>
-                          ))}
-                        </select>
-                        <button type="button" onClick={() => findOnline(it._id)}
-                          className="mt-1 w-20 rounded-full bg-stone-900 text-white text-[10px] px-1 py-0.5 hover:bg-stone-700">
-                          🔍 Find online
-                        </button>
-                      </td>
-                      <td className="px-2 py-2">
-                        <div className="grid grid-cols-2 gap-1">
-                          {fields.map((k) => (
-                            <input key={k}
-                              value={String(it.data[k] ?? "")}
-                              onChange={(e) => updateField(it._id, k, e.target.value)}
-                              placeholder={k}
-                              className="border rounded px-2 py-1 text-xs" />
-                          ))}
+                        <div className="flex flex-col gap-1">
+                          <select
+                            value=""
+                            onChange={(e) => { if (e.target.value) updateField(it._id, "image_url", e.target.value); }}
+                            className="border rounded-full px-2 py-0.5 text-[10px] bg-white"
+                            style={{ borderColor: "var(--line)" }}
+                          >
+                            <option value="">pick from file…</option>
+                            {extractedImages.map((img) => (
+                              <option key={img.url} value={img.url}>{img.source_file.slice(0, 12)}…#{img.ordinal + 1}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => findOnline(it._id)}
+                            className="rounded-full px-2 py-0.5 text-[10px]"
+                            style={{ background: "var(--ink)", color: "#fff" }}
+                          >
+                            🔍 Find online
+                          </button>
                         </div>
-                      </td>
-                      <td className="px-2 py-2 text-stone-500 truncate max-w-[120px]" title={it.source_file ?? ""}>{it.source_file ?? "—"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+
+                      {/* Contact line */}
+                      {(contactEmail || contactPhone) && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]" style={{ color: "var(--ink-2)" }}>
+                          {contactEmail && <span>✉ {contactEmail}</span>}
+                          {contactPhone && <span>📞 {contactPhone}</span>}
+                        </div>
+                      )}
+
+                      {/* Price */}
+                      {priceVal != null && priceVal > 0 && (
+                        <div className="font-serif text-lg" style={{ color: "var(--poppy)", fontWeight: 700 }}>
+                          R{priceVal.toLocaleString("en-ZA")}
+                          {priceKey === "price_per_night" && <span className="text-[11px] font-sans ml-1" style={{ color: "var(--ink-2)" }}>/ night</span>}
+                          {priceKey === "price_from" && <span className="text-[11px] font-sans ml-1" style={{ color: "var(--ink-2)" }}>from</span>}
+                        </div>
+                      )}
+
+                      {/* Description */}
+                      {description && (
+                        <p className="text-[11px] leading-relaxed italic line-clamp-3" style={{ color: "var(--ink-2)" }}>
+                          {description}
+                        </p>
+                      )}
+
+                      {/* Status pill */}
+                      <div className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5"
+                           style={{ color: it._include ? "var(--poppy)" : "var(--ink-2)" }}>
+                        <span>●</span> {it._include ? "Will Import" : "Excluded"}
+                      </div>
+
+                      {/* Edit fields disclosure */}
+                      <details className="text-[11px]">
+                        <summary className="cursor-pointer select-none py-1 rounded" style={{ color: "var(--ink-2)" }}>
+                          Edit fields ▾
+                        </summary>
+                        <div className="mt-2 space-y-1.5">
+                          <div>
+                            <label className="block text-[10px] uppercase tracking-wider mb-0.5" style={{ color: "var(--ink-2)" }}>Category</label>
+                            <select
+                              value={it.category}
+                              onChange={(e) => updateItem(it._id, { category: e.target.value })}
+                              className="w-full rounded-md px-2 py-1 text-[11px]"
+                              style={{ border: "1px solid var(--line)", background: "#fff" }}
+                            >
+                              {CATEGORY_LIST.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                            </select>
+                          </div>
+                          {fields.map((k) => (
+                            <div key={k}>
+                              <label className="block text-[10px] uppercase tracking-wider mb-0.5" style={{ color: "var(--ink-2)" }}>{k.replace(/_/g, " ")}</label>
+                              <input
+                                value={String(it.data[k] ?? "")}
+                                onChange={(e) => updateField(it._id, k, e.target.value)}
+                                placeholder={k}
+                                className="w-full rounded-md px-2 py-1 text-[11px]"
+                                style={{ border: "1px solid var(--line)" }}
+                              />
+                            </div>
+                          ))}
+                          {it.source_file && (
+                            <div className="text-[10px] truncate pt-1" style={{ color: "var(--ink-2)" }} title={it.source_file}>
+                              Source: {it.source_file}
+                            </div>
+                          )}
+                        </div>
+                      </details>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="flex justify-between items-center flex-wrap gap-2">
+          <div className="flex flex-wrap justify-between items-center gap-3">
             <div className="flex gap-2">
               <button onClick={() => setItems((c) => c.map((it) => ({ ...it, _include: true })))} className={BUBBLE_GHOST + " text-xs"}>Select all</button>
               <button onClick={() => setItems((c) => c.map((it) => ({ ...it, _include: false })))} className={BUBBLE_GHOST + " text-xs"}>Select none</button>
             </div>
-            <button disabled={isPending || !includedCount} onClick={commit} className={BUBBLE_PRIMARY}>
-              {isPending ? (
-                <>
-                  <span className="inline-block w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  Importing — don&apos;t close this tab…
-                </>
-              ) : (
-                `Import ${includedCount} item${includedCount === 1 ? "" : "s"} →`
-              )}
-            </button>
+            {!embedded && (
+              <button disabled={isPending || !includedCount} onClick={commit} className={BUBBLE_PRIMARY}>
+                {isPending ? (
+                  <>
+                    <span className="inline-block w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    Importing — don&apos;t close this tab…
+                  </>
+                ) : (
+                  `Import ${includedCount} item${includedCount === 1 ? "" : "s"} →`
+                )}
+              </button>
+            )}
           </div>
         </>
       )}
@@ -476,4 +616,4 @@ export function BulkUploader({ venueId }: { venueId: string }) {
       )}
     </div>
   );
-}
+});
