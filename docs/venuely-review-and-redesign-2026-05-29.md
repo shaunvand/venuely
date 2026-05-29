@@ -180,7 +180,9 @@ Each is a small, contained change:
 
 Built on branch **`venuely-redesign-2026-05-29`** (NOT merged, NOT deployed — master still auto-deploys the live site). Every wave builds green (`npm run build`, exit 0). Decision taken: **1% of platform-transacted spend, no monthly fee, Paystack rail.**
 
-Commits: `d46feb1` (Wave 1) · `1b5dd13` (Wave 2) · `8ec222f` (Wave 3) · `5b8d6e9` (nav).
+Commits: `d46feb1` (W1) · `1b5dd13` (W2) · `8ec222f` (W3) · `5b8d6e9` (nav) · `06d89a0` (W4) · `3e4bbbf` (W5). **81 files, +9,160/−486 vs master.**
+
+> **Billing rule (clarified by founder 2026-05-29):** Venuely's fee = **1% of the couple's BASE payment to the venue, excluding the venue's commission/markup** — the venue keeps 100% of its commission. Implemented as `fee = rate × (grand_total − commission_total)` across `compute.ts`, `markInvoiced`, the manage-page breakdown, and the Paystack split (fixed `transaction_charge`).
 
 **Done — Wave 1 (multi-tenant + pricing + security + quick wins):** portal reads injected globals (real couple/date/venue + data-driven Our-Venue); R1499 path deleted, copy reconciled, real "Fees collected (MTD)", `markInvoiced` recomputes server-side, webhook idempotency; storage-RLS scoped to venue, seed precedence fix; rich accommodation fields editable, silent edit-save bug fixed, Select-all scoped, venue description/directions/website + logo upload, live resend/auto-advance check-email, no re-nag modal, couple rentals honour markup.
 
@@ -188,7 +190,11 @@ Commits: `d46feb1` (Wave 1) · `1b5dd13` (Wave 2) · `8ec222f` (Wave 3) · `5b8d
 
 **Done — Wave 3 (funnel + money):** public `/venues` + `/v/[slug]` SEO listing (opt-in via `listed`); `EnquiryForm` + `/api/enquiry` + `/venue/enquiries` CRM with convert-to-portal; `sendPortalInvite` (email/WhatsApp/QR) + `wedding_invites` + `wedding_members` on auth callback + rotate/revoke + `portal_access_log`; password gate hardened (POST + per-wedding salt + throttle); per-guest RSVP sub-link `/[wedding]/rsvp`; Paystack scaffold (env-gated): `paystack.ts`, `/venue/billing` connect-payouts, checkout + webhook, `platform_payments`, non-blocking readiness helper. Sidebar links wired.
 
-**6 new migrations written, NONE applied:** `20260529100000_venue_profile_fields`, `100100_storage_security`, `100200_fix_patbusch_seed_precedence`, `110000_import_dedupe`, `120000_enquiries`, `120100_paystack_platform_payments`, `120200_couple_invites`.
+**Done — Wave 4 (fee correction + calendar + portal SoT + reviews/team):** fee = 1% of base (venue keeps commission) across compute/markInvoiced/manage-page/Paystack split + webhook; availability calendar (`/venue/calendar`) with double-booking flags, couple accommodation writes `accommodation_bookings` + remaining-capacity badges; relational `/portal/[venue]/[wedding]` retired (redirects to `/[slug]`), owner Overview counts now read `wedding_state`; reviews (public submit + `/v/[slug]` display + owner moderation) + team seats (`/venue/team` invite → `venue_members`).
+
+**Done — Wave 5 (portal tabs + reminders + POPIA + analytics):** couple portal "Pay deposit/balance" → Paystack checkout, "Get RSVP link" (copy/WhatsApp/QR), new Floor Plans / Rooming List / Layout Planner tabs; payment-reminder email/WhatsApp helpers + manage-page buttons; `/privacy` POPIA page; owner/founder funnel analytics (enquiries, conversion, listed venues).
+
+**7 new migrations written, NONE applied:** `20260529100000_venue_profile_fields`, `100100_storage_security`, `100200_fix_patbusch_seed_precedence`, `110000_import_dedupe`, `120000_enquiries`, `120100_paystack_platform_payments`, `120200_couple_invites`, `130000_reviews_and_team`.
 
 ### Go-live checklist (in order)
 1. **Resolve any duplicate `item_code`s** per venue in `catalogue_items`/`rental_items` (the dedupe unique index will fail to create otherwise).
@@ -197,10 +203,11 @@ Commits: `d46feb1` (Wave 1) · `1b5dd13` (Wave 2) · `8ec222f` (Wave 3) · `5b8d
 4. **Set `listed=true`** on venues that should appear in the public directory (default false → directory empty until then).
 5. **Review + merge** the branch to master (triggers Render deploy). Smoke-test the couple portal for a non-Pat-Busch venue, the wizard, an enquiry, and an invite.
 
-### Still open (not built this session)
-- **Availability calendar** — activate `rental_holds`/`accommodation_bookings` (double-booking still possible). *(P1)*
-- **Single-source-of-truth reconciliation** — retire the relational `/portal/[venue]/[wedding]` tree and repoint owner-dashboard counts to `wedding_state`. *(P1)*
-- **Wire "Pay deposit" into the couple portal** (Paystack rail is built server-side; the in-portal button + the readiness gate on a live send-payment action remain).
-- **"Get RSVP link" button** in the portal Guest List tab (public RSVP route exists; the in-portal share button lives in `app.js`).
-- **Phase 5 table-stakes** — reviews/testimonials, team seats (multi-manager invite), automated notification lifecycle (deposit/balance reminders), richer analytics, the 3 missing couple tabs (Floor Plans / Rooming List / Layout Planner), POPIA retention. *(P2)*
-- **Import** — ZIP/loose-photo fan-out (skipped to protect the build).
+### Still open (genuine remainders after W1–W5)
+- **Automated reminders** — only manual "send reminder" buttons exist; scheduled deposit/balance reminders need a cron (Render cron or Supabase scheduled fn).
+- **Password-only couples can't pay-by-link yet** — `/api/paystack/checkout` requires a Supabase session; let it authorise via the `vy_portal_<id>` cookie so cookie-only couples can pay (signed-in members/owners already can).
+- **Venue UI to upload floor-plan media** (`kind='floorplan'`) so the new Floor Plans tab populates (per-room `floor_plan_url` is already editable in InventoryManager).
+- **Rental-hold writing at booking time** — the calendar reads `rental_holds`; accommodation bookings are written on couple confirm, but rental holds aren't yet written on book/convert.
+- **Webhook durability** — idempotency is in-process + unique `provider_ref`; add a persisted events table for multi-instance.
+- **Proforma builder dedup** — `buildWeddingCharges` logic is duplicated across `weddings/actions.ts`, the `[slug]` page, and `reminder-actions.ts`; extract to a shared non-`'use server'` module.
+- **Import** — ZIP / loose-photo fan-out (skipped to protect the build).
