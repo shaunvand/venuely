@@ -5,7 +5,7 @@
 // Returns { ok: true, wedding } when allowed; { ok: false, status } otherwise.
 
 import { type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 
 type WeddingAccessInfo = {
@@ -20,9 +20,12 @@ export type AccessResult =
   | { ok: false; status: 401 | 403 | 404; reason: string };
 
 export async function portalAccess(slug: string, req?: NextRequest): Promise<AccessResult> {
-  const supabase = await createClient();
+  // The wedding lookup MUST bypass RLS: an anonymous couple (password-cookie only)
+  // has no session, and weddings RLS only exposes owner/venue-member/wedding-member
+  // rows. The password/membership gate below is what actually authorises access.
+  const db = createAdminClient() ?? (await createClient());
 
-  const { data: wedding } = await supabase
+  const { data: wedding } = await db
     .from("weddings")
     .select("id, slug, venue_id, portal_password_hash")
     .eq("slug", slug)
@@ -41,13 +44,17 @@ export async function portalAccess(slug: string, req?: NextRequest): Promise<Acc
   }
 
   // Fall back to authenticated user — venue member, wedding member, or platform owner.
-  const { data: { user } } = await supabase.auth.getUser();
+  // getUser() needs the cookie-aware SSR client to read the session; membership
+  // lookups use the admin client (explicitly filtered by user.id) so RLS recursion
+  // on the membership tables can't hide a legitimate grant.
+  const ssr = await createClient();
+  const { data: { user } } = await ssr.auth.getUser();
   if (!user) return { ok: false, status: 401, reason: "Not signed in" };
 
   const [{ data: vm }, { data: wm }, { data: profile }] = await Promise.all([
-    supabase.from("venue_members").select("venue_id").eq("user_id", user.id).eq("venue_id", wedding.venue_id).maybeSingle(),
-    supabase.from("wedding_members").select("wedding_id").eq("user_id", user.id).eq("wedding_id", wedding.id).maybeSingle(),
-    supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+    db.from("venue_members").select("venue_id").eq("user_id", user.id).eq("venue_id", wedding.venue_id).maybeSingle(),
+    db.from("wedding_members").select("wedding_id").eq("user_id", user.id).eq("wedding_id", wedding.id).maybeSingle(),
+    db.from("profiles").select("role").eq("id", user.id).maybeSingle(),
   ]);
 
   if (vm || wm || profile?.role === "owner") {

@@ -143,7 +143,10 @@ export async function GET(
   const { wedding: rawSlug } = await ctx.params;
   if (RESERVED.has(rawSlug)) return new NextResponse("Not found", { status: 404 });
 
-  const supabase = await createClient();
+  // Service-role for the wedding lookup + venue inventory: an anonymous couple has
+  // no session and weddings/inventory RLS would hide the row. The password/auth
+  // gate below is the real authorisation check.
+  const supabase = admin() ?? (await createClient());
 
   // Fetch the wedding (no auth required to look up — auth/password gate below).
   const { data: wedding } = await supabase
@@ -196,7 +199,10 @@ export async function GET(
       });
     }
   } else {
-    const { data: { user } } = await supabase.auth.getUser();
+    // No portal password → fall back to Supabase Auth. getUser() needs the
+    // cookie-aware client (the data client above is service-role, no session).
+    const ssr = await createClient();
+    const { data: { user } } = await ssr.auth.getUser();
     if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
@@ -307,7 +313,10 @@ export async function POST(
   const { wedding: rawSlug } = await ctx.params;
   if (RESERVED.has(rawSlug)) return new NextResponse("Not found", { status: 404 });
 
-  const supabase = await createClient();
+  // Service-role for the wedding lookup + venue inventory: an anonymous couple has
+  // no session and weddings/inventory RLS would hide the row. The password/auth
+  // gate below is the real authorisation check.
+  const supabase = admin() ?? (await createClient());
   const { data: wedding } = await supabase
     .from("weddings")
     .select("id, couple_names, portal_password_hash, portal_salt")
