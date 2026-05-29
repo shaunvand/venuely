@@ -178,7 +178,7 @@ Each is a small, contained change:
 
 ## 10. Implementation status (2026-05-29)
 
-Built on branch **`venuely-redesign-2026-05-29`** (NOT merged, NOT deployed — master still auto-deploys the live site). Every wave builds green (`npm run build`, exit 0). Decision taken: **1% of platform-transacted spend, no monthly fee, Paystack rail.**
+**DEPLOYED LIVE to venuely.co.za** (merged to master, live HEAD `6df7852`). All 9 migrations applied to production. Every wave builds green (`npm run build`, exit 0). Decision taken: **1% of the couple's BASE payment to the venue (venue keeps 100% of its commission), no monthly fee, Paystack rail.** Render deploys via the Render API (no push webhook). Post-deploy owner TODO: add `RESEND_API_KEY` / `PAYSTACK_*` / `CRON_SECRET` env on Render, and set `listed=true` on venues to publish them.
 
 Commits: `d46feb1` (W1) · `1b5dd13` (W2) · `8ec222f` (W3) · `5b8d6e9` (nav) · `06d89a0` (W4) · `3e4bbbf` (W5). **81 files, +9,160/−486 vs master.**
 
