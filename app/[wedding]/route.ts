@@ -184,7 +184,7 @@ export async function GET(
           const res = NextResponse.redirect(cleanUrl);
           res.cookies.set(cookieName, expectedHash, {
             httpOnly: true, sameSite: "lax", secure: true,
-            maxAge: 60 * 60 * 24 * 30, path: `/${rawSlug}`,
+            maxAge: 60 * 60 * 24 * 30, path: "/", // site-wide so it reaches /api/paystack/checkout; cookie name is wedding-scoped (vy_portal_<id>)
           });
           return res;
         }
@@ -348,7 +348,7 @@ export async function POST(
     const res = NextResponse.redirect(url, { status: 303 });
     res.cookies.set(`vy_portal_${wedding.id}`, expectedHash, {
       httpOnly: true, sameSite: "lax", secure: true,
-      maxAge: 60 * 60 * 24 * 30, path: `/${rawSlug}`,
+      maxAge: 60 * 60 * 24 * 30, path: "/", // site-wide so it reaches /api/paystack/checkout; cookie name is wedding-scoped (vy_portal_<id>)
     });
     return res;
   }

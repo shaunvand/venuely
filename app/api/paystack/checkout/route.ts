@@ -1,9 +1,23 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { loadRules, computeTotals, type Charge, type Payment } from "@/lib/billing/compute";
 import { getPaystackConfig, initTransaction, isPaystackConfigured } from "@/lib/billing/paystack";
 
 export const runtime = "nodejs";
+
+// Service-role client. Used for the proforma reads AFTER the access gate passes:
+// password-only couples have no Supabase session, so the RLS-scoped client would
+// see no wedding/venue/charges/payments rows for them (the wedding/charge/ledger
+// RLS policies all key off auth.uid()). This mirrors the wedding/[slug] APIs,
+// which gate with portalAccess and then read via the admin client.
+function admin() {
+  return createAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SECRET_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 type Body = {
   wedding_id?: string;
@@ -31,20 +45,48 @@ export async function POST(request: NextRequest) {
   const weddingId = (body.wedding_id ?? "").trim();
   if (!weddingId) return NextResponse.json({ error: "Missing wedding_id." }, { status: 400 });
 
-  // Authenticated, RLS-scoped client: the caller can only reach weddings at
-  // venues they belong to (or, for a couple, their own wedding — handled by RLS).
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
-
-  const { data: wedding } = await supabase
+  // Resolve the wedding via the admin client so the access check below can run
+  // for both signed-in members AND password-only couples (the latter have no
+  // Supabase session, so an RLS-scoped lookup would 404 them before we ever get
+  // to check their portal cookie). portal_password_hash drives the cookie gate.
+  const ad = admin();
+  const { data: wedding } = await ad
     .from("weddings")
-    .select("id, slug, couple_names, venue_id")
+    .select("id, slug, couple_names, venue_id, portal_password_hash")
     .eq("id", weddingId)
     .single();
   if (!wedding) return NextResponse.json({ error: "Wedding not found." }, { status: 404 });
 
-  const { data: venue } = await supabase
+  // Authorise the caller against THIS specific wedding. Mirrors lib/portal/access
+  // (the same gate the /[wedding] route + /api/wedding/[slug]/* use): authorised if
+  //   (a) the vy_portal_<weddingId> cookie matches this wedding's password hash, OR
+  //   (b) a signed-in Supabase user who is a venue member, wedding member, or owner.
+  // The cookie is keyed by the wedding id, so it can only ever grant access to the
+  // wedding being paid for — it never authorises payment for a different wedding.
+  let authorised = false;
+
+  if (wedding.portal_password_hash) {
+    const cookieValue = request.cookies.get(`vy_portal_${wedding.id}`)?.value;
+    if (cookieValue === wedding.portal_password_hash) authorised = true;
+  }
+
+  if (!authorised) {
+    // RLS-scoped client only to read the caller's own auth identity + memberships.
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+
+    const [{ data: vm }, { data: wm }, { data: profile }] = await Promise.all([
+      supabase.from("venue_members").select("venue_id").eq("user_id", user.id).eq("venue_id", wedding.venue_id).maybeSingle(),
+      supabase.from("wedding_members").select("wedding_id").eq("user_id", user.id).eq("wedding_id", wedding.id).maybeSingle(),
+      supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+    ]);
+    if (!(vm || wm || profile?.role === "owner")) {
+      return NextResponse.json({ error: "No access to this wedding." }, { status: 403 });
+    }
+  }
+
+  const { data: venue } = await ad
     .from("venues")
     .select("id, name, slug, platform_fee_rate, paystack_subaccount_code, contact_email")
     .eq("id", wedding.venue_id)
@@ -67,12 +109,12 @@ export async function POST(request: NextRequest) {
   // rebuild (see buildWeddingCharges in ../venue/weddings/actions.ts) — tracked
   // as a follow-up.
   const [rules, chargesRes, paymentsRes] = await Promise.all([
-    loadRules(supabase, venue.id),
-    supabase
+    loadRules(ad, venue.id),
+    ad
       .from("wedding_charges")
       .select("id, kind, label, qty, unit_price, amount, is_refundable, day_type")
       .eq("wedding_id", wedding.id),
-    supabase
+    ad
       .from("payment_ledger")
       .select("id, amount, direction, kind, paid_at")
       .eq("wedding_id", wedding.id),

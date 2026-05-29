@@ -14,6 +14,11 @@ const LOCATIONS = [
   "Other",
 ] as const;
 
+// Floor-plan / layout images are stored as media_assets the couple-portal
+// Floor Plans tab reads. The gallery upload route can't set kind='floorplan'
+// yet, so we tag them with this category as an interim distinguisher.
+const FLOORPLAN_CATEGORY = "floorplan";
+
 type Media = {
   id: string;
   url: string;
@@ -22,27 +27,42 @@ type Media = {
   category: string | null;
 };
 
-export function YourVenueManager({ venueId, items }: { venueId: string; items: Media[] }) {
+export function YourVenueManager({
+  venueId,
+  items,
+  floorPlans = [],
+}: {
+  venueId: string;
+  items: Media[];
+  floorPlans?: Media[];
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [category, setCategory] = useState<string>("Outside");
   const fileRef = useRef<HTMLInputElement>(null);
+  const planRef = useRef<HTMLInputElement>(null);
 
-  async function upload(files: FileList | null) {
+  // Shared upload flow. `cat` overrides the selected location (used to tag
+  // floor-plan uploads); `ref` is the input to reset on success.
+  async function upload(
+    files: FileList | null,
+    cat: string = category,
+    ref: typeof fileRef = fileRef,
+  ) {
     if (!files || files.length === 0) return;
     setErr(null);
     setBusy("Uploading…");
     const fd = new FormData();
     fd.append("venue_id", venueId);
-    fd.append("category", category);
+    fd.append("category", cat);
     Array.from(files).forEach((f) => fd.append("files", f));
     const res = await fetch("/api/venue/gallery", { method: "POST", body: fd });
     const j = await res.json();
     setBusy(null);
     if (!res.ok) return setErr(j.error || "Upload failed");
-    if (fileRef.current) fileRef.current.value = "";
+    if (ref.current) ref.current.value = "";
     start(() => router.refresh());
   }
 
@@ -106,6 +126,17 @@ export function YourVenueManager({ venueId, items }: { venueId: string; items: M
             className="vy-input"
           />
         </div>
+        <div className="space-y-1">
+          <label className="vy-label">Add floor plan / layout</label>
+          <input
+            ref={planRef}
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={(e) => upload(e.target.files, FLOORPLAN_CATEGORY, planRef)}
+            className="vy-input"
+          />
+        </div>
         <button
           type="button"
           onClick={smartImport}
@@ -119,7 +150,7 @@ export function YourVenueManager({ venueId, items }: { venueId: string; items: M
 
       {err && <div className="text-sm text-[color:var(--poppy)]">{err}</div>}
 
-      {groups.length === 0 ? (
+      {groups.length === 0 && floorPlans.length === 0 ? (
         <div className="vy-card text-sm text-stone-500">
           No venue media yet. Upload photos/videos above, or run Smart Import to
           pull and auto-label images already attached to your areas, accommodation
@@ -164,6 +195,37 @@ export function YourVenueManager({ venueId, items }: { venueId: string; items: M
             </div>
           </section>
         ))
+      )}
+
+      {floorPlans.length > 0 && (
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              Floor plans &amp; layouts
+              <span className="vy-tag vy-tag-soft">{floorPlans.length}</span>
+            </h2>
+            <p className="text-sm text-stone-500">
+              Layout images couples see on the Floor Plans tab of their portal.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {floorPlans.map((m) => (
+              <div key={m.id} className="group relative rounded-lg overflow-hidden border border-stone-200 bg-stone-50">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={m.url} alt={m.label || "Floor plan"} className="h-36 w-full object-contain bg-white" />
+                <div className="absolute inset-x-0 bottom-0 flex items-center justify-end bg-white/90 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={() => remove(m.id)}
+                    className="text-xs text-[color:var(--poppy)] px-1"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );
