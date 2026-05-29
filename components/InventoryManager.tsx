@@ -270,87 +270,154 @@ export function InventoryManager({
       ) : displayed.length === 0 ? (
         <div className="vy-empty">No items match &ldquo;{query}&rdquo;.</div>
       ) : (
-        <div className="overflow-visible">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs text-stone-500 border-b border-stone-200">
-              <tr>
-                <th className="w-10 py-2">
-                  <input type="checkbox" checked={allChecked} ref={(el) => { if (el) el.indeterminate = someChecked; }}
-                    onChange={(e) => toggleAll(e.target.checked)} />
-                </th>
-                <th className="py-2">Image</th>
-                {hasCategory && <th className="py-2">Category</th>}
-                <th className="py-2">Name</th>
-                <th className="py-2">Price</th>
-                {showExtraColumns && <th className="py-2">Commission</th>}
-                {showExtraColumns && <th className="py-2">Total</th>}
-                {showExtraColumns && <th className="py-2">Availability</th>}
-                <th className="py-2">Active</th>
-                <th className="py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayed.map((i) => {
-                const img = i.image_url as string | undefined;
-                return (
-                  <tr key={i.id} className="border-b border-stone-100 hover:bg-stone-50">
-                    <td className="py-2"><input type="checkbox" checked={selected.has(i.id)} onChange={(e) => toggle(i.id, e.target.checked)} /></td>
-                    <td className="py-2">
-                      {img ? (
-                        <ZoomThumb img={img} onClick={() => setZoomUrl(img)} />
+        <div className="space-y-3">
+          {/* Tiny select-all bar above cards */}
+          <label className="flex items-center gap-2 text-xs px-1" style={{ color: "var(--ink-2)" }}>
+            <input
+              type="checkbox"
+              checked={allChecked}
+              ref={(el) => { if (el) el.indeterminate = someChecked; }}
+              onChange={(e) => toggleAll(e.target.checked)}
+              style={{ accentColor: "var(--poppy)" }}
+            />
+            Select all on this page
+          </label>
+
+          {/* Horizontal card list — LekkeSlaap-style row, Venuely brand colours */}
+          <ul className="space-y-3">
+            {displayed.map((i) => {
+              const img = i.image_url as string | undefined;
+              const base = Number(i[priceColumn] ?? 0);
+              const cv = Number(i.commission_value ?? 0);
+              const ct = String(i.commission_type ?? "fixed");
+              const commissionAmt = ct === "percent" ? Math.round(base * cv) / 100 : cv;
+              const total = ct === "percent" ? Math.round(base * (1 + cv / 100) * 100) / 100 : Math.round((base + cv) * 100) / 100;
+              const stock = Number(i.stock_total ?? 0);
+              const isSel = selected.has(i.id);
+              return (
+                <li
+                  key={i.id}
+                  className="relative rounded-2xl bg-white flex items-stretch gap-4 p-3 sm:p-4 transition hover:shadow-md"
+                  style={{
+                    border: "1px solid var(--line)",
+                    boxShadow: isSel ? "0 0 0 2px var(--poppy)" : undefined,
+                  }}
+                >
+                  {/* Left edge accent */}
+                  <span
+                    aria-hidden
+                    className="absolute left-0 top-3 bottom-3 w-1 rounded-r-md"
+                    style={{ background: i.active ? "var(--poppy)" : "var(--line)" }}
+                  />
+
+                  {/* Image */}
+                  <div className="flex-shrink-0 self-center pl-2">
+                    {img ? (
+                      <button
+                        type="button"
+                        onClick={() => setZoomUrl(img)}
+                        className="block h-20 w-20 sm:h-24 sm:w-24 rounded-xl overflow-hidden transition hover:scale-[1.04]"
+                        style={{ border: "1px solid var(--line)" }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img} alt="" className="h-full w-full object-cover" />
+                      </button>
+                    ) : (
+                      <div
+                        className="h-20 w-20 sm:h-24 sm:w-24 rounded-xl flex items-center justify-center text-[10px]"
+                        style={{ border: "1px dashed var(--line)", background: "var(--bone)", color: "var(--ink-2)" }}
+                      >
+                        no image
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Middle: identity + description */}
+                  <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {hasCategory && i.category ? (
+                        <span
+                          className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md"
+                          style={{ background: "var(--cream)", color: "var(--poppy-deep)" }}
+                        >
+                          {String(i.category)}
+                        </span>
+                      ) : null}
+                      {showExtraColumns && (stock > 0 ? (
+                        <span className="text-[10px] font-medium" style={{ color: "#1f5d3e" }}>● {stock} available</span>
                       ) : (
-                        <div className="h-10 w-10 rounded border border-dashed border-stone-300 bg-stone-50" />
+                        <span className="text-[10px] font-medium" style={{ color: "var(--poppy-deep)" }}>○ on request</span>
+                      ))}
+                    </div>
+                    <div className="font-serif text-base sm:text-lg leading-tight truncate" style={{ fontWeight: 700 }}>
+                      {String(i.name ?? "")}
+                    </div>
+                    {i.description ? (
+                      <div className="text-xs leading-relaxed line-clamp-2 max-w-2xl" style={{ color: "var(--ink-2)" }}>
+                        {String(i.description)}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {/* Right: price + commission + actions */}
+                  <div className="flex-shrink-0 flex flex-col items-end justify-between gap-2 sm:min-w-[200px] pr-1">
+                    <div className="text-right">
+                      <div className="font-serif text-lg" style={{ color: "var(--poppy)", fontWeight: 700 }}>
+                        R{base.toLocaleString("en-ZA")}
+                      </div>
+                      {showExtraColumns && cv > 0 && (
+                        <div className="text-[10px]" style={{ color: "var(--ink-2)" }}>
+                          +{ct === "percent" ? `${cv}%` : `R${cv.toLocaleString()}`} · total R{total.toLocaleString("en-ZA")}
+                        </div>
                       )}
-                    </td>
-                    {hasCategory && <td className="py-2"><span className="vy-tag vy-tag-soft">{String(i.category ?? "")}</span></td>}
-                    <td className="py-2">
-                      <div className="font-medium">{String(i.name ?? "")}</div>
-                      {i.description ? <div className="text-xs text-stone-500 mt-0.5 max-w-md truncate">{String(i.description)}</div> : null}
-                    </td>
-                    <td className="py-2">R{Number(i[priceColumn] ?? 0).toLocaleString()}</td>
-                    {showExtraColumns && (() => {
-                      const base = Number(i[priceColumn] ?? 0);
-                      const cv = Number(i.commission_value ?? 0);
-                      const ct = String(i.commission_type ?? "fixed");
-                      const commissionAmt = ct === "percent" ? Math.round(base * cv) / 100 * 100 / 100 : cv;
-                      const total = ct === "percent" ? Math.round(base * (1 + cv / 100) * 100) / 100 : Math.round((base + cv) * 100) / 100;
-                      const stock = Number(i.stock_total ?? 0);
-                      return (
-                        <>
-                          <td className="py-2 text-xs">
-                            {cv ? (ct === "percent" ? `${cv}%` : `R${cv.toLocaleString()}`) : <span className="text-stone-400">—</span>}
-                            {cv ? <span className="text-stone-400"> (R{commissionAmt.toLocaleString()})</span> : null}
-                          </td>
-                          <td className="py-2 font-medium">R{total.toLocaleString()}</td>
-                          <td className="py-2 text-xs">
-                            {stock > 0
-                              ? <span className="text-emerald-700">● {stock} available</span>
-                              : <span className="text-amber-700">○ on request</span>}
-                          </td>
-                        </>
-                      );
-                    })()}
-                    <td className="py-2">
+                      {showExtraColumns && cv > 0 && commissionAmt > 0 && (
+                        <div className="text-[10px]" style={{ color: "var(--sage)" }}>
+                          R{Math.round(commissionAmt).toLocaleString("en-ZA")} commission
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => toggleActiveSingle(i.id, !i.active)}
-                        className={`rounded-full px-3 py-1 text-xs font-medium border transition ${
+                        className="rounded-full px-3 py-1 text-[11px] font-medium transition"
+                        style={
                           i.active
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                            : "bg-stone-100 text-stone-500 border-stone-200 hover:bg-stone-200"
-                        }`}
+                            ? { background: "var(--leaf)", color: "#1f5d3e", border: "1px solid #c2dbcf" }
+                            : { background: "var(--bone)", color: "var(--ink-2)", border: "1px solid var(--line)" }
+                        }
                       >
                         {i.active ? "● Active" : "○ Not active"}
                       </button>
-                    </td>
-                    <td className="py-2 text-right">
-                      <button onClick={() => startEdit(i)} className={`${BUBBLE_GHOST} text-xs px-3 py-1.5`}>Edit</button>
-                      <button onClick={() => deleteSingle(i.id)} className={`${BUBBLE_GHOST} text-xs px-3 py-1.5 hover:text-red-700`}>Remove</button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      <button
+                        onClick={() => startEdit(i)}
+                        className="rounded-full px-3 py-1 text-[11px] font-medium transition hover:bg-stone-100"
+                        style={{ border: "1px solid var(--line)", color: "var(--ink)" }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deleteSingle(i.id)}
+                        className="rounded-full px-3 py-1 text-[11px] font-medium transition hover:text-red-700"
+                        style={{ color: "var(--ink-2)" }}
+                      >
+                        Remove
+                      </button>
+                      <label className="ml-1 flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isSel}
+                          onChange={(e) => toggle(i.id, e.target.checked)}
+                          style={{ accentColor: "var(--poppy)" }}
+                          aria-label={`Select ${String(i.name ?? "item")}`}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
