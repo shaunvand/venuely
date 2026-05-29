@@ -6,9 +6,11 @@ import { createClient } from "@/lib/supabase/server";
 import {
   updateWeddingBasics, setPortalPassword,
   markInvoiced, markCouplePaid, markPlatformFeePaid,
+  sendPortalInvite, rotatePortalAccess, revokeCoupleAccess,
 } from "../actions";
 import { addPayment, deletePayment, addCharge, deleteCharge } from "./ledger-actions";
 import { PortalLinkCard } from "@/components/PortalLinkCard";
+import { SendPortalInvite } from "@/components/SendPortalInvite";
 import { WeddingDocuments } from "@/components/WeddingDocuments";
 import { loadRules, computeTotals, applyMarkup, type Charge, type Payment } from "@/lib/billing/compute";
 import { whatsappUrl, bookingNotificationMessage } from "@/lib/whatsapp";
@@ -43,6 +45,17 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     .eq("slug", slug)
     .single();
   if (!wedding) notFound();
+
+  // Couple-access lifecycle: last-opened (from portal_access_log) + couple members (for Remove).
+  const [lastOpenedRes, coupleMembersRes] = await Promise.all([
+    supabase.from("portal_access_log").select("accessed_at").eq("wedding_id", wedding.id).order("accessed_at", { ascending: false }).limit(1),
+    supabase.from("wedding_members").select("user_id, profiles:profiles(id, full_name)").eq("wedding_id", wedding.id),
+  ]);
+  const lastOpenedAt = (lastOpenedRes.data?.[0]?.accessed_at as string | undefined) ?? null;
+  const coupleMembers = (coupleMembersRes.data ?? []) as unknown as Array<{
+    user_id: string;
+    profiles: { id: string; full_name: string | null } | null;
+  }>;
 
   const state = (wedding.wedding_state ?? {}) as WeddingState;
   const rules = await loadRules(supabase, venue.id);
@@ -207,6 +220,43 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
         passwordSet={!!wedding.portal_password_hash}
         setPasswordAction={setPortalPassword.bind(null, wedding.id, wedding.slug)}
       />
+
+      <SendPortalInvite
+        portalUrl={portalUrl}
+        passwordSet={!!wedding.portal_password_hash}
+        lastOpenedAt={lastOpenedAt}
+        sendAction={sendPortalInvite.bind(null, wedding.id, wedding.slug)}
+      />
+
+      {/* Link lifecycle: rotate the access code, or remove a couple's account access. */}
+      <div className="vy-card space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="vy-eyebrow">Access lifecycle</div>
+        </div>
+        <div className="flex gap-2 flex-wrap items-center">
+          <form action={rotatePortalAccess.bind(null, wedding.id, wedding.slug)}>
+            <button className="vy-btn vy-btn-secondary text-sm">Rotate access code</button>
+          </form>
+          <p className="text-xs text-stone-500">
+            Rotating issues a fresh code and invalidates the old link/cookie. Re-send the invite afterwards.
+          </p>
+        </div>
+        {coupleMembers.length > 0 && (
+          <div className="border-t border-stone-200 pt-3 space-y-2">
+            <div className="text-xs font-medium text-stone-600">Couple accounts with access</div>
+            <ul className="space-y-1.5">
+              {coupleMembers.map((m) => (
+                <li key={m.user_id} className="flex items-center justify-between gap-2 py-1.5 border-b border-stone-100 last:border-0">
+                  <span className="text-sm">{m.profiles?.full_name ?? m.user_id}</span>
+                  <form action={revokeCoupleAccess.bind(null, wedding.id, m.user_id, wedding.slug)}>
+                    <button className="text-xs text-stone-500 hover:text-red-700">Remove access</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
       <form action={updateWeddingBasics.bind(null, wedding.id, wedding.slug)} className="vy-card grid gap-3 md:grid-cols-6">
         <div className="md:col-span-3 space-y-1"><label className="vy-label">Couple names</label><input name="couple_names" required defaultValue={wedding.couple_names} className="vy-input" /></div>

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
 // Build the public origin from x-forwarded-* so we don't leak the internal
@@ -16,24 +17,81 @@ function publicOrigin(request: NextRequest): string {
   return `${proto}://${host}`;
 }
 
+function admin() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SECRET_KEY) return null;
+  return createAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SECRET_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
+
+// When the callback carries a wedding-invite token, redeem it: link the now
+// signed-in user to the wedding (wedding_members → activates can_access_wedding
+// RLS) and mark the invite accepted. Returns the wedding slug to redirect to, or
+// null if there's nothing to redeem / it couldn't be redeemed.
+async function redeemInvite(token: string, userId: string): Promise<string | null> {
+  const ad = admin();
+  if (!ad) return null;
+
+  const { data: invite } = await ad
+    .from("wedding_invites")
+    .select("id, wedding_id, expires_at, accepted_at, status")
+    .eq("token", token)
+    .maybeSingle();
+  if (!invite || !invite.wedding_id) return null;
+  if (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now()) return null;
+
+  // Idempotent: ignore-duplicate on the composite PK (wedding_id, user_id).
+  await ad
+    .from("wedding_members")
+    .upsert({ wedding_id: invite.wedding_id, user_id: userId }, { onConflict: "wedding_id,user_id", ignoreDuplicates: true });
+
+  if (!invite.accepted_at) {
+    await ad
+      .from("wedding_invites")
+      .update({ accepted_at: new Date().toISOString(), status: "accepted" })
+      .eq("id", invite.id);
+  }
+
+  const { data: wedding } = await ad
+    .from("weddings")
+    .select("slug")
+    .eq("id", invite.wedding_id)
+    .maybeSingle();
+  return (wedding?.slug as string | undefined) ?? null;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const origin = publicOrigin(request);
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
+  const invite = searchParams.get("invite");
   const redirect = searchParams.get("redirect") || searchParams.get("next") || "/dashboard";
 
   const supabase = await createClient();
 
+  let authed = false;
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(`${origin}${redirect}`);
+    if (!error) authed = true;
+  } else if (tokenHash && type) {
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+    if (!error) authed = true;
   }
 
-  if (tokenHash && type) {
-    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
-    if (!error) return NextResponse.redirect(`${origin}${redirect}`);
+  if (authed) {
+    // Redeem a wedding invite if one rode along on the callback URL.
+    if (invite) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const slug = await redeemInvite(invite, user.id);
+        if (slug) return NextResponse.redirect(`${origin}/${slug}`);
+      }
+    }
+    return NextResponse.redirect(`${origin}${redirect}`);
   }
 
   return NextResponse.redirect(`${origin}/login?error=callback_failed`);

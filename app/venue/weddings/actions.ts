@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createHash } from "node:crypto";
+import { headers } from "next/headers";
+import { createHash, randomBytes } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { loadRules, computeTotals, applyMarkup, type Charge, type Payment } from "@/lib/billing/compute";
+import { whatsappUrl } from "@/lib/whatsapp";
 
 type WeddingState = {
   rentalSelections?: Record<string, { sel?: boolean; qty?: number; mg?: boolean; wed?: boolean; fb?: boolean }>;
@@ -143,10 +145,24 @@ async function buildWeddingCharges(
   return { grandTotal: totals.grand_total, feeRate };
 }
 
-function hashPassword(plain: string): string {
-  // Lightweight salted hash: salt comes from a server-only env var, falls back to a fixed string in dev.
-  const salt = process.env.PORTAL_PASSWORD_SALT ?? "venuely-portal-v1";
+// Lightweight salted hash. The base salt comes from a server-only env var
+// (falls back to a fixed string in dev). When a per-wedding `portalSalt` is
+// supplied it is folded in too, so rotating a wedding's salt invalidates every
+// old vy_portal_<id> cookie (which stored the previous hash). Must stay in
+// lock-step with the same helper in app/[wedding]/route.ts and lib/portal/access.ts.
+function hashPassword(plain: string, portalSalt?: string | null): string {
+  const base = process.env.PORTAL_PASSWORD_SALT ?? "venuely-portal-v1";
+  const salt = portalSalt ? `${base}::${portalSalt}` : base;
   return createHash("sha256").update(`${salt}::${plain}`).digest("hex");
+}
+
+// A short, friendly, unambiguous password (no 0/O/1/l/I) for couples who don't
+// already have one set. e.g. "petal-7421".
+function friendlyPassword(): string {
+  const words = ["petal", "ivory", "amber", "olive", "coral", "willow", "fern", "dahlia", "marble", "linen"];
+  const word = words[Math.floor(Math.random() * words.length)];
+  const num = 1000 + Math.floor(Math.random() * 9000);
+  return `${word}-${num}`;
 }
 
 // Turn "Alex & Sam Smith" → "AlexAndSamSmithWedding".
@@ -225,8 +241,184 @@ export async function updateWeddingBasics(weddingId: string, slug: string, formD
 export async function setPortalPassword(weddingId: string, slug: string, formData: FormData) {
   const supabase = await createClient();
   const pw = (formData.get("password") as string || "").trim();
-  const patch = { portal_password_hash: pw ? hashPassword(pw) : null };
+  // Hash with the wedding's current per-wedding salt (if it has one from a prior
+  // rotation) so the gate — which prefers portal_salt — keeps matching.
+  const { data: wed } = await supabase.from("weddings").select("portal_salt").eq("id", weddingId).single();
+  const portalSalt = (wed as { portal_salt?: string | null } | null)?.portal_salt ?? null;
+  const patch = { portal_password_hash: pw ? hashPassword(pw, portalSalt) : null };
   const { error } = await supabase.from("weddings").update(patch).eq("id", weddingId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/venue/weddings/${slug}`);
+}
+
+// -----------------------------------------------------------------------------
+// Couple invite & delivery + link lifecycle.
+// -----------------------------------------------------------------------------
+
+const RESEND_API = "https://api.resend.com/emails";
+
+// Build the public origin (https://venuely.co.za) from x-forwarded-* so links
+// never leak the internal Render dyno address.
+async function publicOrigin(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") || h.get("host") || "venuely.co.za";
+  const proto = h.get("x-forwarded-proto") || "https";
+  return `${proto}://${host}`;
+}
+
+export type SendPortalInviteResult = {
+  ok: boolean;
+  url: string;
+  whatsappUrl: string | null;
+  passwordSet: boolean;
+  password?: string;          // only returned when freshly auto-generated
+  emailSent: boolean;
+  reason?: string;
+};
+
+// Ensure the couple has a way in, record the invite, and (best-effort) email them.
+//  - If no portal password is set, auto-generate a friendly one and store its hash.
+//  - Insert a wedding_invites row with a random token, 30-day expiry.
+//  - Email the portal link + access code via the Resend fetch pattern (env-gated).
+//  - Persist couple_email on the wedding.
+export async function sendPortalInvite(
+  weddingId: string,
+  slug: string,
+  opts: { email?: string; whatsapp?: string },
+): Promise<SendPortalInviteResult> {
+  const supabase = await createClient();
+  const email = (opts.email ?? "").trim();
+  const whatsapp = (opts.whatsapp ?? "").trim();
+
+  const { data: wed, error: wErr } = await supabase
+    .from("weddings")
+    .select("id, slug, couple_names, portal_password_hash, portal_salt, venue:venues(name)")
+    .eq("id", weddingId)
+    .single();
+  if (wErr || !wed) throw new Error(wErr?.message ?? "Wedding not found");
+
+  const venueName = (wed as unknown as { venue: { name: string } | null }).venue?.name ?? "your venue";
+  const portalSalt = (wed as { portal_salt?: string | null }).portal_salt ?? null;
+
+  // 1) Ensure an access code exists.
+  let generatedPassword: string | undefined;
+  let passwordSet = !!(wed as { portal_password_hash?: string | null }).portal_password_hash;
+  if (!passwordSet) {
+    generatedPassword = friendlyPassword();
+    const { error: pErr } = await supabase
+      .from("weddings")
+      .update({ portal_password_hash: hashPassword(generatedPassword, portalSalt) })
+      .eq("id", weddingId);
+    if (pErr) throw new Error(pErr.message);
+    passwordSet = true;
+  }
+
+  // 2) Record the invite (random token, 30-day expiry).
+  const token = randomBytes(24).toString("hex");
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  await supabase.from("wedding_invites").insert({
+    wedding_id: weddingId,
+    email: email || null,
+    role: "couple",
+    token,
+    expires_at: expiresAt,
+    status: "sent",
+  });
+
+  // 3) Persist the couple email when supplied.
+  if (email) {
+    await supabase.from("weddings").update({ couple_email: email }).eq("id", weddingId);
+  }
+
+  const origin = await publicOrigin();
+  const url = `${origin}/${slug}`;
+
+  // 4) Compose the WhatsApp share link (returned to the client for one-tap share).
+  const waMessage = generatedPassword
+    ? `Hi! Your ${venueName} wedding planning portal is ready 💍\n\n${url}\nAccess code: ${generatedPassword}`
+    : `Hi! Your ${venueName} wedding planning portal is ready 💍\n\n${url}`;
+  const wa = whatsapp ? whatsappUrl(whatsapp, waMessage) : null;
+
+  // 5) Email the couple (env-gated — never throws at build/import time).
+  let emailSent = false;
+  if (process.env.RESEND_API_KEY && email) {
+    const codeBlock = generatedPassword
+      ? `<p style="margin:0 0 8px;color:#57534e">Your access code:</p>
+         <p style="font-size:22px;font-weight:600;letter-spacing:1px;margin:0 0 20px;color:#FA523C">${generatedPassword}</p>`
+      : `<p style="margin:0 0 20px;color:#57534e">Use the access code your venue gave you to sign in.</p>`;
+    const html = `
+      <div style="font-family:system-ui,-apple-system,sans-serif;max-width:560px;margin:0 auto;background:#FFF6F0;border-radius:16px;padding:36px">
+        <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#FA523C;font-weight:600">Venuely</div>
+        <h1 style="font-family:Georgia,serif;font-size:26px;color:#1c1917;margin:8px 0 4px">Your wedding portal is ready</h1>
+        <p style="color:#57534e;margin:0 0 24px">Hi ${(wed as { couple_names: string }).couple_names}, ${venueName} has set up your personal planning portal.</p>
+        <a href="${url}" style="display:inline-block;background:#FA523C;color:#fff;text-decoration:none;padding:14px 28px;border-radius:999px;font-weight:600;margin:0 0 24px">Open your portal →</a>
+        ${codeBlock}
+        <p style="color:#8a9a86;font-size:13px;margin:24px 0 0;border-top:1px solid #FFC6AD;padding-top:16px">
+          Or paste this link into your browser:<br><span style="color:#57534e;word-break:break-all">${url}</span>
+        </p>
+      </div>`;
+    try {
+      const res = await fetch(RESEND_API, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "Venuely <hello@venuely.co.za>",
+          to: email,
+          subject: `Your ${venueName} wedding portal is ready`,
+          html,
+        }),
+      });
+      emailSent = res.ok;
+    } catch {
+      emailSent = false; // non-fatal — the link + code are still usable
+    }
+  }
+
+  revalidatePath(`/venue/weddings/${slug}`);
+  return {
+    ok: true,
+    url,
+    whatsappUrl: wa,
+    passwordSet,
+    password: generatedPassword,
+    emailSent,
+    reason: !process.env.RESEND_API_KEY ? "email_not_configured" : (!email ? "no_email" : undefined),
+  };
+}
+
+// Rotate portal access: assign a NEW per-wedding portal_salt so every previously
+// issued vy_portal_<id> cookie stops matching. If an explicit new password is
+// supplied we re-hash it under the new salt; otherwise we clear the password so
+// the next sendPortalInvite generates (and surfaces) a fresh access code — the
+// only way to reveal a new code to the venue, since a bare form action can't
+// return one to the UI.
+export async function rotatePortalAccess(weddingId: string, slug: string, formData?: FormData) {
+  const supabase = await createClient();
+  const newSalt = randomBytes(12).toString("hex");
+
+  const supplied = (formData?.get("password") as string | null)?.trim() || "";
+  const nextHash: string | null = supplied ? hashPassword(supplied, newSalt) : null;
+
+  const { error } = await supabase
+    .from("weddings")
+    .update({ portal_salt: newSalt, portal_password_hash: nextHash })
+    .eq("id", weddingId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/venue/weddings/${slug}`);
+}
+
+// Remove a couple member from the wedding (revokes auth-based access; the
+// can_access_wedding RLS no longer matches that user).
+export async function revokeCoupleAccess(weddingId: string, userId: string, slug: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("wedding_members")
+    .delete()
+    .eq("wedding_id", weddingId)
+    .eq("user_id", userId);
   if (error) throw new Error(error.message);
   revalidatePath(`/venue/weddings/${slug}`);
 }

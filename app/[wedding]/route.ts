@@ -1,14 +1,66 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { createClient as createAdmin } from "@supabase/supabase-js";
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { applyMarkup } from "@/lib/billing/compute";
 
-function hashPassword(plain: string): string {
-  const salt = process.env.PORTAL_PASSWORD_SALT ?? "venuely-portal-v1";
+// Salted hash. Folds in the per-wedding portal_salt when present so a rotated
+// salt invalidates old cookies. Must stay in lock-step with the helper in
+// app/venue/weddings/actions.ts.
+function hashPassword(plain: string, portalSalt?: string | null): string {
+  const base = process.env.PORTAL_PASSWORD_SALT ?? "venuely-portal-v1";
+  const salt = portalSalt ? `${base}::${portalSalt}` : base;
   return createHash("sha256").update(`${salt}::${plain}`).digest("hex");
 }
+
+// Service-role client for writing the access log (RLS only permits service-role
+// inserts). Returns null when the key is absent so logging is best-effort and
+// never crashes the page.
+function admin() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SECRET_KEY) return null;
+  return createAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SECRET_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
+
+async function logAccess(weddingId: string, via: "password" | "member"): Promise<void> {
+  const ad = admin();
+  if (!ad) return;
+  try {
+    await ad.from("portal_access_log").insert({ wedding_id: weddingId, via });
+  } catch {
+    // Access logging is best-effort — never block the grant on a log failure.
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Per-slug brute-force throttle (in-memory, bounded). Resets on cold start.
+// Not a substitute for a real rate-limiter, just a cheap speed bump.
+// -----------------------------------------------------------------------------
+const MAX_ATTEMPTS = 8;
+const WINDOW_MS = 5 * 60 * 1000;     // 5 minutes
+const _attempts = new Map<string, { count: number; first: number }>();
+
+function tooManyAttempts(slug: string): boolean {
+  const now = Date.now();
+  const e = _attempts.get(slug);
+  if (!e) return false;
+  if (now - e.first > WINDOW_MS) { _attempts.delete(slug); return false; }
+  return e.count >= MAX_ATTEMPTS;
+}
+function recordAttempt(slug: string): void {
+  const now = Date.now();
+  const e = _attempts.get(slug);
+  if (!e || now - e.first > WINDOW_MS) { _attempts.set(slug, { count: 1, first: now }); return; }
+  e.count += 1;
+  // Bound the map so a flood of distinct slugs can't grow it without limit.
+  if (_attempts.size > 5000) _attempts.clear();
+}
+function clearAttempts(slug: string): void { _attempts.delete(slug); }
 
 function passwordGateHtml(slug: string, couple: string, error?: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -26,7 +78,7 @@ function passwordGateHtml(slug: string, couple: string, error?: string): string 
 <body><div class="card">
   <h1>${couple.replace(/[<>&"]/g, "")}</h1>
   <p>This wedding portal is password-protected. Enter the password your venue gave you.</p>
-  <form method="GET" action="/${slug}">
+  <form method="POST" action="/${slug}">
     <input type="password" name="p" autofocus placeholder="Password" required />
     <button type="submit">Unlock portal</button>
     ${error ? `<div class="err">${error}</div>` : ""}
@@ -95,12 +147,13 @@ export async function GET(
   // Fetch the wedding (no auth required to look up — auth/password gate below).
   const { data: wedding } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, wedding_state, portal_password_hash, venue:venues(id, name, slug, description, directions, website, included_items, contact_email, contact_phone, google_maps_url)")
+    .select("id, slug, couple_names, wedding_date, wedding_state, portal_password_hash, portal_salt, venue:venues(id, name, slug, description, directions, website, included_items, contact_email, contact_phone, google_maps_url)")
     .eq("slug", rawSlug)
     .maybeSingle();
   if (!wedding) return new NextResponse("Wedding portal not found.", { status: 404 });
 
   const expectedHash = (wedding as unknown as { portal_password_hash: string | null }).portal_password_hash;
+  const portalSalt = (wedding as unknown as { portal_salt: string | null }).portal_salt;
 
   // Access logic:
   //  - If a portal password is set → that password is the gate; no Supabase Auth needed.
@@ -108,17 +161,33 @@ export async function GET(
   if (expectedHash) {
     const cookieName = `vy_portal_${wedding.id}`;
     const cookieValue = request.cookies.get(cookieName)?.value;
-    if (cookieValue !== expectedHash) {
+    if (cookieValue === expectedHash) {
+      // Already authenticated via cookie — log the open. (No-op without service key.)
+      await logAccess(wedding.id, "password");
+    } else {
+      // Backward-compatible ?p= grant (older links). The preferred path is the
+      // POST handler below; GET ?p= is kept so existing emails/QRs still work.
       const supplied = request.nextUrl.searchParams.get("p");
-      if (supplied && hashPassword(supplied) === expectedHash) {
-        const cleanUrl = request.nextUrl.clone();
-        cleanUrl.searchParams.delete("p");
-        const res = NextResponse.redirect(cleanUrl);
-        res.cookies.set(cookieName, expectedHash, {
-          httpOnly: true, sameSite: "lax", secure: true,
-          maxAge: 60 * 60 * 24 * 30, path: `/${rawSlug}`,
-        });
-        return res;
+      if (supplied) {
+        if (tooManyAttempts(rawSlug)) {
+          return new NextResponse(passwordGateHtml(rawSlug, wedding.couple_names, "Too many attempts — wait a few minutes and try again."), {
+            status: 429, headers: { "Content-Type": "text/html; charset=utf-8" },
+          });
+        }
+        // Use the per-wedding salt when present, else the legacy base salt.
+        if (hashPassword(supplied, portalSalt) === expectedHash) {
+          clearAttempts(rawSlug);
+          await logAccess(wedding.id, "password");
+          const cleanUrl = request.nextUrl.clone();
+          cleanUrl.searchParams.delete("p");
+          const res = NextResponse.redirect(cleanUrl);
+          res.cookies.set(cookieName, expectedHash, {
+            httpOnly: true, sameSite: "lax", secure: true,
+            maxAge: 60 * 60 * 24 * 30, path: `/${rawSlug}`,
+          });
+          return res;
+        }
+        recordAttempt(rawSlug);
       }
       const err = supplied ? "Incorrect password — try again." : undefined;
       return new NextResponse(passwordGateHtml(rawSlug, wedding.couple_names, err), {
@@ -133,6 +202,8 @@ export async function GET(
       url.searchParams.set("redirect", `/${rawSlug}`);
       return NextResponse.redirect(url);
     }
+    // Authenticated member/owner/venue-staff grant.
+    await logAccess(wedding.id, "member");
   }
 
   const venue = (wedding as unknown as {
@@ -210,5 +281,68 @@ export async function GET(
   return new NextResponse(html, {
     status: 200,
     headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+// Preferred password-gate path: the unlock form POSTs here. On success we set
+// the cookie and 303-redirect to the GET portal (cookie now matches). On
+// failure we re-render the gate. Keeps the GET ?p= path working for old links.
+export async function POST(
+  request: NextRequest,
+  ctx: { params: Promise<{ wedding: string }> }
+) {
+  const { wedding: rawSlug } = await ctx.params;
+  if (RESERVED.has(rawSlug)) return new NextResponse("Not found", { status: 404 });
+
+  const supabase = await createClient();
+  const { data: wedding } = await supabase
+    .from("weddings")
+    .select("id, couple_names, portal_password_hash, portal_salt")
+    .eq("slug", rawSlug)
+    .maybeSingle();
+  if (!wedding) return new NextResponse("Wedding portal not found.", { status: 404 });
+
+  const expectedHash = (wedding as unknown as { portal_password_hash: string | null }).portal_password_hash;
+  const portalSalt = (wedding as unknown as { portal_salt: string | null }).portal_salt;
+
+  // No password set → there's nothing to POST; bounce to the GET (auth) flow.
+  if (!expectedHash) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/${rawSlug}`;
+    return NextResponse.redirect(url, { status: 303 });
+  }
+
+  if (tooManyAttempts(rawSlug)) {
+    return new NextResponse(passwordGateHtml(rawSlug, wedding.couple_names, "Too many attempts — wait a few minutes and try again."), {
+      status: 429, headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+
+  let supplied = "";
+  try {
+    const form = await request.formData();
+    supplied = String(form.get("p") ?? "").trim();
+  } catch {
+    supplied = "";
+  }
+
+  if (supplied && hashPassword(supplied, portalSalt) === expectedHash) {
+    clearAttempts(rawSlug);
+    await logAccess(wedding.id, "password");
+    const url = request.nextUrl.clone();
+    url.pathname = `/${rawSlug}`;
+    url.search = "";
+    const res = NextResponse.redirect(url, { status: 303 });
+    res.cookies.set(`vy_portal_${wedding.id}`, expectedHash, {
+      httpOnly: true, sameSite: "lax", secure: true,
+      maxAge: 60 * 60 * 24 * 30, path: `/${rawSlug}`,
+    });
+    return res;
+  }
+
+  recordAttempt(rawSlug);
+  const err = supplied ? "Incorrect password — try again." : "Enter your access code.";
+  return new NextResponse(passwordGateHtml(rawSlug, wedding.couple_names, err), {
+    status: 200, headers: { "Content-Type": "text/html; charset=utf-8" },
   });
 }
