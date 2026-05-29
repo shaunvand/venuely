@@ -14,7 +14,7 @@ export default async function OwnerDashboard() {
 
   const [{ count: venueCount }, { data: venues }, { data: weddingsRaw }] = await Promise.all([
     supabase.from("venues").select("*", { count: "exact", head: true }),
-    supabase.from("venues").select("id, slug, name, region, subscription_status").order("created_at"),
+    supabase.from("venues").select("id, slug, name, region, subscription_status, listed").order("created_at"),
     supabase
       .from("weddings")
       .select("id, slug, couple_names, wedding_date, venue:venues(slug, name)")
@@ -22,6 +22,25 @@ export default async function OwnerDashboard() {
   ]);
 
   const weddings = (weddingsRaw ?? []) as unknown as WeddingRow[];
+
+  // ---- Funnel analytics (additive, read-only) ----------------------------
+  // Lead flow across this owner's venues. RLS exposes only enquiries on the
+  // owner's venues; an empty / missing enquiries table simply yields zeros
+  // (we read .data ?? [], never throw).
+  const ownerVenueIds = (venues ?? []).map((v) => v.id);
+  let totalEnquiries = 0;
+  let bookedEnquiries = 0;
+  if (ownerVenueIds.length) {
+    const { data: enquiryRows } = await supabase
+      .from("enquiries")
+      .select("status, venue_id")
+      .in("venue_id", ownerVenueIds);
+    const rows = enquiryRows ?? [];
+    totalEnquiries = rows.length;
+    bookedEnquiries = rows.filter((e) => e.status === "booked").length;
+  }
+  const conversionRate = totalEnquiries > 0 ? (bookedEnquiries / totalEnquiries) * 100 : 0;
+  const activeListedVenues = (venues ?? []).filter((v) => v.listed).length;
 
   // Fees collected month-to-date: sum of platform_fee_owed across this owner's
   // venues where the platform fee has been settled this calendar month.
@@ -50,6 +69,21 @@ export default async function OwnerDashboard() {
         <Stat label="Fees collected (MTD)" value={`R${feesCollectedMtd.toLocaleString()}`} />
         <Stat label="Trial venues" value={venues?.filter((v) => v.subscription_status === "trialing").length ?? 0} />
       </div>
+
+      <section>
+        <h2 className="font-semibold mb-3">Lead funnel</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Enquiries across all your venues, from first lead to booked wedding.
+        </p>
+        <div className="grid grid-cols-3 gap-4">
+          <Stat label="Total enquiries" value={totalEnquiries} />
+          <Stat
+            label="Enquiry → booked"
+            value={totalEnquiries > 0 ? `${conversionRate.toFixed(1)}%` : "—"}
+          />
+          <Stat label="Active listed venues" value={activeListedVenues} />
+        </div>
+      </section>
 
       <section>
         <h2 className="font-semibold mb-3">Jump in</h2>

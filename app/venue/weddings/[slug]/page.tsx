@@ -9,6 +9,8 @@ import {
   sendPortalInvite, rotatePortalAccess, revokeCoupleAccess,
 } from "../actions";
 import { addPayment, deletePayment, addCharge, deleteCharge } from "./ledger-actions";
+import { sendDepositReminder, sendBalanceReminder } from "../reminder-actions";
+import { depositReminder, balanceReminder } from "@/lib/notifications";
 import { PortalLinkCard } from "@/components/PortalLinkCard";
 import { SendPortalInvite } from "@/components/SendPortalInvite";
 import { WeddingDocuments } from "@/components/WeddingDocuments";
@@ -40,7 +42,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
 
   const { data: wedding } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, guest_count, status, total_budget, notes, wedding_state, wedding_state_updated_at, portal_password_hash, invoiced_at, invoice_total, couple_paid_at, platform_fee_owed, platform_fee_paid_at, deposit_due_at, balance_due_at, area_selections")
+    .select("id, slug, couple_names, wedding_date, guest_count, status, total_budget, notes, wedding_state, wedding_state_updated_at, portal_password_hash, invoiced_at, invoice_total, couple_paid_at, platform_fee_owed, platform_fee_paid_at, deposit_due_at, balance_due_at, couple_email, area_selections")
     .eq("venue_id", venue.id)
     .eq("slug", slug)
     .single();
@@ -211,6 +213,20 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
   // of its commission. projectedFee is therefore charged on platform_fee_base.
   const projectedFee = platformFee(totals, platformFeeRate);
 
+  // Void-returning form wrappers around the value-returning reminder actions, so
+  // the <form action> contract stays () => Promise<void>. The actions themselves
+  // still return a ReminderResult for direct / future-cron callers.
+  const weddingIdForReminders = wedding.id;
+  const weddingSlugForReminders = wedding.slug;
+  async function sendDepositReminderForm() {
+    "use server";
+    await sendDepositReminder(weddingIdForReminders, weddingSlugForReminders);
+  }
+  async function sendBalanceReminderForm() {
+    "use server";
+    await sendBalanceReminder(weddingIdForReminders, weddingSlugForReminders);
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-start gap-4 flex-wrap">
@@ -326,6 +342,69 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
           <div><div className="text-stone-500 text-xs">Paid in</div><div className="text-emerald-700">R{totals.payments_in.toLocaleString()}</div></div>
           <div><div className="text-stone-500 text-xs">Balance due</div><div className={totals.balance_due > 0 ? "text-amber-700" : "text-emerald-700"}>R{totals.balance_due.toLocaleString()}</div></div>
         </div>
+
+        {/* Payment reminders — owner-triggered. Email goes to couple_email (set when
+            you sent the portal invite); WhatsApp opens a pre-filled message you pick
+            the chat for. No scheduler — tap to send each one. */}
+        {(() => {
+          const depMsg = depositReminder(
+            { couple_names: wedding.couple_names, wedding_date: wedding.wedding_date, venueName: venue.name },
+            totals.deposit_amount,
+            wedding.deposit_due_at,
+          );
+          const balMsg = balanceReminder(
+            { couple_names: wedding.couple_names, wedding_date: wedding.wedding_date, venueName: venue.name },
+            totals.balance_due,
+            wedding.balance_due_at,
+          );
+          // Recipient-less wa.me link: opens WhatsApp pre-filled; owner picks the couple's chat.
+          const waLink = (text: string) => `https://wa.me/?text=${encodeURIComponent(text)}`;
+          const coupleEmail = (wedding as { couple_email?: string | null }).couple_email ?? null;
+          return (
+            <div className="border-t border-stone-200 pt-3 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="vy-eyebrow">Payment reminders</div>
+                <span className="text-xs text-stone-500">
+                  {coupleEmail ? <>Emails go to {coupleEmail}</> : "No couple email yet — send the portal invite first, or use WhatsApp"}
+                </span>
+              </div>
+              <div className="flex gap-2 flex-wrap items-center">
+                {totals.deposit_amount > 0 && (
+                  <>
+                    {/* Inline wrapper discards the action's ReminderResult so the form
+                        action stays () => Promise<void>; the action itself still returns
+                        a status for direct/cron callers. */}
+                    <form action={sendDepositReminderForm}>
+                      <button className="vy-btn vy-btn-secondary text-sm" disabled={!coupleEmail} title={coupleEmail ? "" : "Set the couple's email by sending the portal invite first"}>
+                        Send deposit reminder · R{totals.deposit_amount.toLocaleString()}
+                      </button>
+                    </form>
+                    <a href={waLink(depMsg.whatsappText)} target="_blank" rel="noopener noreferrer"
+                      className="rounded-full bg-emerald-600 text-white px-4 py-1.5 text-xs font-medium hover:bg-emerald-700 whitespace-nowrap">
+                      ↗ Deposit via WhatsApp
+                    </a>
+                  </>
+                )}
+                {totals.balance_due > 0 && (
+                  <>
+                    <form action={sendBalanceReminderForm}>
+                      <button className="vy-btn vy-btn-secondary text-sm" disabled={!coupleEmail} title={coupleEmail ? "" : "Set the couple's email by sending the portal invite first"}>
+                        Send balance reminder · R{totals.balance_due.toLocaleString()}
+                      </button>
+                    </form>
+                    <a href={waLink(balMsg.whatsappText)} target="_blank" rel="noopener noreferrer"
+                      className="rounded-full bg-emerald-600 text-white px-4 py-1.5 text-xs font-medium hover:bg-emerald-700 whitespace-nowrap">
+                      ↗ Balance via WhatsApp
+                    </a>
+                  </>
+                )}
+                {totals.deposit_amount <= 0 && totals.balance_due <= 0 && (
+                  <span className="text-xs text-stone-500">Nothing currently due — reminders appear once a deposit or balance is outstanding.</span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Charges table */}

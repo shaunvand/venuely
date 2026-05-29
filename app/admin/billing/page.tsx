@@ -27,6 +27,24 @@ export default async function OwnerBilling() {
     }, {} as Record<string, { total: number; booked: number; pending: number }>);
   }
 
+  // Per-venue enquiry funnel so the founder sees lead flow next to revenue.
+  // Reads the wave-3 enquiries table; an empty / missing table yields zeros
+  // (we read .data ?? [], never throw).
+  type Funnel = { new: number; quoted: number; booked: number; lost: number };
+  const enquiriesByVenue: Record<string, Funnel> = {};
+  if (venueIds.length) {
+    const { data: enqs } = await supabase
+      .from("enquiries")
+      .select("venue_id, status")
+      .in("venue_id", venueIds);
+    (enqs ?? []).forEach((e) => {
+      const k = e.venue_id as string;
+      const f = (enquiriesByVenue[k] = enquiriesByVenue[k] || { new: 0, quoted: 0, booked: 0, lost: 0 });
+      const s = e.status as keyof Funnel;
+      if (s in f) f[s] += 1;
+    });
+  }
+
   return (
     <div className="space-y-6">
       <header>
@@ -86,6 +104,48 @@ export default async function OwnerBilling() {
           </table>
         </div>
       )}
+
+      {venues?.length ? (
+        <section className="space-y-3">
+          <div>
+            <div className="vy-eyebrow">Lead flow</div>
+            <h2 className="vy-h2 mt-1">Enquiry funnel per venue</h2>
+            <p className="text-stone-600 text-sm mt-1">
+              Where each venue&apos;s leads sit in the pipeline — from new enquiry to booked.
+            </p>
+          </div>
+          <div className="vy-card p-0 overflow-hidden">
+            <table className="vy-table">
+              <thead>
+                <tr>
+                  <th>Venue</th>
+                  <th>New</th>
+                  <th>Quoted</th>
+                  <th>Booked</th>
+                  <th>Lost</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {venues.map((v) => {
+                  const f = enquiriesByVenue[v.id as string] || { new: 0, quoted: 0, booked: 0, lost: 0 };
+                  const total = f.new + f.quoted + f.booked + f.lost;
+                  return (
+                    <tr key={v.id}>
+                      <td><div className="font-medium">{v.name}</div></td>
+                      <td>{f.new}</td>
+                      <td>{f.quoted}</td>
+                      <td>{f.booked > 0 ? <span className="text-emerald-700">{f.booked}</span> : 0}</td>
+                      <td>{f.lost > 0 ? <span className="text-stone-400">{f.lost}</span> : 0}</td>
+                      <td className="font-medium">{total}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

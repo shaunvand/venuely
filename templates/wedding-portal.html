@@ -64,6 +64,9 @@
   <button class="nav-btn" onclick="showTab('budget',this)">Budget</button>
   <button class="nav-btn" onclick="showTab('checklist',this)">Checklist</button>
   <button class="nav-btn" onclick="showTab('timeline',this)">Day Timeline</button>
+  <button class="nav-btn" onclick="showTab('floorplans',this)">Floor Plans</button>
+  <button class="nav-btn" onclick="showTab('rooming',this)">Rooming List</button>
+  <button class="nav-btn" onclick="showTab('layout',this)">Layout Planner</button>
 </nav>
 
 <!-- ══ MAIN ══ -->
@@ -266,11 +269,13 @@
         <div class="section-title">Guest <span>List</span></div>
         <div class="section-sub">Add all your guests, then head to Accommodation to assign them to rooms</div>
       </div>
-      <div style="display:flex;gap:10px;align-items:center">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <input id="guestSearch" type="text" placeholder="Search guests…" oninput="renderGuests()" style="padding:7px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.83rem;width:180px;outline:none">
+        <button class="btn btn-secondary btn-sm" onclick="toggleRsvpLink()">🔗 Get RSVP link</button>
         <button class="btn btn-primary btn-sm" onclick="openGuestModal()">+ Add Guests</button>
       </div>
     </div>
+    <div id="rsvpLinkBox" class="card" style="display:none;margin-bottom:16px"></div>
     <div class="guest-stats" id="guestStats"></div>
     <div class="card" style="padding:0;overflow:hidden">
       <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
@@ -408,6 +413,45 @@
       </div>
     </div>
     <div id="rentalCategoriesContainer"></div>
+  </div>
+
+  <!-- Floor Plans -->
+  <div id="tab-floorplans" class="tab-panel">
+    <div class="panel-header">
+      <div>
+        <div class="section-title">Floor <span>Plans</span></div>
+        <div class="section-sub">Venue layouts and room floor plans to help you picture the day</div>
+      </div>
+    </div>
+    <div id="floorplansOutput"></div>
+  </div>
+
+  <!-- Rooming List -->
+  <div id="tab-rooming" class="tab-panel">
+    <div class="panel-header">
+      <div>
+        <div class="section-title">Rooming <span>List</span></div>
+        <div class="section-sub">A summary of who's sleeping where — assign guests on the Accommodation tab</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="showTab('accommodation',document.querySelector('.nav-btn[onclick*=accommodation]'))">Edit assignments →</button>
+    </div>
+    <div id="roomingOutput"></div>
+  </div>
+
+  <!-- Layout Planner -->
+  <div id="tab-layout" class="tab-panel">
+    <div class="panel-header">
+      <div>
+        <div class="section-title">Reception <span>Layout Planner</span></div>
+        <div class="section-sub">Sketch out your tables and jot reception notes — saved automatically</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addLayoutTable()">+ Add Table</button>
+    </div>
+    <div class="card" style="margin-bottom:18px">
+      <div class="info-label" style="margin-bottom:6px">Reception Notes</div>
+      <textarea id="layoutNotes" placeholder="e.g. Sweetheart table near the oak tree, dance floor centre, gift table by the entrance…" style="width:100%;min-height:90px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-family:'Jost',sans-serif;font-size:0.88rem;line-height:1.6;outline:none;box-sizing:border-box;resize:vertical" oninput="onLayoutNotesInput(this)"></textarea>
+    </div>
+    <div id="layoutTablesOutput"></div>
   </div>
 
 </main>

@@ -103,7 +103,7 @@ function readTemplate(): string {
 type Commish = { commission_value?: number | null; commission_type?: string | null };
 type Catalogue = { id: string; category: string; name: string; description: string | null; sort_order: number };
 type Rental    = { id: string; category: string; name: string; description: string | null; price: number; stock_total: number; sort_order: number } & Commish;
-type Room      = { id: string; name: string; room_type: string | null; sleeps: number; description: string | null; sort_order: number; price_per_night: number } & Commish;
+type Room      = { id: string; name: string; room_type: string | null; sleeps: number; description: string | null; sort_order: number; price_per_night: number; floor_plan_url: string | null } & Commish;
 
 // applyMarkup imported from @/lib/billing/compute — single source of truth
 
@@ -131,6 +131,7 @@ function shapeForApp(
       description: r.description ?? "",
       amenities: [],
       pricePerNight: applyMarkup(Number(r.price_per_night), r.commission_value, r.commission_type),
+      floorPlan: r.floor_plan_url ?? null,
     })),
   };
 }
@@ -217,13 +218,17 @@ export async function GET(
   const venueId = venue?.id;
 
   // Pull venue inventory in parallel.
-  const [{ data: catRaw }, { data: rentRaw }, { data: roomRaw }, { data: vendorRaw }, { data: galleryRaw }, { data: areaRaw }] = await Promise.all([
+  const [{ data: catRaw }, { data: rentRaw }, { data: roomRaw }, { data: vendorRaw }, { data: galleryRaw }, { data: areaRaw }, { data: floorplanRaw }] = await Promise.all([
     supabase.from("catalogue_items").select("id, category, name, description, sort_order").eq("venue_id", venueId).eq("active", true).order("sort_order"),
     supabase.from("rental_items").select("id, category, name, description, price, stock_total, sort_order, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
-    supabase.from("accommodation_rooms").select("id, name, room_type, sleeps, description, sort_order, price_per_night, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
+    supabase.from("accommodation_rooms").select("id, name, room_type, sleeps, description, sort_order, price_per_night, floor_plan_url, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
     supabase.from("vendor_partners").select("id, vendor_type, name, description, contact_email, contact_phone, website_url, price_from, image_url, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
     supabase.from("media_assets").select("url, label, kind, category, sort_order").eq("venue_id", venueId).eq("owner_type", "venue").in("kind", ["photo", "video", "hero"]).order("sort_order"),
     supabase.from("venue_areas").select("name, description, sort_order").eq("venue_id", venueId).eq("active", true).order("sort_order"),
+    // Floor-plan / layout images live as media_assets with kind='floorplan'. Kept
+    // out of the photo gallery query above so the "Our Venue" gallery stays photos
+    // only; surfaced on the new Floor Plans tab via window.VENUE_FLOORPLANS.
+    supabase.from("media_assets").select("url, label, category, sort_order").eq("venue_id", venueId).eq("owner_type", "venue").eq("kind", "floorplan").order("sort_order"),
   ]);
 
   const shaped = shapeForApp((catRaw ?? []) as Catalogue[], (rentRaw ?? []) as Rental[], (roomRaw ?? []) as Room[]);
@@ -265,6 +270,14 @@ export async function GET(
       .map((g) => {
         const gg = g as Record<string, unknown>;
         return { src: gg.url, kind: gg.kind, category: gg.category ?? "Other", label: gg.label ?? "" };
+      })
+  )};
+  window.VENUE_FLOORPLANS = ${JSON.stringify(
+    (floorplanRaw ?? [])
+      .filter((g) => /\.(jpe?g|png|webp|gif|avif|heic|svg)(\?|$)/i.test(String((g as Record<string, unknown>).url)))
+      .map((g) => {
+        const gg = g as Record<string, unknown>;
+        return { src: gg.url, category: gg.category ?? "Floor plan", label: gg.label ?? "" };
       })
   )};
   window.WEDDING_INITIAL_STATE = ${JSON.stringify(wState)};

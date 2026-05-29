@@ -635,6 +635,7 @@ let state = {
   guests: [],
   roomAssignments: {},
   galleryImages: [],
+  layout: { notes: '', tables: [] },
   editingSupplierId: null,
   editingEventId: null,
   editingDietaryGuest: null,
@@ -738,6 +739,11 @@ function load() {
   if (!state.roomAssignments) state.roomAssignments = {};
   if (!state.galleryImages) state.galleryImages = [];
   if (!state.guestDietary) state.guestDietary = {};
+  // Layout planner state (notes + simple table list). Tolerate older saves that
+  // never had this key, or a partially-shaped object.
+  if (!state.layout || typeof state.layout !== 'object') state.layout = { notes: '', tables: [] };
+  if (typeof state.layout.notes !== 'string') state.layout.notes = '';
+  if (!Array.isArray(state.layout.tables)) state.layout.tables = [];
   // Migrate timeline events without a day or category
   if (state.timeline) state.timeline.forEach(function(e) {
     if (!e.day) e.day = 'wed';
@@ -775,7 +781,7 @@ function showTab(name, btn) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   btn.classList.add('active');
-  const renders = { dashboard: renderDashboard, catalogue: renderCatalogue, accommodation: renderAccommodation, guests: renderGuests, suppliers: renderSuppliers, budget: renderBudget, timeline: renderTimeline, checklist: renderChecklist, venue: renderVenue, rentals: renderRentals };
+  const renders = { dashboard: renderDashboard, catalogue: renderCatalogue, accommodation: renderAccommodation, guests: renderGuests, suppliers: renderSuppliers, budget: renderBudget, timeline: renderTimeline, checklist: renderChecklist, venue: renderVenue, rentals: renderRentals, floorplans: renderFloorPlans, rooming: renderRooming, layout: renderLayout };
   if (renders[name]) renders[name]();
 }
 
@@ -1729,6 +1735,7 @@ function renderBudget() {
     }).join('');
     html += `<div class="section-title" style="font-size:1.1rem;margin-bottom:14px;margin-top:24px">Budget Breakdown</div>`;
   }
+  renderPayPanel();
   if (!withPrice.length) { document.getElementById('budgetBars').innerHTML = html + `<div style="color:var(--text-light);font-style:italic;padding:16px 0">Upload an invoice or add vendors with prices to see the breakdown.</div>`; return; }
   html += withPrice.map(s => {
     const amt = parseMoney(s.price); const pct = total ? Math.min((amt/total)*100,100) : 0;
@@ -2065,6 +2072,341 @@ function showToast(msg) { const t = document.getElementById('toast'); t.textCont
     zoom.style.top  = y + 'px';
   });
 })();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FLOOR PLANS  ·  ROOMING LIST  ·  LAYOUT PLANNER  ·  PAY  ·  RSVP LINK
+// (Wave: couple-portal additions — every feature guards on its injected global
+//  so the Pat-Busch static fallback and dev mode keep working unchanged.)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Floor Plans tab (read-only image grid) ─────────────────────────────────
+// Sources: venue floor-plan media (window.VENUE_FLOORPLANS, kind='floorplan'),
+// any gallery items tagged floorplan/layout, plus per-room floorPlan images.
+function renderFloorPlans() {
+  const out = document.getElementById('floorplansOutput');
+  if (!out) return;
+
+  const cards = [];
+
+  // 1) Dedicated venue floor-plan / layout media assets.
+  (Array.isArray(window.VENUE_FLOORPLANS) ? window.VENUE_FLOORPLANS : []).forEach(function(fp) {
+    if (!fp || !fp.src) return;
+    cards.push({ src: fp.src, caption: fp.label || fp.category || 'Floor plan' });
+  });
+
+  // 2) Gallery images explicitly categorised as floorplan/layout (defensive —
+  //    most floorplans arrive via VENUE_FLOORPLANS above, but a venue may have
+  //    tagged a normal photo's category as "Floor plan" / "Layout").
+  (Array.isArray(window.VENUE_GALLERY) ? window.VENUE_GALLERY : []).forEach(function(m) {
+    if (!m || !m.src || m.kind === 'video') return;
+    const cat = String(m.category || '').toLowerCase();
+    if (cat.indexOf('floor') !== -1 || cat.indexOf('layout') !== -1) {
+      cards.push({ src: m.src, caption: m.label || m.category || 'Layout' });
+    }
+  });
+
+  // 3) Per-room floor plans (rooms already injected for Accommodation).
+  (Array.isArray(ACCOMMODATION) ? ACCOMMODATION : []).forEach(function(room) {
+    if (room && room.floorPlan) {
+      cards.push({ src: room.floorPlan, caption: (room.name || 'Room') + ' — floor plan' });
+    }
+  });
+
+  if (!cards.length) {
+    out.innerHTML = '<div class="card" style="text-align:center;color:var(--text-light);font-style:italic;padding:30px">No floor plans have been shared yet. Your venue can upload layouts and room plans here — check back soon, or ask your coordinator.</div>';
+    return;
+  }
+
+  out.innerHTML = '<div class="venue-gallery">' + cards.map(function(c) {
+    return '<div class="gallery-slot" onclick="openFloorPlanZoom(' + escHtml(JSON.stringify(c.src)) + ')" style="cursor:zoom-in">' +
+      '<img src="' + escHtml(c.src) + '" alt="' + escHtml(c.caption) + '">' +
+      '<div style="position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:2px 7px;border-radius:99px">' + escHtml(c.caption) + '</div>' +
+    '</div>';
+  }).join('') + '</div>';
+}
+function openFloorPlanZoom(src) {
+  const zoom = document.getElementById('imgZoom');
+  const zoomImg = document.getElementById('imgZoomImg');
+  if (!zoom || !zoomImg || !src) return;
+  zoomImg.src = src;
+  zoom.style.display = 'block';
+  zoom.style.left = '50%';
+  zoom.style.top = '50%';
+  zoom.style.transform = 'translate(-50%,-50%)';
+  // Dismiss on next click anywhere.
+  const dismiss = function() {
+    zoom.style.display = 'none';
+    zoom.style.transform = '';
+    document.removeEventListener('click', dismiss, true);
+  };
+  setTimeout(function() { document.addEventListener('click', dismiss, true); }, 0);
+}
+
+// ── Rooming List tab (read-only summary of room assignments) ────────────────
+function renderRooming() {
+  const out = document.getElementById('roomingOutput');
+  if (!out) return;
+
+  const assignments = state.roomAssignments || {};
+  const placed = new Set(Object.values(assignments).flat());
+  const unassigned = (state.guests || []).filter(function(g) { return !placed.has(g); });
+
+  // Stat strip mirrors the Guest List tab's look.
+  const totalGuests = (state.guests || []).length;
+  const totalCap = (Array.isArray(ACCOMMODATION) ? ACCOMMODATION : []).reduce(function(a, r) { return a + (r.sleeps || 0); }, 0);
+  let html = '<div class="guest-stats">' + [
+    { val: placed.size, lbl: 'Guests housed' },
+    { val: unassigned.length, lbl: 'Not yet placed' },
+    { val: totalGuests || '—', lbl: 'Total guests' },
+    { val: totalCap || '—', lbl: 'Total capacity' }
+  ].map(function(s) { return '<div class="guest-stat"><div class="guest-stat-val">' + s.val + '</div><div class="guest-stat-lbl">' + s.lbl + '</div></div>'; }).join('') + '</div>';
+
+  // Only show rooms that actually have someone in them, but always show the grid.
+  const occupiedRooms = (Array.isArray(ACCOMMODATION) ? ACCOMMODATION : []).filter(function(room) {
+    return (assignments[room.id] || []).length > 0;
+  });
+
+  if (!occupiedRooms.length && !unassigned.length) {
+    out.innerHTML = html + '<div class="card" style="text-align:center;color:var(--text-light);font-style:italic;padding:30px">No guests assigned to rooms yet. Add guests on the Guest List tab, then place them on the Accommodation tab — they\'ll appear here automatically.</div>';
+    return;
+  }
+
+  if (occupiedRooms.length) {
+    html += '<div class="accom-grid">' + occupiedRooms.map(function(room) {
+      const guests = assignments[room.id] || [];
+      return '<div class="accom-card">' +
+        '<div class="accom-hd">' +
+          '<div>' +
+            '<div class="accom-name">' + escHtml(room.name) + '</div>' +
+            '<div class="accom-meta"><span class="accom-meta-item">👥 ' + guests.length + ' / ' + room.sleeps + ' guests</span></div>' +
+          '</div>' +
+          '<span class="accom-type-tag">' + escHtml(room.type || 'Room') + '</span>' +
+        '</div>' +
+        '<div class="accom-body">' +
+          '<div class="guest-chips">' + guests.map(function(g) {
+            return '<div class="gchip" style="display:inline-flex;align-items:center;gap:3px">' + getDietaryDot(g) + '<span>' + escHtml(g) + '</span></div>';
+          }).join('') + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+  }
+
+  // Unassigned guests block.
+  if (unassigned.length) {
+    html += '<div class="card" style="margin-top:18px">' +
+      '<div class="info-label" style="margin-bottom:8px">Not yet placed (' + unassigned.length + ')</div>' +
+      '<div class="guest-chips">' + unassigned.map(function(g) {
+        return '<div class="gchip" style="display:inline-flex;align-items:center;gap:3px">' + getDietaryDot(g) + '<span>' + escHtml(g) + '</span></div>';
+      }).join('') + '</div>' +
+      '<div style="font-size:0.78rem;color:var(--text-light);margin-top:10px">Head to the <strong>Accommodation</strong> tab to assign these guests to a room.</div>' +
+    '</div>';
+  }
+
+  out.innerHTML = html;
+}
+
+// ── Layout Planner tab (notes + simple table list, persisted in state.layout) ─
+let _layoutNotesTimer = null;
+function onLayoutNotesInput(el) {
+  if (!state.layout) state.layout = { notes: '', tables: [] };
+  state.layout.notes = el.value;
+  // Debounce so every keystroke doesn't fire a server PUT.
+  clearTimeout(_layoutNotesTimer);
+  _layoutNotesTimer = setTimeout(function() { save(); }, 400);
+}
+function renderLayout() {
+  if (!state.layout) state.layout = { notes: '', tables: [] };
+  const notesEl = document.getElementById('layoutNotes');
+  if (notesEl && notesEl.value !== state.layout.notes) notesEl.value = state.layout.notes || '';
+
+  const out = document.getElementById('layoutTablesOutput');
+  if (!out) return;
+
+  const tables = Array.isArray(state.layout.tables) ? state.layout.tables : [];
+  const totalSeats = tables.reduce(function(a, t) { return a + (parseInt(t.seats, 10) || 0); }, 0);
+
+  let html = '';
+  if (tables.length) {
+    html += '<div class="guest-stats" style="margin-bottom:16px">' + [
+      { val: tables.length, lbl: 'Tables' },
+      { val: totalSeats || '—', lbl: 'Total seats' }
+    ].map(function(s) { return '<div class="guest-stat"><div class="guest-stat-val">' + s.val + '</div><div class="guest-stat-lbl">' + s.lbl + '</div></div>'; }).join('') + '</div>';
+  }
+
+  if (!tables.length) {
+    html += '<div class="card" style="text-align:center;color:var(--text-light);font-style:italic;padding:30px">No tables added yet. Click <strong>+ Add Table</strong> to start sketching your reception layout.</div>';
+  } else {
+    html += tables.map(function(t, i) {
+      return '<div class="card" style="margin-bottom:12px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">' +
+        '<div style="flex:2;min-width:160px">' +
+          '<div class="info-label" style="margin-bottom:4px">Table name</div>' +
+          '<input type="text" value="' + escHtml(t.name || '') + '" placeholder="e.g. Sweetheart / Table 1" oninput="updateLayoutTable(' + i + ',\'name\',this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:\'Jost\',sans-serif;font-size:0.85rem;outline:none;box-sizing:border-box">' +
+        '</div>' +
+        '<div style="flex:1;min-width:90px">' +
+          '<div class="info-label" style="margin-bottom:4px">Seats</div>' +
+          '<input type="number" min="0" max="100" value="' + (t.seats != null ? escHtml(String(t.seats)) : '') + '" placeholder="8" oninput="updateLayoutTable(' + i + ',\'seats\',this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:\'Jost\',sans-serif;font-size:0.85rem;outline:none;box-sizing:border-box">' +
+        '</div>' +
+        '<div style="flex:3;min-width:200px">' +
+          '<div class="info-label" style="margin-bottom:4px">Notes</div>' +
+          '<input type="text" value="' + escHtml(t.note || '') + '" placeholder="e.g. near the dance floor, family side" oninput="updateLayoutTable(' + i + ',\'note\',this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:\'Jost\',sans-serif;font-size:0.85rem;outline:none;box-sizing:border-box">' +
+        '</div>' +
+        '<button class="btn btn-danger btn-sm" style="align-self:center;font-size:0.65rem;margin-top:18px" onclick="removeLayoutTable(' + i + ')">Remove</button>' +
+      '</div>';
+    }).join('');
+  }
+  out.innerHTML = html;
+}
+function addLayoutTable() {
+  if (!state.layout) state.layout = { notes: '', tables: [] };
+  if (!Array.isArray(state.layout.tables)) state.layout.tables = [];
+  state.layout.tables.push({ name: 'Table ' + (state.layout.tables.length + 1), seats: 8, note: '' });
+  save(); renderLayout();
+}
+function updateLayoutTable(i, field, value) {
+  if (!state.layout || !Array.isArray(state.layout.tables) || !state.layout.tables[i]) return;
+  if (field === 'seats') {
+    const n = parseInt(value, 10);
+    state.layout.tables[i].seats = isNaN(n) ? '' : Math.max(0, Math.min(100, n));
+  } else {
+    state.layout.tables[i][field] = value;
+  }
+  // Debounce — text inputs fire per keystroke.
+  clearTimeout(_layoutNotesTimer);
+  _layoutNotesTimer = setTimeout(function() { save(); }, 400);
+}
+function removeLayoutTable(i) {
+  if (!state.layout || !Array.isArray(state.layout.tables)) return;
+  state.layout.tables.splice(i, 1);
+  save(); renderLayout();
+}
+
+// ── Pay deposit / balance (Paystack) ────────────────────────────────────────
+// POSTs to /api/paystack/checkout with the wedding_id + slice; on success
+// redirects to Paystack's authorization_url. Any "not configured" / error /
+// network failure falls back to a friendly "ask your venue" message — never
+// breaks the page.
+const PAY_FALLBACK_MSG = "Online payments aren't set up for this portal yet — your venue will share their payment details with you directly.";
+let _payInFlight = false;
+function payVenue(slice) {
+  if (_payInFlight) return;
+  const which = (slice === 'balance') ? 'balance' : 'deposit';
+  const noteEl = document.getElementById('payNote');
+  // Without a linked wedding (static/dev mode) there's nothing to charge against.
+  if (!window.WEDDING_USE_SERVER || !window.WEDDING_ID) {
+    if (noteEl) noteEl.textContent = PAY_FALLBACK_MSG;
+    else showToast(PAY_FALLBACK_MSG);
+    return;
+  }
+  _payInFlight = true;
+  if (noteEl) noteEl.textContent = 'Connecting to secure payment…';
+  fetch('/api/paystack/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ wedding_id: window.WEDDING_ID, amount_type: which })
+  })
+    .then(function(r) { return r.json().catch(function() { return {}; }); })
+    .then(function(data) {
+      if (data && data.authorization_url) {
+        window.location.href = data.authorization_url;
+        return;
+      }
+      // configured:false, or any structured error → friendly fallback.
+      if (noteEl) noteEl.textContent = (data && data.configured === false) ? PAY_FALLBACK_MSG : (data && data.error ? data.error : PAY_FALLBACK_MSG);
+      else showToast(PAY_FALLBACK_MSG);
+    })
+    .catch(function() {
+      if (noteEl) noteEl.textContent = PAY_FALLBACK_MSG;
+      else showToast(PAY_FALLBACK_MSG);
+    })
+    .finally(function() { _payInFlight = false; });
+}
+// Injects a "Pay your venue" card at the top of the Budget tab. Only rendered
+// when this portal is linked to a live wedding (Paystack needs a wedding_id).
+function renderPayPanel() {
+  const host = document.getElementById('budgetSummary');
+  if (!host) return;
+  let panel = document.getElementById('payPanel');
+  if (!window.WEDDING_USE_SERVER || !window.WEDDING_ID) {
+    if (panel) panel.remove();
+    return;
+  }
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'payPanel';
+    panel.className = 'card';
+    panel.style.cssText = 'margin-bottom:18px;display:flex;flex-wrap:wrap;align-items:center;gap:14px';
+    host.parentNode.insertBefore(panel, host);
+  }
+  panel.innerHTML =
+    '<div style="flex:1;min-width:200px">' +
+      '<div class="info-label">Pay your venue</div>' +
+      '<div style="font-size:0.82rem;color:var(--text-light);margin-top:4px">Securely pay your deposit or balance online.</div>' +
+      '<div id="payNote" style="font-size:0.78rem;color:var(--sage);margin-top:6px;min-height:16px"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
+      '<button class="btn btn-primary btn-sm" onclick="payVenue(\'deposit\')">Pay deposit</button>' +
+      '<button class="btn btn-secondary btn-sm" onclick="payVenue(\'balance\')">Pay balance</button>' +
+    '</div>';
+}
+
+// ── Get RSVP link (Guest List tab) ──────────────────────────────────────────
+// Reveals the public per-guest RSVP URL with Copy / WhatsApp / QR. The
+// /[wedding]/rsvp public form already exists; we just build & share the link.
+function rsvpUrl() {
+  const slug = window.WEDDING_SLUG || '';
+  if (!slug) return '';
+  return window.location.origin + '/' + slug + '/rsvp';
+}
+function toggleRsvpLink() {
+  const box = document.getElementById('rsvpLinkBox');
+  if (!box) return;
+  if (box.style.display === 'none' || !box.style.display) { box.style.display = 'block'; renderRsvpLink(); }
+  else { box.style.display = 'none'; }
+}
+function renderRsvpLink() {
+  const box = document.getElementById('rsvpLinkBox');
+  if (!box) return;
+  const url = rsvpUrl();
+  if (!url) {
+    box.innerHTML = '<div style="font-size:0.8rem;color:var(--text-light);font-style:italic">An RSVP link will appear here once your portal is fully set up by your venue.</div>';
+    return;
+  }
+  const couple = (VENUE.couple.name1 || '') + (VENUE.couple.name2 ? ' & ' + VENUE.couple.name2 : '');
+  const waText = encodeURIComponent("You're invited to " + couple + "'s wedding! Please RSVP here: " + url);
+  const waLink = 'https://wa.me/?text=' + waText;
+  const qrSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=' + encodeURIComponent(url);
+  box.innerHTML =
+    '<div style="display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start">' +
+      '<div style="flex:1;min-width:220px">' +
+        '<div class="info-label" style="margin-bottom:6px">Share this RSVP link with your guests</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+          '<input id="rsvpLinkInput" type="text" readonly value="' + escHtml(url) + '" onclick="this.select()" style="flex:1;min-width:200px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:\'Jost\',sans-serif;font-size:0.8rem;outline:none;background:var(--cream)">' +
+          '<button class="btn btn-primary btn-sm" onclick="copyRsvpLink()">Copy</button>' +
+          '<a class="btn btn-secondary btn-sm" href="' + waLink + '" target="_blank" rel="noopener" style="text-decoration:none">WhatsApp</a>' +
+        '</div>' +
+        '<div style="font-size:0.74rem;color:var(--text-light);margin-top:8px">Each guest fills in their own attendance, meal and song requests. Responses flow back to your venue.</div>' +
+      '</div>' +
+      '<div style="text-align:center">' +
+        '<img src="' + qrSrc + '" alt="RSVP QR code" width="160" height="160" style="border:1px solid var(--border);border-radius:8px;background:#fff;padding:4px">' +
+        '<div style="font-size:0.68rem;color:var(--text-light);margin-top:4px">Scan to RSVP</div>' +
+      '</div>' +
+    '</div>';
+}
+function copyRsvpLink() {
+  const url = rsvpUrl();
+  if (!url) return;
+  const done = function() { showToast('RSVP link copied ✦'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done).catch(function() {
+      const inp = document.getElementById('rsvpLinkInput');
+      if (inp) { inp.select(); try { document.execCommand('copy'); done(); } catch (e) {} }
+    });
+  } else {
+    const inp = document.getElementById('rsvpLinkInput');
+    if (inp) { inp.select(); try { document.execCommand('copy'); done(); } catch (e) {} }
+  }
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // INIT
