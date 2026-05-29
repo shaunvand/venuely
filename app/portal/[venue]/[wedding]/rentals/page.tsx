@@ -1,5 +1,6 @@
 import { getPortalContext } from "@/lib/portal/context";
 import { createClient } from "@/lib/supabase/server";
+import { applyMarkup } from "@/lib/billing/compute";
 import { addSelection, removeSelection } from "./actions";
 
 export default async function Rentals({ params }: { params: Promise<{ venue: string; wedding: string }> }) {
@@ -7,10 +8,10 @@ export default async function Rentals({ params }: { params: Promise<{ venue: str
   const { venue, wedding } = await getPortalContext(vSlug, wSlug);
   const supabase = await createClient();
 
-  const [{ data: items }, { data: picks }] = await Promise.all([
+  const [{ data: rawItems }, { data: picks }] = await Promise.all([
     supabase
       .from("rental_items")
-      .select("id, category, name, description, price, stock_total")
+      .select("id, category, name, description, price, stock_total, commission_value, commission_type, cost_treatment")
       .eq("venue_id", venue.id)
       .eq("active", true)
       .order("category")
@@ -22,14 +23,24 @@ export default async function Rentals({ params }: { params: Promise<{ venue: str
       .not("rental_item_id", "is", null),
   ]);
 
+  // Honour the owner's settings: an 'included' item ships with the booking (no charge),
+  // everything else is a paid extra priced at the marked-up rate the owner configured.
+  const items = (rawItems ?? []).map((it) => {
+    const included = it.cost_treatment === "included";
+    const price = included
+      ? 0
+      : applyMarkup(Number(it.price ?? 0), it.commission_value as number | null, it.commission_type as string | null);
+    return { ...it, included, price };
+  });
+
   const pickMap = new Map((picks ?? []).map((p) => [p.rental_item_id!, p]));
   const total = (picks ?? []).reduce((sum, p) => {
-    const item = items?.find((i) => i.id === p.rental_item_id);
+    const item = items.find((i) => i.id === p.rental_item_id);
     return sum + (item ? Number(item.price) * p.quantity : 0);
   }, 0);
 
   const grouped = new Map<string, typeof items>();
-  for (const it of items ?? []) {
+  for (const it of items) {
     if (!grouped.has(it.category)) grouped.set(it.category, []);
     grouped.get(it.category)!.push(it);
   }
@@ -60,15 +71,21 @@ export default async function Rentals({ params }: { params: Promise<{ venue: str
                     <div className="text-gray-600 text-xs">{it.description}</div>
                   </div>
                   <div className="text-right whitespace-nowrap">
-                    <div>R{Number(it.price).toLocaleString()}</div>
-                    {pick ? (
-                      <form action={removeSelection.bind(null, pick.id)}>
-                        <button className="text-xs text-red-600 hover:underline">remove (qty {pick.quantity})</button>
-                      </form>
+                    {it.included ? (
+                      <span className="text-xs font-medium text-green-700">Included</span>
                     ) : (
-                      <form action={addSelection.bind(null, wedding.id, it.id)}>
-                        <button className="text-xs text-blue-600 hover:underline">add</button>
-                      </form>
+                      <>
+                        <div>R{Number(it.price).toLocaleString()}</div>
+                        {pick ? (
+                          <form action={removeSelection.bind(null, pick.id)}>
+                            <button className="text-xs text-red-600 hover:underline">remove (qty {pick.quantity})</button>
+                          </form>
+                        ) : (
+                          <form action={addSelection.bind(null, wedding.id, it.id)}>
+                            <button className="text-xs text-blue-600 hover:underline">add</button>
+                          </form>
+                        )}
+                      </>
                     )}
                   </div>
                 </li>

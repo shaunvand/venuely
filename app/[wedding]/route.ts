@@ -95,7 +95,7 @@ export async function GET(
   // Fetch the wedding (no auth required to look up — auth/password gate below).
   const { data: wedding } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, wedding_state, portal_password_hash, venue:venues(id, name, slug)")
+    .select("id, slug, couple_names, wedding_date, wedding_state, portal_password_hash, venue:venues(id, name, slug, description, directions, website, included_items, contact_email, contact_phone, google_maps_url)")
     .eq("slug", rawSlug)
     .maybeSingle();
   if (!wedding) return new NextResponse("Wedding portal not found.", { status: 404 });
@@ -135,16 +135,24 @@ export async function GET(
     }
   }
 
-  const venue = (wedding as unknown as { venue: { id: string; name: string; slug: string } | null }).venue;
+  const venue = (wedding as unknown as {
+    venue: {
+      id: string; name: string; slug: string;
+      description: string | null; directions: string | null; website: string | null;
+      included_items: unknown; contact_email: string | null; contact_phone: string | null;
+      google_maps_url: string | null;
+    } | null
+  }).venue;
   const venueId = venue?.id;
 
   // Pull venue inventory in parallel.
-  const [{ data: catRaw }, { data: rentRaw }, { data: roomRaw }, { data: vendorRaw }, { data: galleryRaw }] = await Promise.all([
+  const [{ data: catRaw }, { data: rentRaw }, { data: roomRaw }, { data: vendorRaw }, { data: galleryRaw }, { data: areaRaw }] = await Promise.all([
     supabase.from("catalogue_items").select("id, category, name, description, sort_order").eq("venue_id", venueId).eq("active", true).order("sort_order"),
     supabase.from("rental_items").select("id, category, name, description, price, stock_total, sort_order, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
     supabase.from("accommodation_rooms").select("id, name, room_type, sleeps, description, sort_order, price_per_night, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
     supabase.from("vendor_partners").select("id, vendor_type, name, description, contact_email, contact_phone, website_url, price_from, image_url, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
     supabase.from("media_assets").select("url, label, kind, category, sort_order").eq("venue_id", venueId).eq("owner_type", "venue").in("kind", ["photo", "video", "hero"]).order("sort_order"),
+    supabase.from("venue_areas").select("name, description, sort_order").eq("venue_id", venueId).eq("active", true).order("sort_order"),
   ]);
 
   const shaped = shapeForApp((catRaw ?? []) as Catalogue[], (rentRaw ?? []) as Rental[], (roomRaw ?? []) as Room[]);
@@ -157,6 +165,16 @@ export async function GET(
   window.WEDDING_COUPLE  = ${JSON.stringify(wedding.couple_names)};
   window.WEDDING_DATE    = ${JSON.stringify(wedding.wedding_date)};
   window.WEDDING_VENUE   = ${JSON.stringify({ id: venue?.id, name: venue?.name, slug: venue?.slug })};
+  window.VENUE_DESCRIPTION = ${JSON.stringify(venue?.description ?? null)};
+  window.VENUE_DIRECTIONS  = ${JSON.stringify(venue?.directions ?? null)};
+  window.VENUE_WEBSITE     = ${JSON.stringify(venue?.website ?? null)};
+  window.VENUE_INCLUDED    = ${JSON.stringify(Array.isArray(venue?.included_items) ? venue?.included_items : [])};
+  window.VENUE_CONTACT     = ${JSON.stringify({ email: venue?.contact_email ?? null, phone: venue?.contact_phone ?? null })};
+  window.VENUE_MAP_URL     = ${JSON.stringify(venue?.google_maps_url ?? null)};
+  window.VENUE_AREAS       = ${JSON.stringify((areaRaw ?? []).map((a) => {
+    const aa = a as Record<string, unknown>;
+    return { name: aa.name ?? "", description: aa.description ?? "" };
+  }))};
   window.VENUE_CATALOGUE_ITEMS = ${JSON.stringify(shaped.CATALOGUE_ITEMS)};
   window.VENUE_CATALOGUE_CATS  = ${JSON.stringify(shaped.CATALOGUE_CATS)};
   window.VENUE_RENTAL_ITEMS    = ${JSON.stringify(shaped.RENTAL_ITEMS)};

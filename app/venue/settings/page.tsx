@@ -1,5 +1,7 @@
 import { getCurrentVenue } from "@/lib/venue/current";
+import { createClient } from "@/lib/supabase/server";
 import { VenueAddressPicker } from "@/components/VenueAddressPicker";
+import { LogoUploadField } from "@/components/SetupVenueForm";
 import { updateVenue } from "./actions";
 
 export default async function VenueSettings({
@@ -10,6 +12,15 @@ export default async function VenueSettings({
   const venue = await getCurrentVenue();
   const sp = await searchParams;
   const mapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? null;
+
+  // Public-profile fields aren't in getCurrentVenue()'s column list — read them here.
+  const supabase = await createClient();
+  const { data: profileFields } = await supabase
+    .from("venues")
+    .select("description, directions, website")
+    .eq("id", venue.id)
+    .maybeSingle();
+  const profile = (profileFields ?? {}) as { description?: string | null; directions?: string | null; website?: string | null };
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -37,6 +48,18 @@ export default async function VenueSettings({
             defaultValue={venue.name}
             className="w-full border rounded px-3 py-2"
           />
+        </section>
+
+        <section className="space-y-1">
+          <label className="text-sm font-medium">About your venue</label>
+          <textarea
+            name="description"
+            rows={4}
+            defaultValue={profile.description ?? ""}
+            placeholder="The public about / our-story blurb couples see on your listing and portal."
+            className="w-full border rounded px-3 py-2"
+          />
+          <p className="text-xs text-stone-500">Shown on your public listing and at the top of every couple portal.</p>
         </section>
 
         <section>
@@ -90,6 +113,29 @@ export default async function VenueSettings({
         </section>
 
         <section className="space-y-1">
+          <label className="text-sm font-medium">Website</label>
+          <input
+            name="website"
+            type="url"
+            defaultValue={profile.website ?? ""}
+            placeholder="https://yourvenue.co.za"
+            className="w-full border rounded px-3 py-2"
+          />
+          <p className="text-xs text-stone-500">Your own site — linked from your public listing.</p>
+        </section>
+
+        <section className="space-y-1">
+          <label className="text-sm font-medium">Directions</label>
+          <textarea
+            name="directions"
+            rows={3}
+            defaultValue={profile.directions ?? ""}
+            placeholder="How couples and guests get here — turn-offs, gate codes, GPS notes."
+            className="w-full border rounded px-3 py-2"
+          />
+        </section>
+
+        <section className="space-y-1">
           <label className="text-sm font-medium">Brand colour</label>
           <div className="flex items-center gap-3">
             <input
@@ -102,16 +148,12 @@ export default async function VenueSettings({
           </div>
         </section>
 
-        <section className="space-y-1">
-          <label className="text-sm font-medium">Logo URL (optional)</label>
-          <input
-            name="branding_logo_url"
-            type="url"
-            defaultValue={venue.branding_logo_url ?? ""}
-            placeholder="https://yourvenue.co.za/logo.png"
-            className="w-full border rounded px-3 py-2"
+        <section>
+          <LogoUploadField
+            fieldName="branding_logo_url"
+            venueId={venue.id}
+            defaultUrl={venue.branding_logo_url ?? ""}
           />
-          <p className="text-xs text-stone-500">Paste a hosted image URL for now. Upload-from-device coming.</p>
         </section>
 
         <section className="space-y-1">

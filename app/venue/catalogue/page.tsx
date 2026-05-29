@@ -8,7 +8,7 @@ export default async function VenueCatalogue() {
   const supabase = await createClient();
   const { data: items } = await supabase
     .from("catalogue_items")
-    .select("id, category, name, description, price, price_unit, active, image_url")
+    .select("id, category, name, description, cost_treatment, price, price_unit, commission_value, commission_type, item_code, active, image_url")
     .eq("venue_id", venue.id)
     .order("category")
     .order("sort_order");

@@ -60,11 +60,19 @@ export function InventoryManager({
   const [importPreview, setImportPreview] = useState<ImportPreviewRow[]>([]);
   const [importFields, setImportFields] = useState<Field[]>([]);
 
-  const allChecked = items.length > 0 && selected.size === items.length;
-  const someChecked = selected.size > 0 && selected.size < items.length;
+  // Scope "Select all on this page" to the FILTERED set the owner can actually see,
+  // so the checkbox state and bulk-select match what's displayed (not the full list).
+  const displayedChecked = displayed.filter((i) => selected.has(i.id)).length;
+  const allChecked = displayed.length > 0 && displayedChecked === displayed.length;
+  const someChecked = displayedChecked > 0 && displayedChecked < displayed.length;
 
   function toggleAll(checked: boolean) {
-    setSelected(checked ? new Set(items.map((i) => i.id)) : new Set());
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) for (const i of displayed) next.add(i.id);
+      else for (const i of displayed) next.delete(i.id);
+      return next;
+    });
   }
   function toggle(id: string, checked: boolean) {
     const next = new Set(selected);
@@ -96,7 +104,17 @@ export function InventoryManager({
     for (const f of fields) {
       const v = editDraft[f.key];
       if (f.type === "number") patch[f.key] = v === "" || v == null ? null : Number(v);
-      else patch[f.key] = v === "" ? null : v;
+      else if (f.key === "amenities") {
+        // text[] column — accept a comma-separated list (or an existing array) and store an array.
+        if (Array.isArray(v)) patch[f.key] = v;
+        else {
+          const parts = String(v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+          patch[f.key] = parts.length ? parts : null;
+        }
+      } else if (f.key === "bridal_suite") {
+        // boolean (NOT NULL) column — coerce the "true"/"false" select value, default false when blank.
+        patch[f.key] = v === true || v === "true";
+      } else patch[f.key] = v === "" ? null : v;
     }
     const missing = fields.filter((f) => f.required && !String(editDraft[f.key] ?? "").trim());
     if (missing.length) return;

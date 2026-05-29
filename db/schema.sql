@@ -1,0 +1,20 @@
+-- Venuely base schema reference (informative).
+--
+-- This file is a human-readable companion to the authoritative migrations in
+-- supabase/migrations/. It is NOT applied — Supabase applies the timestamped
+-- migrations. Keep this doc in sync as columns are added.
+
+-- ---------------------------------------------------------------------------
+-- venues — new public venue-profile / listing columns
+--   (added by supabase/migrations/20260529100000_venue_profile_fields.sql)
+-- ---------------------------------------------------------------------------
+--   description     text          -- public "about / our story" blurb
+--   directions      text          -- how to get there
+--   website         text          -- venue's own website URL
+--   included_items  jsonb         -- array of "what's included" strings
+--   capacity_min    int           -- min guest capacity
+--   capacity_max    int           -- max guest capacity
+--   setting_type    text          -- 'indoor' | 'outdoor' | 'both'
+--   ceremony_types  text[]        -- ceremony tag filters
+--   amenities       text[]        -- amenity tag filters
+--   listed          boolean       -- appears in public directory (default false)

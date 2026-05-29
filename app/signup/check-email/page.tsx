@@ -1,12 +1,70 @@
-import Link from "next/link";
-import { LogoMark } from "@/components/Logo";
+"use client";
 
-export default async function CheckEmailPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ email?: string }>;
-}) {
-  const { email } = await searchParams;
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { LogoMark } from "@/components/Logo";
+import { createClient } from "@/lib/supabase/client";
+
+export default function CheckEmailPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+
+  // searchParams isn't available as a prop in a client page — read it from the URL.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const e = new URLSearchParams(window.location.search).get("email");
+    if (e) setEmail(e);
+  }, []);
+
+  // Auto-advance to the dashboard the moment the email gets confirmed.
+  useEffect(() => {
+    const supabase = createClient();
+
+    // If they confirm in another tab, this fires with a session.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) router.replace("/dashboard");
+    });
+
+    // Belt-and-braces: poll getSession in case the confirmation lands without an event.
+    const poll = setInterval(async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        clearInterval(poll);
+        router.replace("/dashboard");
+      }
+    }, 4000);
+
+    return () => {
+      sub.subscription.unsubscribe();
+      clearInterval(poll);
+    };
+  }, [router]);
+
+  async function resend() {
+    if (!email) {
+      setResendState("error");
+      setResendMsg("We don't have your email on this page — sign up again to resend.");
+      return;
+    }
+    setResendState("sending");
+    setResendMsg(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard` },
+    });
+    if (error) {
+      setResendState("error");
+      setResendMsg(error.message);
+    } else {
+      setResendState("sent");
+      setResendMsg("Sent — check your inbox again (and your spam folder).");
+    }
+  }
 
   return (
     <main
@@ -72,6 +130,25 @@ export default async function CheckEmailPage({
             ) : null}
             . Click it and you&apos;ll land straight in your new venue dashboard.
           </p>
+
+          <button
+            type="button"
+            onClick={resend}
+            disabled={resendState === "sending"}
+            className="mt-6 inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-medium text-white transition disabled:opacity-50"
+            style={{ background: "var(--poppy)" }}
+          >
+            {resendState === "sending" ? "Sending…" : resendState === "sent" ? "Email resent ✓" : "Resend email"}
+          </button>
+          {resendMsg && (
+            <p
+              className="mt-3 text-xs"
+              style={{ color: resendState === "error" ? "#a3210e" : "var(--ink-2)" }}
+            >
+              {resendMsg}
+            </p>
+          )}
+
           <p className="mt-5 text-xs" style={{ color: "var(--ink-2)" }}>
             Didn&apos;t get it? Check spam, or try{" "}
             <Link href="/signup" className="underline" style={{ color: "var(--poppy)" }}>

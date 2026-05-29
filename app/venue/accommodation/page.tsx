@@ -8,7 +8,7 @@ export default async function VenueAccommodation() {
   const supabase = await createClient();
   const { data: rooms } = await supabase
     .from("accommodation_rooms")
-    .select("id, name, room_type, sleeps, price_per_night, description, active, image_url")
+    .select("id, name, room_type, tier, sleeps, ideal_sleeps, max_sleeps, bridal_suite, amenities, price_per_night, description, contact_name, contact_phone, contact_email, website_url, address, cost_treatment, commission_value, commission_type, hero_image_url, floor_plan_url, active, image_url")
     .eq("venue_id", venue.id)
     .order("sort_order");
 

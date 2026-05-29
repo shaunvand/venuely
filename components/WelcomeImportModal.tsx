@@ -15,6 +15,9 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.localStorage.getItem(`vy_welcome_never_${venueId}`) === "1") return;
+    // Real "has the owner ever imported" signal — once they've imported (here or via the
+    // dashboard BulkUploader), don't nag with the welcome import modal again.
+    if (window.localStorage.getItem(`vy_imported_${venueId}`) === "1") return;
     const key = `vy_welcome_dismissed_at_${venueId}`;
     const last = Number(window.localStorage.getItem(key) || 0);
     const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
@@ -22,6 +25,15 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
       setOpen(true);
     }
   }, [venueId]);
+
+  // Persist the "has imported" flag the moment an import succeeds, so the modal won't
+  // re-open on the next dashboard visit right after a successful import.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (uploaderState.imported) {
+      window.localStorage.setItem(`vy_imported_${venueId}`, "1");
+    }
+  }, [uploaderState.imported, venueId]);
 
   function dismiss(goToChecklist: boolean) {
     if (typeof window !== "undefined") {

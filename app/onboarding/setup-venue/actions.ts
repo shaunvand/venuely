@@ -33,6 +33,7 @@ export async function setupVenue(formData: FormData) {
   const contactEmail = (formData.get("contact_email") as string || "").trim() || null;
   const contactPhone = (formData.get("contact_phone") as string || "").trim() || null;
   const logoUrl      = (formData.get("logo_url") as string || "").trim() || null;
+  const description  = (formData.get("description") as string || "").trim() || null;
 
   let seed: SeedPayload = {};
   const rawSeed = (formData.get("seed_payload") as string || "").trim();
@@ -53,6 +54,7 @@ export async function setupVenue(formData: FormData) {
       .insert({
         slug: attemptSlug,
         name,
+        description,
         region,
         address,
         latitude: lat,

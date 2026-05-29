@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wedding Portal — Pat Busch</title>
+<title>Wedding Portal</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Jost:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <link rel="stylesheet" href="/wedding-portal/styles.css">
@@ -15,25 +15,24 @@
   <div class="lock-wrap">
     <div class="lock-logo">
       <svg viewBox="0 0 200 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <text x="100" y="38" text-anchor="middle" font-family="Cormorant Garamond,serif" font-size="22" fill="rgba(255,255,255,0.9)" letter-spacing="3">PAT BUSCH</text>
-        <text x="100" y="58" text-anchor="middle" font-family="Cormorant Garamond,serif" font-size="12" fill="rgba(255,255,255,0.55)" letter-spacing="5">MOUNTAIN RESERVE</text>
+        <text id="lockLogoName" x="100" y="48" text-anchor="middle" font-family="Cormorant Garamond,serif" font-size="20" fill="rgba(255,255,255,0.9)" letter-spacing="3"></text>
         <line x1="40" y1="66" x2="160" y2="66" stroke="rgba(184,118,42,0.6)" stroke-width="0.8"/>
       </svg>
     </div>
-    <div class="lock-couple" id="lockCoupleName">Heather &amp; Shaun</div>
-    <div class="lock-venue">7 January 2027 &nbsp;·&nbsp; Wedding Portal</div>
+    <div class="lock-couple" id="lockCoupleName"></div>
+    <div class="lock-venue" id="lockVenueLine">Wedding Portal</div>
     <div class="lock-error" id="lockError">&nbsp;</div>
     <input class="lock-input" type="password" id="lockPin" placeholder="Enter your access code" onkeydown="if(event.key==='Enter')tryUnlock()">
     <button class="lock-btn" onclick="tryUnlock()">Access My Portal</button>
-    <div class="lock-hint">Your personal access code was included in your booking confirmation email.<br>Contact <a href="mailto:info@patbusch.co.za" style="color:rgba(255,255,255,0.5)">info@patbusch.co.za</a> if you need assistance.</div>
+    <div class="lock-hint">Your personal access code was included in your booking confirmation email.<br>Contact <a id="lockHintEmail" href="#" style="color:rgba(255,255,255,0.5)"></a> if you need assistance.</div>
   </div>
-  <div class="lock-footer">Pat Busch Mountain Reserve &nbsp;·&nbsp; Est. 1989</div>
+  <div class="lock-footer" id="lockFooter"></div>
 </div>
 
 
 <!-- ══ HEADER ══ -->
 <div class="header">
-  <img class="header-logo" src="/wedding-portal/img/96acd318fa46.png" alt="Pat Busch Mountain Reserve">
+  <img class="header-logo" src="/wedding-portal/img/96acd318fa46.png" alt="">
   <div class="header-content">
     <div class="venue-eyebrow" id="hVenueName"></div>
     <div class="couple-title">
@@ -103,10 +102,7 @@
     </div>
     <div class="venue-gallery" id="venueGallery"></div>
     <div class="venue-info-grid">
-      <div class="card">
-        <div class="info-label">About the Venue</div>
-        <div class="info-val" style="margin-top:6px;line-height:1.8">Pat Busch Mountain Reserve is a private nature reserve in the Robertson Valley, Western Cape. Nestled between mountains and fynbos, it offers an intimate, wild, and utterly private backdrop for your celebration. The reserve sleeps up to 49 guests across the main property (Oak, Fig, Quince, Pine, Nightjar, Hadeda cottages + Farmhouse Erika), plus a further 50 guests in 10 Africamps boutique safari tents — your whole wedding party under one sky.</div>
-      </div>
+      <div class="card" id="venueAbout"></div>
       <div class="card" style="display:flex;flex-direction:column;gap:16px">
         <div>
           <div class="info-label">Location</div>
@@ -117,86 +113,11 @@
           <div class="info-label">Contact</div>
           <div class="info-val" id="venueContact"></div>
         </div>
-        <div>
-          <div class="info-label">Directions</div>
-          <div class="info-val" style="font-size:0.82rem;line-height:1.9">
-            <strong>From Cape Town:</strong> Take the N1 to Worcester (±100km).<br>
-            Turn right onto the <strong>R60 towards Robertson</strong> and drive through Worcester following signs to Robertson (±50km).<br>
-            Continue straight through Robertson towards Ashton on the R60. Cross the traffic circle as you leave Robertson — after <strong>10km</strong> take the road on the <strong>left</strong> up towards the mountain: <strong>KLAASVOOGDS WEST</strong>.<br>
-            3km up Klaasvoogds West: <strong>right</strong> at the first T-junction, <strong>left</strong> at the second T-junction, then 3km up the gravel road.<br>
-            🔐 <strong>Security gate:</strong> enter the code emailed to you.
-          </div>
-        </div>
+        <div id="venueDirections"></div>
       </div>
     </div>
-    <div style="margin-top:8px">
-      <div class="info-label" style="margin-bottom:4px">What's Included in Your Booking</div>
-      <div class="included-chips">
-        <span class="included-chip"><span class="chip-check">✓</span>Exclusive reserve use</span>
-        <span class="included-chip"><span class="chip-check">✓</span>Accommodation — 49 guests + 50 in Africamps</span>
-        <span class="included-chip"><span class="chip-check">✓</span>Bedding, linen &amp; towels in every unit</span>
-        <span class="included-chip"><span class="chip-check">✓</span>Braai equipment &amp; potjies</span>
-        <span class="included-chip"><span class="chip-check">✓</span>Electric blankets (Exclusive Cottages)</span>
-        <span class="included-chip"><span class="chip-check">✓</span>Barn Venue &amp; Wedding Meadow</span>
-        <span class="included-chip"><span class="chip-check">✓</span>Full glassware, crockery &amp; cutlery</span>
-        <span class="included-chip"><span class="chip-check">✓</span>Kitchen facilities for caterer</span>
-        <span class="included-chip"><span class="chip-check">✓</span>Parking — 3 areas on site</span>
-        <span class="included-chip"><span class="chip-check">✓</span>Catalogue furniture &amp; décor items</span>
-        <span class="included-chip"><span class="chip-check">✓</span>Pool with a View</span>
-        <span class="included-chip"><span class="chip-check">✓</span>Hiking trails — Karin, Middelrug, Hermit</span>
-        <span class="included-chip"><span class="chip-check">✓</span>Grounds keeper &amp; coordinator on the day</span>
-      </div>
-    </div>
-    <div style="margin-top:24px">
-      <div class="info-label" style="margin-bottom:4px">Venue Areas &amp; Spaces</div>
-      <div class="venue-areas-grid">
-        <div class="venue-area-card">
-          <div class="venue-area-icon">🏛️</div>
-          <div class="venue-area-name">Barn Venue</div>
-          <div class="venue-area-desc">Main wedding reception &amp; ceremony hall, adjacent to Oak Cottage</div>
-        </div>
-        <div class="venue-area-card">
-          <div class="venue-area-icon">🌿</div>
-          <div class="venue-area-name">Wedding Meadow</div>
-          <div class="venue-area-desc">Open-air ceremony space next to the Barn &amp; the ancient Oak Tree</div>
-        </div>
-        <div class="venue-area-card">
-          <div class="venue-area-icon">🌳</div>
-          <div class="venue-area-name">Oak Tree Area</div>
-          <div class="venue-area-desc">Iconic ancient oak tree — a stunning backdrop for ceremonies &amp; photos</div>
-        </div>
-        <div class="venue-area-card">
-          <div class="venue-area-icon">🏊</div>
-          <div class="venue-area-name">Pool with a View</div>
-          <div class="venue-area-desc">Shared pool between Africamps tents and the main venue area</div>
-        </div>
-        <div class="venue-area-card">
-          <div class="venue-area-icon">🌲</div>
-          <div class="venue-area-name">Poplar Forest</div>
-          <div class="venue-area-desc">Atmospheric forest, accessible via Hermit Trail (no vehicles)</div>
-        </div>
-        <div class="venue-area-card">
-          <div class="venue-area-icon">🌲</div>
-          <div class="venue-area-name">Pine Forest</div>
-          <div class="venue-area-desc">Upper pine forest area, accessible via Karin Trail</div>
-        </div>
-        <div class="venue-area-card">
-          <div class="venue-area-icon">💧</div>
-          <div class="venue-area-name">Dam &amp; Echo Dam</div>
-          <div class="venue-area-desc">Scenic dam with picnic spots, accessible via Middelrug Trail</div>
-        </div>
-        <div class="venue-area-card">
-          <div class="venue-area-icon">🛖</div>
-          <div class="venue-area-name">Lapa</div>
-          <div class="venue-area-desc">Covered outdoor entertainment area near the Barn Venue</div>
-        </div>
-        <div class="venue-area-card">
-          <div class="venue-area-icon">🏪</div>
-          <div class="venue-area-name">Shop &amp; Reception</div>
-          <div class="venue-area-desc">At the reserve entrance, near Hadeda &amp; Nightjar cottages</div>
-        </div>
-      </div>
-    </div>
+    <div style="margin-top:8px" id="venueIncluded"></div>
+    <div style="margin-top:24px" id="venueAreas"></div>
   </div>
 
   <!-- Catalogue -->
@@ -206,7 +127,7 @@
         <div class="section-title">Venue <span>Catalogue</span></div>
         <div class="section-sub">All free items included in your venue booking — tick which days you need each item</div>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="openSubmitModal('catalogue')">📧 Send to Pat Busch</button>
+      <button class="btn btn-primary btn-sm" onclick="openSubmitModal('catalogue')">📧 Send to Venue</button>
     </div>
     <div class="cat-toolbar" style="flex-wrap:wrap;gap:6px">
       <input class="cat-search" id="catSearch" placeholder="Search items…" oninput="renderCatalogue()" style="width:100%;margin-bottom:4px">
@@ -319,7 +240,7 @@
     <div class="panel-header">
       <div>
         <div class="section-title">On-Site <span>Accommodation</span></div>
-        <div class="section-sub">Up to 49 guests across 8 units on the reserve, plus 50 more in 10 Africamps boutique tents — all yours exclusively for the weekend</div>
+        <div class="section-sub">Assign your overnight guests to the rooms and units available at your venue</div>
       </div>
       <button class="btn btn-primary btn-sm" onclick="openGuestModal()">+ Add Guest</button>
     </div>
@@ -462,7 +383,7 @@
   <div id="tab-rentals" class="tab-panel">
     <div class="panel-header">
       <div>
-        <div class="section-title">Pat Busch <span>Optional Rentals</span></div>
+        <div class="section-title">Optional <span>Rentals</span></div>
         <div class="section-sub">Tick items to select — choose which days — costs calculate live</div>
       </div>
       <button class="btn btn-primary btn-sm" onclick="openSubmitModal('rentals')">📧 Submit Rental Order</button>
@@ -690,7 +611,7 @@
 <div class="modal-overlay" id="guestModal">
   <div class="modal" style="max-width:400px">
     <h3>Add Guests</h3>
-    <div class="form-group"><label>Guest Names</label><textarea id="guestNames" placeholder="One name per line&#10;e.g.&#10;Heather McLeod&#10;Shaun Barnard&#10;Mark &amp; Lisa Smith" style="min-height:120px"></textarea></div>
+    <div class="form-group"><label>Guest Names</label><textarea id="guestNames" placeholder="One name per line&#10;e.g.&#10;Jane Smith&#10;John Smith&#10;Mark &amp; Lisa Brown" style="min-height:120px"></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('guestModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveGuests()">Add Guests</button>
@@ -705,10 +626,10 @@
 <div class="modal-overlay" id="submitModal" onclick="if(event.target===this)closeModal('submitModal')">
   <div class="modal-box" style="max-width:560px">
     <div class="modal-header">
-      <div class="modal-title" id="submitModalTitle">Send to Pat Busch</div>
+      <div class="modal-title" id="submitModalTitle">Send to Venue</div>
       <button class="modal-close" onclick="closeModal('submitModal')">✕</button>
     </div>
-    <div style="padding:4px 0 12px;font-size:0.82rem;color:var(--text-light)">Review your selections below, then send directly to your Pat Busch coordinator.</div>
+    <div style="padding:4px 0 12px;font-size:0.82rem;color:var(--text-light)">Review your selections below, then send directly to your venue coordinator.</div>
     <div class="submit-modal-body" id="submitModalBody"></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button id="submitToVenueBtn" onclick="sendSubmissionToVenue()" class="btn btn-primary" style="flex:2">✉️ Send to venue</button>

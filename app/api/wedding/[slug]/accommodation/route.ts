@@ -28,6 +28,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
       .order("sort_order"),
     ad.from("media_assets")
       .select("id, owner_id, kind, url, label, sort_order")
+      .eq("venue_id", access.wedding.venue_id)
       .in("kind", ["photo", "floorplan"])
       .order("sort_order"),
   ]);

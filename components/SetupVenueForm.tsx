@@ -39,9 +39,12 @@ export function SetupVenueForm({
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [region, setRegion] = useState("");
+  const [description, setDescription] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoErr, setLogoErr] = useState<string | null>(null);
   const [addressSeed, setAddressSeed] = useState("");
   const [pickerKey, setPickerKey] = useState(0);
   const [slugTaken, setSlugTaken] = useState(false);
@@ -67,6 +70,33 @@ export function SetupVenueForm({
     return () => clearTimeout(t);
   }, [slug]);
 
+  async function uploadLogo(files: FileList | null) {
+    const f = files?.[0];
+    if (!f) return;
+    setLogoErr(null);
+    setLogoUploading(true);
+    try {
+      // Mirrors YourVenueManager.upload() — posts to the shared gallery uploader and
+      // stores the returned public URL. (At onboarding there's no venue yet, so this can
+      // fail the venue-auth gate; the URL field below stays as a fallback.)
+      const fd = new FormData();
+      fd.append("category", "Other");
+      fd.append("files", f);
+      const res = await fetch("/api/venue/gallery", { method: "POST", body: fd });
+      const j = await res.json();
+      if (!res.ok || !j.ok) {
+        setLogoErr(j.error || "Upload failed — paste a hosted URL below instead.");
+        return;
+      }
+      const uploadedUrl = j.inserted?.[0]?.url;
+      if (uploadedUrl) setLogoUrl(uploadedUrl);
+    } catch (e) {
+      setLogoErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLogoUploading(false);
+    }
+  }
+
   async function runImport() {
     if (!url.trim()) return;
     setImporting(true);
@@ -85,6 +115,7 @@ export function SetupVenueForm({
       const d: Imported = json.data;
       setData(d);
       if (d.name && !name) { setName(d.name); if (!slug) setSlug(slugify(d.name)); }
+      if (d.description && !description) setDescription(d.description);
       if (d.region && !region) setRegion(d.region);
       if (d.contact_email && !contactEmail) setContactEmail(d.contact_email);
       if (d.contact_phone && !contactPhone) setContactPhone(d.contact_phone);
@@ -173,7 +204,20 @@ export function SetupVenueForm({
       </div>
 
       <div className="space-y-1">
-        <label className="text-sm font-medium">Logo URL (optional)</label>
+        <label className="text-sm font-medium">About your venue (optional)</label>
+        <textarea
+          name="description"
+          rows={4}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="A short story / about blurb couples see on your listing and portal."
+          className="w-full border rounded px-3 py-2"
+        />
+        <p className="text-xs text-stone-500">We pre-fill this from your website when we can — tidy it up before saving.</p>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-sm font-medium">Logo (optional)</label>
         <div className="flex items-center gap-3">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -181,9 +225,15 @@ export function SetupVenueForm({
           ) : (
             <div className="h-12 w-12 shrink-0 rounded border border-dashed border-stone-300 bg-stone-50" aria-hidden />
           )}
-          <input name="logo_url" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)}
-            placeholder="https://…/logo.png" className="flex-1 border rounded px-3 py-2" />
+          <label className="px-4 py-2 rounded bg-white border border-stone-300 text-sm font-medium cursor-pointer hover:bg-stone-100">
+            {logoUploading ? "Uploading…" : "Upload logo"}
+            <input type="file" accept="image/*" className="hidden"
+              onChange={(e) => uploadLogo(e.target.files)} />
+          </label>
         </div>
+        {logoErr && <p className="text-xs text-amber-700">{logoErr}</p>}
+        <input name="logo_url" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)}
+          placeholder="…or paste a hosted logo URL (https://…/logo.png)" className="w-full border rounded px-3 py-2 text-sm" />
       </div>
 
       <div className="space-y-1">
@@ -239,5 +289,76 @@ export function SetupVenueForm({
         {slugTaken ? "Pick an available URL first" : "Create my venue"}
       </button>
     </form>
+  );
+}
+
+// Reusable logo upload control — posts to the shared /api/venue/gallery uploader
+// (same call shape as YourVenueManager.upload()) and writes the returned public URL
+// into a hidden field so it persists through a native server-action form submit.
+// Falls back to a paste-a-URL input (the gallery gate needs an existing venue, which
+// onboarding doesn't have yet). Renders fine inside a server component.
+export function LogoUploadField({
+  fieldName,
+  venueId,
+  defaultUrl = "",
+}: {
+  fieldName: string;
+  venueId?: string;
+  defaultUrl?: string;
+}) {
+  const [logoUrl, setLogoUrl] = useState(defaultUrl);
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function upload(files: FileList | null) {
+    const f = files?.[0];
+    if (!f) return;
+    setErr(null);
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      if (venueId) fd.append("venue_id", venueId);
+      fd.append("category", "Other");
+      fd.append("files", f);
+      const res = await fetch("/api/venue/gallery", { method: "POST", body: fd });
+      const j = await res.json();
+      if (!res.ok || !j.ok) {
+        setErr(j.error || "Upload failed — paste a hosted URL below instead.");
+        return;
+      }
+      const uploaded = j.inserted?.[0]?.url;
+      if (uploaded) setLogoUrl(uploaded);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <label className="text-sm font-medium">Logo (optional)</label>
+      <div className="flex items-center gap-3">
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} alt="Logo preview" className="h-12 w-12 shrink-0 rounded border border-stone-200 bg-white object-contain p-1" />
+        ) : (
+          <div className="h-12 w-12 shrink-0 rounded border border-dashed border-stone-300 bg-stone-50" aria-hidden />
+        )}
+        <label className="px-4 py-2 rounded bg-white border border-stone-300 text-sm font-medium cursor-pointer hover:bg-stone-100">
+          {uploading ? "Uploading…" : "Upload logo"}
+          <input type="file" accept="image/*" className="hidden" onChange={(e) => upload(e.target.files)} />
+        </label>
+      </div>
+      {err && <p className="text-xs text-amber-700">{err}</p>}
+      <input
+        name={fieldName}
+        type="url"
+        value={logoUrl}
+        onChange={(e) => setLogoUrl(e.target.value)}
+        placeholder="…or paste a hosted logo URL (https://…/logo.png)"
+        className="w-full border rounded px-3 py-2 text-sm"
+      />
+    </div>
   );
 }

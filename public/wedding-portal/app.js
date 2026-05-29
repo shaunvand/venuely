@@ -332,6 +332,42 @@ if (typeof window !== 'undefined' && Array.isArray(window.VENUE_ACCOMMODATION) &
   ACCOMMODATION = window.VENUE_ACCOMMODATION;
 }
 
+// ── Venue-injected profile/identity (multi-tenant) ─────────────────────────
+// Overlay the live wedding + venue identity onto VENUE so the couple sees
+// THEIR names/date and THIS venue's contact details. Every assignment guards
+// on the global existing, so the hardcoded Pat Busch fallback still works in
+// local/dev where no globals are injected.
+if (typeof window !== 'undefined') {
+  if (window.WEDDING_VENUE && window.WEDDING_VENUE.name) VENUE.name = window.WEDDING_VENUE.name;
+  if (typeof window.WEDDING_COUPLE === 'string' && window.WEDDING_COUPLE.trim()) {
+    var _parts = window.WEDDING_COUPLE.split('&');
+    var _n1 = (_parts[0] || '').trim();
+    var _n2 = (_parts[1] || '').trim();
+    if (_n1) VENUE.couple.name1 = _n1;
+    if (_n2) VENUE.couple.name2 = _n2;
+  }
+  if (typeof window.WEDDING_DATE === 'string' && window.WEDDING_DATE) {
+    VENUE.couple.date = window.WEDDING_DATE;
+    try {
+      VENUE.couple.displayDate = new Date(window.WEDDING_DATE + 'T00:00:00')
+        .toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch (e) {}
+  }
+  if (window.VENUE_CONTACT && window.VENUE_CONTACT.email) VENUE.email = window.VENUE_CONTACT.email;
+  if (window.VENUE_CONTACT && window.VENUE_CONTACT.phone) VENUE.phone = window.VENUE_CONTACT.phone;
+  if (window.VENUE_WEBSITE) VENUE.website = window.VENUE_WEBSITE;
+  if (window.VENUE_MAP_URL) VENUE.mapUrl = window.VENUE_MAP_URL;
+  // In server/multi-tenant mode the route does not inject a one-line address,
+  // so clear the hardcoded Pat-Busch location/map so it never leaks into
+  // another venue's portal. Fall back to the venue name, and only keep a map
+  // link if one was actually injected.
+  if (window.WEDDING_USE_SERVER) {
+    VENUE.location = (window.WEDDING_VENUE && window.WEDDING_VENUE.name) ? window.WEDDING_VENUE.name : '';
+    if (!window.VENUE_MAP_URL) VENUE.mapUrl = '';
+    if (!window.VENUE_WEBSITE) VENUE.website = '';
+  }
+}
+
 // ── Default Suppliers ─────────────────────────────────────────────────────
 const DEFAULT_SUPPLIERS = [
   // ── YOUR BOOKED SUPPLIER ──────────────────────────────────────────────────
@@ -657,28 +693,40 @@ function load() {
     } catch(e) {}
   }
 
+  // The DEFAULT_SUPPLIERS / DEFAULT_CHECKLIST below are Pat-Busch-specific
+  // (Heather's booked photographer, Robertson-local vendors, PB deadlines).
+  // Only seed them as a local/dev fallback — i.e. when this portal is NOT
+  // running against a live venue backend. A real venue's couple must start
+  // with an empty list, not someone else's suppliers/checklist.
+  var _seedPatBuschDefaults = !window.WEDDING_USE_SERVER;
+
   // Seed default suppliers if none saved, or merge in any new defaults not yet in state
-  if (!state.suppliers || !state.suppliers.length) {
-    state.suppliers = DEFAULT_SUPPLIERS.map(s => ({...s}));
-  } else {
-    // Merge in any DEFAULT_SUPPLIERS entries whose id doesn't already exist in saved state
-    const existingIds = new Set(state.suppliers.map(s => s.id));
-    const newDefaults = DEFAULT_SUPPLIERS.filter(s => !existingIds.has(s.id));
-    if (newDefaults.length) {
-      state.suppliers = [...state.suppliers, ...newDefaults.map(s => ({...s}))];
+  if (!state.suppliers) state.suppliers = [];
+  if (_seedPatBuschDefaults) {
+    if (!state.suppliers.length) {
+      state.suppliers = DEFAULT_SUPPLIERS.map(s => ({...s}));
+    } else {
+      // Merge in any DEFAULT_SUPPLIERS entries whose id doesn't already exist in saved state
+      const existingIds = new Set(state.suppliers.map(s => s.id));
+      const newDefaults = DEFAULT_SUPPLIERS.filter(s => !existingIds.has(s.id));
+      if (newDefaults.length) {
+        state.suppliers = [...state.suppliers, ...newDefaults.map(s => ({...s}))];
+      }
     }
   }
   // Seed checklist
-  if (!state.checklist || !Object.keys(state.checklist).length) {
-    state.checklist = {};
-    for (const [section, items] of Object.entries(DEFAULT_CHECKLIST)) {
-      state.checklist[section] = items.map(t => ({ text: t, done: false }));
-    }
-  } else {
-    // Ensure all default sections/items exist
-    for (const [section, items] of Object.entries(DEFAULT_CHECKLIST)) {
-      if (!state.checklist[section]) {
+  if (!state.checklist) state.checklist = {};
+  if (_seedPatBuschDefaults) {
+    if (!Object.keys(state.checklist).length) {
+      for (const [section, items] of Object.entries(DEFAULT_CHECKLIST)) {
         state.checklist[section] = items.map(t => ({ text: t, done: false }));
+      }
+    } else {
+      // Ensure all default sections/items exist
+      for (const [section, items] of Object.entries(DEFAULT_CHECKLIST)) {
+        if (!state.checklist[section]) {
+          state.checklist[section] = items.map(t => ({ text: t, done: false }));
+        }
       }
     }
   }
@@ -800,12 +848,92 @@ function renderDashboard() {
 }
 
 // ── Venue ──────────────────────────────────────────────────────────────────
+// Pat-Busch fallbacks for the "Our Venue" tab — used only when the server has
+// not injected venue-profile globals (i.e. local/dev or the original PB portal).
+const PB_VENUE_ABOUT = "Pat Busch Mountain Reserve is a private nature reserve in the Robertson Valley, Western Cape. Nestled between mountains and fynbos, it offers an intimate, wild, and utterly private backdrop for your celebration. The reserve sleeps up to 49 guests across the main property (Oak, Fig, Quince, Pine, Nightjar, Hadeda cottages + Farmhouse Erika), plus a further 50 guests in 10 Africamps boutique safari tents — your whole wedding party under one sky.";
+const PB_VENUE_INCLUDED = [
+  'Exclusive reserve use','Accommodation — 49 guests + 50 in Africamps','Bedding, linen & towels in every unit',
+  'Braai equipment & potjies','Electric blankets (Exclusive Cottages)','Barn Venue & Wedding Meadow',
+  'Full glassware, crockery & cutlery','Kitchen facilities for caterer','Parking — 3 areas on site',
+  'Catalogue furniture & décor items','Pool with a View','Hiking trails — Karin, Middelrug, Hermit',
+  'Grounds keeper & coordinator on the day'
+];
+const PB_VENUE_AREAS = [
+  { name: 'Barn Venue', description: 'Main wedding reception & ceremony hall, adjacent to Oak Cottage' },
+  { name: 'Wedding Meadow', description: 'Open-air ceremony space next to the Barn & the ancient Oak Tree' },
+  { name: 'Oak Tree Area', description: 'Iconic ancient oak tree — a stunning backdrop for ceremonies & photos' },
+  { name: 'Pool with a View', description: 'Shared pool between Africamps tents and the main venue area' },
+  { name: 'Poplar Forest', description: 'Atmospheric forest, accessible via Hermit Trail (no vehicles)' },
+  { name: 'Pine Forest', description: 'Upper pine forest area, accessible via Karin Trail' },
+  { name: 'Dam & Echo Dam', description: 'Scenic dam with picnic spots, accessible via Middelrug Trail' },
+  { name: 'Lapa', description: 'Covered outdoor entertainment area near the Barn Venue' },
+  { name: 'Shop & Reception', description: 'At the reserve entrance, near Hadeda & Nightjar cottages' }
+];
+const PB_VENUE_DIRECTIONS = '<strong>From Cape Town:</strong> Take the N1 to Worcester (±100km).<br>Turn right onto the <strong>R60 towards Robertson</strong> and drive through Worcester following signs to Robertson (±50km).<br>Continue straight through Robertson towards Ashton on the R60. Cross the traffic circle as you leave Robertson — after <strong>10km</strong> take the road on the <strong>left</strong> up towards the mountain: <strong>KLAASVOOGDS WEST</strong>.<br>3km up Klaasvoogds West: <strong>right</strong> at the first T-junction, <strong>left</strong> at the second T-junction, then 3km up the gravel road.<br>🔐 <strong>Security gate:</strong> enter the code emailed to you.';
+
 function renderVenue() {
-  document.getElementById('venueLocation').textContent = VENUE.location;
-  document.getElementById('venueMapLink').href = VENUE.mapUrl;
-  document.getElementById('venueContact').innerHTML = `<a href="mailto:${VENUE.email}" class="info-link">${VENUE.email}</a><br>${VENUE.phone}<br><a href="${VENUE.website}" class="info-link" target="_blank">${VENUE.website}</a>`;
+  // ── Location / map / contact (guard each lookup — template may restructure) ──
+  const locEl = document.getElementById('venueLocation');
+  if (locEl) locEl.textContent = VENUE.location;
+  const mapEl = document.getElementById('venueMapLink');
+  if (mapEl) {
+    if (VENUE.mapUrl) { mapEl.href = VENUE.mapUrl; mapEl.style.display = ''; }
+    else { mapEl.removeAttribute('href'); mapEl.style.display = 'none'; }
+  }
+  const contactEl = document.getElementById('venueContact');
+  if (contactEl) contactEl.innerHTML = `<a href="mailto:${escHtml(VENUE.email)}" class="info-link">${escHtml(VENUE.email)}</a><br>${escHtml(VENUE.phone)}${VENUE.website ? `<br><a href="${escHtml(VENUE.website)}" class="info-link" target="_blank">${escHtml(VENUE.website)}</a>` : ''}`;
+
+  // ── About (venue story/blurb) ──
+  const aboutEl = document.getElementById('venueAbout');
+  if (aboutEl) {
+    const about = (window.VENUE_DESCRIPTION != null && String(window.VENUE_DESCRIPTION).trim())
+      ? escHtml(window.VENUE_DESCRIPTION) : (window.WEDDING_USE_SERVER ? '' : escHtml(PB_VENUE_ABOUT));
+    aboutEl.innerHTML = about
+      ? `<div class="info-label">About the Venue</div><div class="info-val" style="margin-top:6px;line-height:1.8">${about.replace(/\n/g,'<br>')}</div>`
+      : '';
+    aboutEl.style.display = about ? '' : 'none';
+  }
+
+  // ── Directions ──
+  const dirEl = document.getElementById('venueDirections');
+  if (dirEl) {
+    let dir = '';
+    if (window.VENUE_DIRECTIONS != null && String(window.VENUE_DIRECTIONS).trim()) dir = escHtml(window.VENUE_DIRECTIONS).replace(/\n/g,'<br>');
+    else if (!window.WEDDING_USE_SERVER) dir = PB_VENUE_DIRECTIONS;
+    dirEl.innerHTML = dir
+      ? `<div class="info-label">Directions</div><div class="info-val" style="font-size:0.82rem;line-height:1.9">${dir}</div>`
+      : '';
+  }
+
+  // ── What's Included ──
+  const incEl = document.getElementById('venueIncluded');
+  if (incEl) {
+    let included = Array.isArray(window.VENUE_INCLUDED) && window.VENUE_INCLUDED.length
+      ? window.VENUE_INCLUDED : (window.WEDDING_USE_SERVER ? [] : PB_VENUE_INCLUDED);
+    incEl.innerHTML = included.length
+      ? `<div class="info-label" style="margin-bottom:4px">What's Included in Your Booking</div>
+         <div class="included-chips">${included.map(i => `<span class="included-chip"><span class="chip-check">✓</span>${escHtml(i)}</span>`).join('')}</div>`
+      : '';
+  }
+
+  // ── Venue Areas & Spaces ──
+  const areasEl = document.getElementById('venueAreas');
+  if (areasEl) {
+    let areas = Array.isArray(window.VENUE_AREAS) && window.VENUE_AREAS.length
+      ? window.VENUE_AREAS : (window.WEDDING_USE_SERVER ? [] : PB_VENUE_AREAS);
+    areasEl.innerHTML = areas.length
+      ? `<div class="info-label" style="margin-bottom:4px">Venue Areas &amp; Spaces</div>
+         <div class="venue-areas-grid">${areas.map(a => `
+           <div class="venue-area-card">
+             <div class="venue-area-icon">📍</div>
+             <div class="venue-area-name">${escHtml(a.name)}</div>
+             ${a.description ? `<div class="venue-area-desc">${escHtml(a.description)}</div>` : ''}
+           </div>`).join('')}</div>`
+      : '';
+  }
 
   const gallery = document.getElementById('venueGallery');
+  if (!gallery) return;
   const slots = 8;
   const venueMedia = (window.VENUE_GALLERY || []);
   let html = venueMedia.map(m => m.kind === 'video'
@@ -1949,6 +2077,18 @@ function showToast(msg) { const t = document.getElementById('toast'); t.textCont
   document.getElementById('hName2').textContent = VENUE.couple.name2;
   document.getElementById('hDate').textContent = VENUE.couple.displayDate;
   document.title = `${VENUE.couple.name1} & ${VENUE.couple.name2} — ${VENUE.name}`;
+  // Lock screen (server gate is authoritative; this just keeps the static
+  // template neutral and branded to the real couple/venue/date).
+  var _lockCouple = document.getElementById('lockCoupleName');
+  if (_lockCouple) _lockCouple.textContent = VENUE.couple.name1 + ' & ' + VENUE.couple.name2;
+  var _lockVenue = document.getElementById('lockVenueLine');
+  if (_lockVenue) _lockVenue.textContent = VENUE.couple.displayDate + '  ·  Wedding Portal';
+  var _lockLogoName = document.getElementById('lockLogoName');
+  if (_lockLogoName) _lockLogoName.textContent = (VENUE.name || '').toUpperCase();
+  var _lockHintEmail = document.getElementById('lockHintEmail');
+  if (_lockHintEmail && VENUE.email) { _lockHintEmail.textContent = VENUE.email; _lockHintEmail.href = 'mailto:' + VENUE.email; }
+  var _lockFooter = document.getElementById('lockFooter');
+  if (_lockFooter) _lockFooter.textContent = VENUE.name;
   updateCountdown();
   setInterval(updateCountdown, 30000);
   // Initial renders
@@ -2007,17 +2147,18 @@ function renderDeadlines() {
   function addMonths(d, m) { const r=new Date(d); r.setMonth(r.getMonth()-m); return r; }
   function addWeeks(d, w)  { const r=new Date(d); r.setDate(r.getDate()-(w*7)); return r; }
 
+  const venueName = VENUE.name || 'your venue';
   const deadlines = [
-    { label: 'Confirm catering & bar supplier with Pat Busch',    date: addMonths(weddingDate,9) },
+    { label: 'Confirm catering & bar supplier with ' + venueName, date: addMonths(weddingDate,9) },
     { label: 'Send save-the-dates to guests',                     date: addMonths(weddingDate,9) },
     { label: 'Confirm all vendor bookings & deposits',            date: addMonths(weddingDate,6) },
-    { label: 'Submit rental selections to Pat Busch',             date: addMonths(weddingDate,3), action: "openSubmitModal('rentals')" },
-    { label: 'Submit catalogue day-selections to Pat Busch',      date: addMonths(weddingDate,3), action: "openSubmitModal('catalogue')" },
+    { label: 'Submit rental selections to ' + venueName,          date: addMonths(weddingDate,3), action: "openSubmitModal('rentals')" },
+    { label: 'Submit catalogue day-selections to ' + venueName,   date: addMonths(weddingDate,3), action: "openSubmitModal('catalogue')" },
     { label: 'Book accommodation for all overnight guests',       date: addMonths(weddingDate,3) },
     { label: 'Pay balance of venue fee',                          date: addWeeks(weddingDate,2) },
     { label: 'Venue walkthrough with coordinator',                date: addWeeks(weddingDate,2) },
     { label: 'Confirm final headcount with caterer',              date: addWeeks(weddingDate,2) },
-    { label: 'Receive security gate code from Pat Busch',         date: addWeeks(weddingDate,2) },
+    { label: 'Receive access details from ' + venueName,          date: addWeeks(weddingDate,2) },
     { label: 'Brief bridal party & vendors on day-of timeline',   date: addWeeks(weddingDate,1) },
     { label: 'Pack & deliver décor items to venue',               date: addWeeks(weddingDate,1) },
   ];
@@ -2053,23 +2194,26 @@ function renderContactPanel() {
   const el = document.getElementById('dashContact');
   if (!el) return;
   const couple = VENUE.couple;
+  const venueName = VENUE.name;
+  const phoneDigits = (VENUE.phone || '').replace(/[^0-9]/g, '');
   const subject = encodeURIComponent('Wedding Enquiry — ' + couple.name1 + ' & ' + couple.name2 + ' · ' + couple.displayDate);
-  const body = encodeURIComponent('Hi Pat Busch team,\n\nI have a question regarding our wedding booking on ' + couple.displayDate + '.\n\n[Your question here]\n\nKind regards,\n' + couple.name1);
-  const waMsg = encodeURIComponent('Hi, I have a question about my Pat Busch wedding on ' + couple.displayDate + ' (' + couple.name1 + ' & ' + couple.name2 + ')');
+  const body = encodeURIComponent('Hi ' + venueName + ' team,\n\nI have a question regarding our wedding booking on ' + couple.displayDate + '.\n\n[Your question here]\n\nKind regards,\n' + couple.name1);
+  const waMsg = encodeURIComponent('Hi, I have a question about my wedding at ' + venueName + ' on ' + couple.displayDate + ' (' + couple.name1 + ' & ' + couple.name2 + ')');
+  const avatar = (venueName || 'V').trim().charAt(0).toUpperCase();
   el.innerHTML = `<div class="contact-panel" style="margin-bottom:18px">
     <div class="contact-panel-title">Your Venue Coordinator</div>
     <div class="contact-coordinator">
-      <div class="contact-avatar">P</div>
+      <div class="contact-avatar">${escHtml(avatar)}</div>
       <div>
-        <div class="contact-name">Pat Busch Team</div>
-        <div class="contact-role">Wedding Coordination · Robertson</div>
+        <div class="contact-name">${escHtml(venueName)} Team</div>
+        <div class="contact-role">Wedding Coordination</div>
       </div>
     </div>
     <div class="contact-actions">
-      <a href="mailto:info@patbusch.co.za?subject=${subject}&body=${body}" class="contact-btn contact-btn-primary">📧 Email Us</a>
-      <a href="https://wa.me/27236263716?text=${waMsg}" target="_blank" class="contact-btn contact-btn-ghost">💬 WhatsApp</a>
-      <a href="tel:+27236263716" class="contact-btn contact-btn-ghost">📞 Call</a>
-      <a href="https://www.patbusch.co.za" target="_blank" class="contact-btn contact-btn-ghost">🌐 Website</a>
+      ${VENUE.email ? `<a href="mailto:${escHtml(VENUE.email)}?subject=${subject}&body=${body}" class="contact-btn contact-btn-primary">📧 Email Us</a>` : ''}
+      ${phoneDigits ? `<a href="https://wa.me/${phoneDigits}?text=${waMsg}" target="_blank" class="contact-btn contact-btn-ghost">💬 WhatsApp</a>` : ''}
+      ${VENUE.phone ? `<a href="tel:${escHtml((VENUE.phone||'').replace(/\s/g,''))}" class="contact-btn contact-btn-ghost">📞 Call</a>` : ''}
+      ${VENUE.website ? `<a href="${escHtml(VENUE.website)}" target="_blank" class="contact-btn contact-btn-ghost">🌐 Website</a>` : ''}
     </div>
   </div>`;
 }
@@ -2128,7 +2272,10 @@ function openSubmitModal(type) {
 
   document.getElementById('submitModalBody').innerHTML = bodyHtml;
   const mailBody = encodeURIComponent(plainText);
-  document.getElementById('submitMailtoBtn').href = 'mailto:info@patbusch.co.za?subject=' + encodeURIComponent(subject) + '&body=' + mailBody;
+  const mailtoBtn = document.getElementById('submitMailtoBtn');
+  if (mailtoBtn) {
+    mailtoBtn.href = (VENUE.email ? 'mailto:' + VENUE.email : 'mailto:') + '?subject=' + encodeURIComponent(subject) + '&body=' + mailBody;
+  }
   document.getElementById('submitModal').classList.add('open');
 }
 

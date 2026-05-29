@@ -23,13 +23,31 @@ export default async function OwnerDashboard() {
 
   const weddings = (weddingsRaw ?? []) as unknown as WeddingRow[];
 
+  // Fees collected month-to-date: sum of platform_fee_owed across this owner's
+  // venues where the platform fee has been settled this calendar month.
+  // Mirrors the per-venue tally on /admin/billing (booked = platform_fee_paid_at set).
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+  const venueIds = (venues ?? []).map((v) => v.id);
+  let feesCollectedMtd = 0;
+  if (venueIds.length) {
+    const { data: paidFees } = await supabase
+      .from("weddings")
+      .select("platform_fee_owed, platform_fee_paid_at, venue_id")
+      .in("venue_id", venueIds)
+      .gte("platform_fee_paid_at", monthStart);
+    feesCollectedMtd = (paidFees ?? []).reduce(
+      (sum, w) => (w.platform_fee_paid_at ? sum + Number(w.platform_fee_owed ?? 0) : sum),
+      0,
+    );
+  }
+
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-semibold">Owner Dashboard</h1>
 
       <div className="grid grid-cols-3 gap-4">
         <Stat label="Venues" value={venueCount ?? 0} />
-        <Stat label="MRR (ZAR)" value="R0" />
+        <Stat label="Fees collected (MTD)" value={`R${feesCollectedMtd.toLocaleString()}`} />
         <Stat label="Trial venues" value={venues?.filter((v) => v.subscription_status === "trialing").length ?? 0} />
       </div>
 
