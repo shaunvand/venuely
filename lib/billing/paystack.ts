@@ -134,8 +134,15 @@ export async function createSubaccount(input: {
 }
 
 // ── Initialise a transaction (returns the hosted checkout URL) ─────────────────
-// bearer="account" => the platform's subaccount percentage_charge comes off the
-// top of this transaction (the platform keeps the fee, venue gets the net).
+// bearer="account" => the platform's fee comes off the top of this transaction
+// (the platform keeps the fee, the venue's subaccount gets the net).
+//
+// Fee precedence: when transactionChargeCents is supplied it sets Paystack's
+// `transaction_charge` (a FIXED amount, in the smallest currency unit), which
+// OVERRIDES the subaccount's stored percentage_charge for THIS transaction only.
+// Venuely uses this so the platform fee is a fixed rate × (gross − venue
+// commission), not a flat percentage of the gross — the venue keeps 100% of its
+// own commission. Omit it to fall back to the subaccount's percentage_charge.
 export async function initTransaction(input: {
   email: string;
   amountKobo: number; // amount in the smallest currency unit (ZAR cents)
@@ -143,22 +150,36 @@ export async function initTransaction(input: {
   reference?: string;
   callbackUrl?: string;
   metadata?: Record<string, unknown>;
+  transactionChargeCents?: number; // FIXED platform fee in ZAR cents (overrides percentage_charge)
+  bearer?: "account" | "subaccount";
 }): Promise<PaystackResult<InitTransaction>> {
   if (!input.email) return { ok: false, error: "A customer email is required." };
   if (!Number.isFinite(input.amountKobo) || input.amountKobo <= 0) {
     return { ok: false, error: "A positive amount is required." };
   }
+
+  const body: Record<string, unknown> = {
+    email: input.email,
+    amount: Math.round(input.amountKobo),
+    currency: "ZAR",
+    subaccount: input.subaccountCode,
+    bearer: input.bearer ?? "account",
+    reference: input.reference,
+    callback_url: input.callbackUrl,
+    metadata: input.metadata ?? {},
+  };
+  // Only include transaction_charge when a valid non-negative fixed fee is given;
+  // a present value (even 0) overrides the subaccount's percentage_charge.
+  if (
+    typeof input.transactionChargeCents === "number" &&
+    Number.isFinite(input.transactionChargeCents) &&
+    input.transactionChargeCents >= 0
+  ) {
+    body.transaction_charge = Math.round(input.transactionChargeCents);
+  }
+
   return call<InitTransaction>(`/transaction/initialize`, {
     method: "POST",
-    body: JSON.stringify({
-      email: input.email,
-      amount: Math.round(input.amountKobo),
-      currency: "ZAR",
-      subaccount: input.subaccountCode,
-      bearer: "account",
-      reference: input.reference,
-      callback_url: input.callbackUrl,
-      metadata: input.metadata ?? {},
-    }),
+    body: JSON.stringify(body),
   });
 }

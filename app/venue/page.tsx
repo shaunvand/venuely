@@ -20,6 +20,54 @@ function fmtRand(n: number): string {
   return `R${Math.round(n).toLocaleString("en-ZA")}`;
 }
 
+// -----------------------------------------------------------------------------
+// wedding_state is the single source of truth couples actually edit (the static
+// /{slug} portal hydrates from it). The old relational tables (guests, suppliers,
+// selections, checklist) are near-dead — couples never populate them — so reading
+// counts from them shows misleading zeros. We instead parse the JSON blob with the
+// exact same shape the portal's renderDashboard() uses.
+type WeddingStateBlob = {
+  guests?: unknown[];
+  rentalSelections?: Record<string, { sel?: boolean }>;
+  catalogueSelections?: Record<string, { sel?: boolean; mg?: boolean; wed?: boolean; fb?: boolean }>;
+  roomAssignments?: Record<string, unknown[]>;
+  suppliers?: Array<{ status?: string }>;
+  checklist?: Record<string, Array<{ done?: boolean }>>;
+};
+
+type CoupleEngagement = {
+  guests: number;
+  placedGuests: number;
+  selections: number;
+  suppliersBooked: number;
+  tasksDone: number;
+  tasksTotal: number;
+};
+
+function parseEngagement(blob: unknown): CoupleEngagement {
+  const s = (blob ?? {}) as WeddingStateBlob;
+  const guests = Array.isArray(s.guests) ? s.guests.length : 0;
+  const placedGuests = Object.values(s.roomAssignments ?? {}).reduce(
+    (n, arr) => n + (Array.isArray(arr) ? arr.length : 0),
+    0,
+  );
+  const rentalSel = Object.values(s.rentalSelections ?? {}).filter((v) => v?.sel).length;
+  const cataSel = Object.values(s.catalogueSelections ?? {}).filter(
+    (v) => v?.sel || v?.mg || v?.wed || v?.fb,
+  ).length;
+  const suppliersBooked = (s.suppliers ?? []).filter((v) => v?.status === "booked").length;
+  const tasks = Object.values(s.checklist ?? {}).flat();
+  const tasksDone = tasks.filter((t) => t?.done).length;
+  return {
+    guests,
+    placedGuests,
+    selections: rentalSel + cataSel,
+    suppliersBooked,
+    tasksDone,
+    tasksTotal: tasks.length,
+  };
+}
+
 export default async function VenueOverview() {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
@@ -31,6 +79,7 @@ export default async function VenueOverview() {
     { data: upcoming },
     { data: recentWeddings },
     { data: allWeddings },
+    { data: stateRows },
     { data: paySum },
     { data: rentalRows },
     { data: roomRows },
@@ -39,11 +88,34 @@ export default async function VenueOverview() {
     supabase.from("weddings").select("id, slug, couple_names, wedding_date").eq("venue_id", venue.id).gte("wedding_date", todayIso).order("wedding_date").limit(5),
     supabase.from("weddings").select("id, slug, couple_names, wedding_date").eq("venue_id", venue.id).order("created_at", { ascending: false }).limit(5),
     supabase.from("weddings").select("slug, couple_names, wedding_date").eq("venue_id", venue.id),
+    // Couple-edited portal state — the single source of truth. We aggregate these
+    // blobs for the engagement counts instead of the dead relational tables.
+    supabase.from("weddings").select("wedding_state, wedding_state_updated_at").eq("venue_id", venue.id),
     supabase.from("payments").select("amount, status, due_date, paid_date, wedding:weddings!inner(id, slug, couple_names, venue_id)").eq("wedding.venue_id", venue.id),
     supabase.from("rental_items").select("price, commission_value, commission_type, active, stock_total").eq("venue_id", venue.id),
     supabase.from("accommodation_rooms").select("price_per_night, commission_value, commission_type, active").eq("venue_id", venue.id),
     supabase.from("vendor_partners").select("price_from, commission_value, commission_type, active").eq("venue_id", venue.id),
   ]);
+
+  // Roll the per-wedding wedding_state blobs up into venue-wide couple-engagement
+  // totals (guests, selections, booked suppliers, checklist progress).
+  const engagementRows = (stateRows ?? []) as Array<{ wedding_state: unknown; wedding_state_updated_at: string | null }>;
+  const engagement = engagementRows.map((r) => parseEngagement(r.wedding_state));
+  const coupleGuests = engagement.reduce((n, e) => n + e.guests, 0);
+  const coupleSelections = engagement.reduce((n, e) => n + e.selections, 0);
+  const coupleSuppliersBooked = engagement.reduce((n, e) => n + e.suppliersBooked, 0);
+  const coupleTasksDone = engagement.reduce((n, e) => n + e.tasksDone, 0);
+  const coupleTasksTotal = engagement.reduce((n, e) => n + e.tasksTotal, 0);
+  const couplePlacedGuests = engagement.reduce((n, e) => n + e.placedGuests, 0);
+  // How many couples have actually started editing (any state activity at all).
+  const activeCouples = engagement.filter(
+    (e) => e.guests > 0 || e.selections > 0 || e.suppliersBooked > 0 || e.tasksDone > 0,
+  ).length;
+  const lastCoupleEdit = engagementRows
+    .map((r) => r.wedding_state_updated_at)
+    .filter((d): d is string => Boolean(d))
+    .sort()
+    .pop() ?? null;
 
   type Pay = { amount: number | string; status: string | null; due_date: string | null; paid_date: string | null; wedding: { id: string; slug: string; couple_names: string } | null };
   const payments = (paySum ?? []).map((p) => {
@@ -233,6 +305,40 @@ export default async function VenueOverview() {
           </Link>
         ))}
       </div>
+
+      {/* Couple activity — derived from wedding_state (what couples actually edit
+          in their /{slug} portal), not the dead relational tables. */}
+      <section className="vy-card">
+        <div className="flex items-baseline justify-between flex-wrap gap-2">
+          <div>
+            <div className="vy-eyebrow">Couple activity</div>
+            <h2 className="vy-h2 mt-1">
+              {activeCouples} of {counts.weddings} couple{counts.weddings === 1 ? "" : "s"} planning
+            </h2>
+          </div>
+          <div className="text-xs text-right" style={{ color: "var(--ink-2)" }}>
+            {lastCoupleEdit
+              ? <>Last portal edit {new Date(lastCoupleEdit).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}</>
+              : <>No couple has edited their portal yet</>}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mt-4">
+          {[
+            { label: "Guests added", value: coupleGuests.toString(), sub: couplePlacedGuests ? `${couplePlacedGuests} housed` : "across all weddings", accent: "var(--poppy)" },
+            { label: "Items selected", value: coupleSelections.toString(), sub: "catalogue + rentals", accent: "var(--sage)" },
+            { label: "Suppliers booked", value: coupleSuppliersBooked.toString(), sub: "by couples", accent: "var(--peach)" },
+            { label: "Checklist done", value: coupleTasksTotal ? `${coupleTasksDone}/${coupleTasksTotal}` : "—", sub: coupleTasksTotal ? "tasks complete" : "no tasks yet", accent: "var(--sage)" },
+            { label: "Weddings", value: counts.weddings.toString(), sub: "total on portal", accent: "var(--poppy)" },
+          ].map((s) => (
+            <div key={s.label} className="vy-stat relative overflow-hidden">
+              <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: s.accent }} />
+              <div className="vy-stat-label">{s.label}</div>
+              <div className="vy-stat-value" style={{ color: s.accent }}>{s.value}</div>
+              <div className="text-xs mt-1" style={{ color: "var(--ink-2)" }}>{s.sub}</div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Charts row */}
       <div className="grid lg:grid-cols-3 gap-4">

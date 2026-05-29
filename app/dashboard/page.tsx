@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 type WeddingMembership = {
-  wedding: { slug: string; venue: { slug: string } } | null;
+  wedding: { slug: string } | null;
 };
 
 // Single dashboard entry point — figures out where the user actually belongs
@@ -31,17 +31,19 @@ export default async function DashboardRouter() {
     redirect("/onboarding/wizard");
   }
 
-  // Couples: look up their first wedding membership.
+  // Couples: look up their first wedding membership and send them to their
+  // canonical static portal at /{slug} — the single source of truth they edit
+  // (weddings.wedding_state). The old relational /portal/... tree is retired.
   const { data: membershipRaw } = await supabase
     .from("wedding_members")
-    .select("wedding:weddings(slug, venue:venues(slug))")
+    .select("wedding:weddings(slug)")
     .eq("user_id", user.id)
     .limit(1)
     .maybeSingle();
 
   const membership = membershipRaw as unknown as WeddingMembership | null;
-  if (membership?.wedding?.venue) {
-    redirect(`/portal/${membership.wedding.venue.slug}/${membership.wedding.slug}`);
+  if (membership?.wedding?.slug) {
+    redirect(`/${membership.wedding.slug}`);
   }
 
   redirect("/onboarding/awaiting-invite");

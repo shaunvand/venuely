@@ -58,6 +58,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Build the proforma from persisted line items + ledger, then computeTotals.
+  // NOTE: wedding_charges rows carry no commission columns, so charges read here
+  // have no base_amount → computeTotals reports commission_total = 0 and
+  // platform_fee_base = grand_total for any auto-derived (couple-selection) lines
+  // that haven't been persisted with a base. The fee below is computed off
+  // platform_fee_base, so it is correct for whatever commission the route can
+  // currently see; surfacing auto-line commission here needs the full proforma
+  // rebuild (see buildWeddingCharges in ../venue/weddings/actions.ts) — tracked
+  // as a follow-up.
   const [rules, chargesRes, paymentsRes] = await Promise.all([
     loadRules(supabase, venue.id),
     supabase
@@ -94,10 +102,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A customer email is required to take a payment." }, { status: 400 });
   }
 
-  // platform_fee_rate is stored as a fraction (e.g. 0.0100 for 1%). Paystack's
-  // subaccount percentage_charge was set at connect-time; we pass the fraction
-  // through metadata so the webhook can record the fee on the platform_payments row.
+  // platform_fee_rate is stored as a fraction (e.g. 0.0100 for 1%). Venuely's fee
+  // = rate × (grand_total − venue commission); the venue keeps 100% of its
+  // commission. Paystack's subaccount percentage_charge would tax the GROSS, so
+  // instead we pass a per-transaction FIXED `transaction_charge` that overrides
+  // it, computed off the commission-excluding base.
   const feeRate = Number(venue.platform_fee_rate ?? 0.01);
+
+  // The couple pays the full amountMajor (gross) via Paystack, but we charge the
+  // platform fee only on its commission-excluding share. Scale the proforma's
+  // fee-base ratio (platform_fee_base / grand_total) onto whatever slice is being
+  // paid now (deposit / balance / custom). Guard the divide for empty proformas.
+  const feeBaseRatio = totals.grand_total > 0 ? totals.platform_fee_base / totals.grand_total : 1;
+  const feeBaseMajor = amountMajor * feeBaseRatio;
+  const feeAmountCents = Math.round(feeRate * feeBaseMajor * 100);
 
   const proto = request.headers.get("x-forwarded-proto") ?? "https";
   const host = request.headers.get("host") ?? request.nextUrl.host;
@@ -107,12 +125,19 @@ export async function POST(request: NextRequest) {
     email,
     amountKobo: Math.round(amountMajor * 100),
     subaccountCode: venue.paystack_subaccount_code,
+    // Fixed platform fee (in cents) for THIS transaction. bearer="account" => the
+    // fee comes off the platform's share; the venue's subaccount receives
+    // gross − feeAmount. Overrides the subaccount's stored percentage_charge.
+    transactionChargeCents: feeAmountCents,
+    bearer: "account",
     callbackUrl,
     metadata: {
       venue_id: venue.id,
       wedding_id: wedding.id,
       payment_kind: amountType === "balance" ? "balance" : amountType === "custom" ? "payment" : "deposit",
       platform_fee_rate: feeRate,
+      platform_fee_base: Math.round(feeBaseMajor * 100) / 100,
+      platform_fee_amount: Math.round(feeAmountCents) / 100,
       couple_names: wedding.couple_names,
     },
   });

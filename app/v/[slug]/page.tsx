@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { EnquiryForm } from "@/components/EnquiryForm";
+import { ReviewForm } from "@/components/ReviewForm";
 
 // Public, SEO-friendly venue listing. Only renders venues with listed = true
 // (RLS already hides the rest from the anon client; we also re-check + notFound).
@@ -105,7 +106,7 @@ export default async function VenueListing({
 
   const supabase = await createClient();
 
-  const [galleryRes, areasRes, cataRes, accomRes] = await Promise.all([
+  const [galleryRes, areasRes, cataRes, accomRes, reviewsRes] = await Promise.all([
     supabase
       .from("media_assets")
       .select("url, kind, label, sort_order")
@@ -135,6 +136,13 @@ export default async function VenueListing({
       .eq("active", true)
       .order("sort_order")
       .limit(4),
+    supabase
+      .from("reviews")
+      .select("author_name, rating, body, created_at")
+      .eq("venue_id", venue.id)
+      .eq("status", "published")
+      .order("created_at", { ascending: false })
+      .limit(12),
   ]);
 
   const gallery = ((galleryRes.data ?? []) as { url: string; kind: string; label: string | null }[]).filter(
@@ -150,6 +158,14 @@ export default async function VenueListing({
   const rooms = (accomRes.data ?? []) as {
     name: string; room_type: string | null; sleeps: number; price_per_night: number; description: string | null;
   }[];
+  const reviews = (reviewsRes.data ?? []) as {
+    author_name: string | null; rating: number | null; body: string | null; created_at: string;
+  }[];
+  const ratedReviews = reviews.filter((r) => typeof r.rating === "number" && r.rating! >= 1);
+  const avgRating =
+    ratedReviews.length > 0
+      ? ratedReviews.reduce((sum, r) => sum + (r.rating ?? 0), 0) / ratedReviews.length
+      : null;
 
   const included = Array.isArray(venue.included_items)
     ? (venue.included_items as unknown[]).map((x) => String(x)).filter(Boolean)
@@ -205,7 +221,16 @@ export default async function VenueListing({
           <h1 className="font-serif text-4xl sm:text-5xl leading-tight mt-2" style={{ fontWeight: 900 }}>
             {venue.name}
           </h1>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {avgRating !== null && (
+              <span className="inline-flex items-center gap-1.5 text-sm" style={{ color: "var(--ink)" }}>
+                <Stars value={avgRating} />
+                <span style={{ fontWeight: 600 }}>{avgRating.toFixed(1)}</span>
+                <span style={{ color: "var(--ink-2)" }}>
+                  ({ratedReviews.length} review{ratedReviews.length === 1 ? "" : "s"})
+                </span>
+              </span>
+            )}
             {capacity && <Pill>{capacity}</Pill>}
             {venue.setting_type && <Pill>{titleCase(venue.setting_type)}</Pill>}
             {ceremonyTypes.slice(0, 3).map((c) => (
@@ -356,6 +381,55 @@ export default async function VenueListing({
               )}
             </Section>
           )}
+
+          {/* Reviews */}
+          <Section title="Reviews">
+            {avgRating !== null && (
+              <div className="flex items-center gap-2.5 mb-5">
+                <span className="font-serif text-3xl" style={{ color: "var(--ink)", fontWeight: 900 }}>
+                  {avgRating.toFixed(1)}
+                </span>
+                <span className="flex flex-col">
+                  <Stars value={avgRating} />
+                  <span className="text-xs mt-0.5" style={{ color: "var(--ink-2)" }}>
+                    {ratedReviews.length} review{ratedReviews.length === 1 ? "" : "s"}
+                  </span>
+                </span>
+              </div>
+            )}
+
+            {reviews.length > 0 ? (
+              <div className="space-y-4">
+                {reviews.map((r, i) => (
+                  <div
+                    key={i}
+                    className="rounded-2xl bg-white p-5"
+                    style={{ border: "1px solid var(--line)" }}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-serif text-base" style={{ color: "var(--ink)", fontWeight: 700 }}>
+                        {r.author_name || "A happy couple"}
+                      </span>
+                      {typeof r.rating === "number" && <Stars value={r.rating} />}
+                    </div>
+                    {r.body && (
+                      <p className="text-sm mt-2 leading-relaxed whitespace-pre-line" style={{ color: "var(--ink-2)" }}>
+                        {r.body}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm mb-1" style={{ color: "var(--ink-2)" }}>
+                No reviews yet — be the first to share your experience.
+              </p>
+            )}
+
+            <div className="mt-5">
+              <ReviewForm venueId={venue.id} venueName={venue.name} />
+            </div>
+          </Section>
         </div>
 
         {/* RIGHT — enquiry CTA (sticky on desktop) */}
@@ -446,4 +520,22 @@ function OfferRow({
 function titleCase(s: string): string {
   if (s === "both") return "Indoor & outdoor";
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Read-only star row. Rounds to the nearest whole star for the filled count.
+function Stars({ value }: { value: number }) {
+  const filled = Math.round(value);
+  return (
+    <span aria-label={`${value.toFixed(1)} out of 5`} className="inline-flex leading-none">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <span
+          key={n}
+          aria-hidden
+          style={{ color: n <= filled ? "var(--poppy)" : "var(--line)", fontSize: "1rem" }}
+        >
+          ★
+        </span>
+      ))}
+    </span>
+  );
 }

@@ -12,6 +12,7 @@ const TOP_LINKS: Item[] = [
   { href: "/venue/your-venue", label: "Your Venue" },
   { href: "/venue/enquiries", label: "Enquiries" },
   { href: "/venue/weddings", label: "Weddings" },
+  { href: "/venue/calendar", label: "Calendar" },
   { href: "/venue/uploads", label: "Smart Import" },
 ];
 
@@ -45,7 +46,7 @@ const GROUPS: Group[] = [
     ],
   },
   { label: "Money", items: [{ href: "/venue/payments", label: "Payments" }, { href: "/venue/billing", label: "Payouts & fees" }] },
-  { label: "Setup", items: [{ href: "/venue/setup", label: "Checklist" }, { href: "/venue/settings", label: "Settings" }] },
+  { label: "Setup", items: [{ href: "/venue/setup", label: "Checklist" }, { href: "/venue/settings", label: "Settings" }, { href: "/venue/team", label: "Team" }] },
 ];
 
 export function VenueSidebarNav() {

@@ -4,6 +4,10 @@ import { createClient as createAdmin } from "@supabase/supabase-js";
 import { portalAccess } from "@/lib/portal/access";
 import { AccommodationGrid } from "@/components/AccommodationGrid";
 import { applyMarkup } from "@/lib/billing/compute";
+import { ConfirmBookings } from "./ConfirmBookings";
+
+// Each physical room is one bookable unit per night.
+const ROOM_CAPACITY = 1;
 
 export default async function CoupleAccommodation({ params }: { params: Promise<{ wedding: string }> }) {
   const { wedding: slug } = await params;
@@ -46,6 +50,39 @@ export default async function CoupleAccommodation({ params }: { params: Promise<
   const state = (wedding.wedding_state ?? {}) as { roomAssignments?: Record<string, string[]>; guests?: string[] };
   const venue = (wedding as unknown as { venue: { name: string } | null }).venue;
 
+  // --- Remaining-capacity model for the wedding date -----------------------
+  // A booking covers the wedding date when check_in <= date < check_out.
+  // Count OTHER weddings' bookings per room to compute what's still free.
+  const weddingDate = String(wedding.wedding_date ?? "").slice(0, 10) || null;
+  const roomIds = (rooms ?? []).map((r) => r.id);
+  const remainingByRoom: Record<string, number> = {};
+  roomIds.forEach((id) => (remainingByRoom[id] = ROOM_CAPACITY));
+  if (weddingDate && roomIds.length > 0) {
+    const { data: clashRows } = await ad
+      .from("accommodation_bookings")
+      .select("room_id, wedding_id")
+      .in("room_id", roomIds)
+      .lte("check_in", weddingDate)
+      .gt("check_out", weddingDate);
+    const used: Record<string, number> = {};
+    (clashRows ?? []).forEach((r) => {
+      if (r.wedding_id === wedding.id) return; // our own holds don't count against us
+      used[r.room_id] = (used[r.room_id] ?? 0) + 1;
+    });
+    roomIds.forEach((id) => {
+      remainingByRoom[id] = Math.max(0, ROOM_CAPACITY - (used[id] ?? 0));
+    });
+  }
+
+  const assignments = state.roomAssignments ?? {};
+  const roomCaps = (rooms ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    remaining: remainingByRoom[r.id] ?? ROOM_CAPACITY,
+    capacity: ROOM_CAPACITY,
+    assigned: (assignments[r.id] ?? []).length,
+  }));
+
   return (
     <main className="min-h-screen bg-stone-50">
       <header className="border-b border-stone-200 bg-white px-6 py-4">
@@ -64,6 +101,12 @@ export default async function CoupleAccommodation({ params }: { params: Promise<
           guests={state.guests ?? []}
           initialAssignments={state.roomAssignments ?? {}}
           weddingSlug={wedding.slug}
+        />
+
+        <ConfirmBookings
+          weddingSlug={wedding.slug}
+          weddingDate={weddingDate}
+          initialRooms={roomCaps}
         />
       </div>
     </main>

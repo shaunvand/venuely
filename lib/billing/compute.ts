@@ -21,6 +21,12 @@ export type Charge = {
   amount: number;
   is_refundable: boolean;
   day_type?: string | null;
+  // Pre-markup amount for this line (the supplier/base cost before the venue's
+  // commission/markup). Optional: when set, computeTotals uses (amount - base_amount)
+  // as this line's commission contribution. When absent, the line is treated as
+  // pure pass-through (no venue commission), e.g. area hire, breakage deposit,
+  // and manual charges that carry no commission inputs.
+  base_amount?: number;
 };
 
 export type Payment = { id: string; amount: number; direction: "in" | "out"; kind: string; paid_at: string };
@@ -37,6 +43,12 @@ export type Computed = {
   refundable_held: number;
   balance_due: number;
   deposit_amount: number;
+  // Sum across all charged lines of (marked-up amount − base amount): the venue's
+  // own commission/markup. The venue keeps 100% of this — Venuely never taxes it.
+  commission_total: number;
+  // The slice of grand_total that Venuely's platform fee is charged on:
+  // grand_total − commission_total. (The couple's BASE payment to the venue.)
+  platform_fee_base: number;
 };
 
 export function applyMarkup(price: number, value: number | null | undefined, type: string | null | undefined): number {
@@ -44,6 +56,17 @@ export function applyMarkup(price: number, value: number | null | undefined, typ
   if (!v) return price;
   if (type === "percent") return Math.round((price * (1 + v / 100)) * 100) / 100;
   return Math.round((price + v) * 100) / 100;
+}
+
+// Inverse of applyMarkup: given an already-marked-up unit price and the same
+// commission inputs, recover the pre-markup base unit price. Used by callers
+// that only retained the final (marked-up) unit_price on a Charge but still know
+// the commission_value/commission_type, so commission_total can be derived.
+export function deriveBase(marked: number, value: number | null | undefined, type: string | null | undefined): number {
+  const v = Number(value ?? 0);
+  if (!v) return marked;
+  if (type === "percent") return Math.round((marked / (1 + v / 100)) * 100) / 100;
+  return Math.round((marked - v) * 100) / 100;
 }
 
 export async function loadRules(supabase: SupabaseClient, venueId: string): Promise<PaymentRules> {
@@ -82,9 +105,32 @@ export function computeTotals(rules: PaymentRules, charges: Charge[], payments: 
   const deposit_amount = Math.round(grand_total * rules.deposit_pct * 100) / 100;
   const refundable_held = Math.max(0, breakage - payments_out);
 
+  // Venue commission/markup: per charged line, (marked-up amount − base_amount).
+  // Lines without a base_amount carry no commission (pure pass-through). We only
+  // count it on charged amounts (included/zero lines contribute nothing).
+  const commission_total = Math.round(
+    charges.reduce((s, c) => {
+      if (c.amount <= 0 || c.base_amount == null) return s;
+      const markup = c.amount - c.base_amount;
+      return markup > 0 ? s + markup : s;
+    }, 0) * 100
+  ) / 100;
+
+  // Venuely fee = rate × (grand_total − venue commission); the venue keeps 100%
+  // of its commission. platform_fee_base is that commission-excluding base.
+  const platform_fee_base = Math.round(Math.max(0, grand_total - commission_total) * 100) / 100;
+
   return {
     rules, charges,
     subtotal, vat_amount, breakage, grand_total,
     payments_in, payments_out, refundable_held, balance_due, deposit_amount,
+    commission_total, platform_fee_base,
   };
+}
+
+// Venuely's platform fee for a computed proforma: rate × platform_fee_base,
+// i.e. rate × (grand_total − venue commission). The venue keeps 100% of its
+// commission/markup — Venuely NEVER taxes the commission.
+export function platformFee(totals: Computed, rate: number): number {
+  return Math.round(totals.platform_fee_base * rate * 100) / 100;
 }

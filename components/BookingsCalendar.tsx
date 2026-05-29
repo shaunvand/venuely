@@ -2,9 +2,27 @@ import Link from "next/link";
 
 type Booking = { slug: string; couple_names: string; wedding_date: string };
 
+// Optional overlays for the dedicated availability calendar. The venue
+// dashboard renders BookingsCalendar with just `bookings`, so every new prop
+// is optional and the widget degrades to its original behaviour.
+type RoomNight = { date: string; room_name: string | null; couple_names: string | null; guest_name: string | null };
+type RentalHold = { weekend_of: string; rental_name: string | null; quantity: number; couple_names: string | null };
+
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
-export function BookingsCalendar({ bookings, months: monthsToShow = 6 }: { bookings: Booking[]; months?: number }) {
+export function BookingsCalendar({
+  bookings,
+  months: monthsToShow = 6,
+  roomNights,
+  rentalHolds,
+  weddingHref = "/venue/weddings",
+}: {
+  bookings: Booking[];
+  months?: number;
+  roomNights?: RoomNight[];
+  rentalHolds?: RentalHold[];
+  weddingHref?: string;
+}) {
   // Group bookings by ISO date (yyyy-mm-dd).
   const byDate = new Map<string, Booking[]>();
   for (const b of bookings) {
@@ -13,6 +31,26 @@ export function BookingsCalendar({ bookings, months: monthsToShow = 6 }: { booki
     list.push(b);
     byDate.set(k, list);
   }
+
+  // Group accommodation room-nights by ISO date.
+  const roomByDate = new Map<string, RoomNight[]>();
+  for (const r of roomNights ?? []) {
+    const k = String(r.date).slice(0, 10);
+    const list = roomByDate.get(k) ?? [];
+    list.push(r);
+    roomByDate.set(k, list);
+  }
+
+  // Group rental holds by the Saturday they cover.
+  const holdByDate = new Map<string, RentalHold[]>();
+  for (const h of rentalHolds ?? []) {
+    const k = String(h.weekend_of).slice(0, 10);
+    const list = holdByDate.get(k) ?? [];
+    list.push(h);
+    holdByDate.set(k, list);
+  }
+
+  const hasOverlays = (roomNights?.length ?? 0) > 0 || (rentalHolds?.length ?? 0) > 0;
 
   const today = new Date();
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -27,19 +65,42 @@ export function BookingsCalendar({ bookings, months: monthsToShow = 6 }: { booki
     });
   }
 
+  type Cell = {
+    day: number;
+    key: string;
+    bookings: Booking[];
+    rooms: RoomNight[];
+    holds: RentalHold[];
+    isToday: boolean;
+  };
+
   function buildGrid(year: number, month: number) {
     const firstDay = new Date(year, month, 1);
     // Mon=0 ... Sun=6
     const offset = (firstDay.getDay() + 6) % 7;
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const cells: ({ day: number; key: string; bookings: Booking[]; isToday: boolean } | null)[] = [];
+    const cells: (Cell | null)[] = [];
     for (let i = 0; i < offset; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) {
       const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      cells.push({ day: d, key, bookings: byDate.get(key) ?? [], isToday: key === todayKey });
+      cells.push({
+        day: d,
+        key,
+        bookings: byDate.get(key) ?? [],
+        rooms: roomByDate.get(key) ?? [],
+        holds: holdByDate.get(key) ?? [],
+        isToday: key === todayKey,
+      });
     }
     while (cells.length % 7 !== 0) cells.push(null);
     return cells;
+  }
+
+  // A clash = more than one DISTINCT wedding on the same date.
+  function distinctCouples(c: Cell): number {
+    const set = new Set<string>();
+    c.bookings.forEach((b) => set.add(b.couple_names));
+    return set.size;
   }
 
   return (
@@ -53,20 +114,30 @@ export function BookingsCalendar({ bookings, months: monthsToShow = 6 }: { booki
               : `Next ${monthsToShow} months`}
           </h2>
         </div>
-        <div className="flex items-center gap-4 text-xs" style={{ color: "var(--ink-2)" }}>
+        <div className="flex flex-wrap items-center gap-4 text-xs" style={{ color: "var(--ink-2)" }}>
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full" style={{ background: "var(--poppy)" }} /> Single booking
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full" style={{ background: "var(--peach)" }} /> Multiple
           </span>
+          {hasOverlays && (
+            <>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-sm" style={{ background: "var(--sage)" }} /> Room night
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5" style={{ background: "var(--ink-2)" }} /> Rental hold
+              </span>
+            </>
+          )}
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full" style={{ outline: "2px solid var(--sage)", background: "transparent" }} /> Today
           </span>
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className={hasOverlays ? "grid sm:grid-cols-2 gap-6" : "grid sm:grid-cols-2 lg:grid-cols-3 gap-6"}>
         {months.map((m) => {
           const cells = buildGrid(m.year, m.month);
           return (
@@ -81,11 +152,33 @@ export function BookingsCalendar({ bookings, months: monthsToShow = 6 }: { booki
                 {cells.map((c, i) => {
                   if (!c) return <div key={`${m.label}-e-${i}`} />;
                   const count = c.bookings.length;
-                  const tooltip = count > 0 ? c.bookings.map((b) => `${b.couple_names}`).join(", ") : "";
-                  const colour =
-                    count === 0 ? "transparent" : count === 1 ? "var(--poppy)" : "var(--peach)";
-                  const txtColour = count === 0 ? "var(--ink)" : count === 1 ? "#fff" : "var(--ink)";
-                  const link = count === 1 ? `/venue/weddings/${c.bookings[0].slug}` : count > 1 ? "/venue/weddings" : null;
+                  const couples = distinctCouples(c);
+                  const clash = couples > 1;
+                  const roomCount = c.rooms.length;
+                  const holdQty = c.holds.reduce((s, h) => s + (Number(h.quantity) || 0), 0);
+
+                  // Build a rich tooltip describing everything happening that day.
+                  const tipLines: string[] = [];
+                  if (count > 0) tipLines.push(...c.bookings.map((b) => `Wedding: ${b.couple_names}`));
+                  if (clash) tipLines.push("⚠ Double-booking — more than one wedding this date");
+                  if (roomCount > 0) {
+                    tipLines.push(
+                      `${roomCount} room night${roomCount === 1 ? "" : "s"} booked`,
+                      ...c.rooms.slice(0, 6).map((r) => `· ${r.room_name ?? "Room"}${r.couple_names ? ` (${r.couple_names})` : ""}`)
+                    );
+                  }
+                  if (holdQty > 0) {
+                    tipLines.push(
+                      `${holdQty} rental item${holdQty === 1 ? "" : "s"} held`,
+                      ...c.holds.slice(0, 6).map((h) => `· ${h.rental_name ?? "Rental"} ×${h.quantity}${h.couple_names ? ` (${h.couple_names})` : ""}`)
+                    );
+                  }
+                  const tooltip = tipLines.join("\n");
+
+                  const colour = count === 0 ? "transparent" : couples === 1 ? "var(--poppy)" : "var(--peach)";
+                  const txtColour = count === 0 ? "var(--ink)" : couples === 1 ? "#fff" : "var(--ink)";
+                  const link = count === 1 ? `/venue/weddings/${c.bookings[0].slug}` : count > 1 ? weddingHref : null;
+
                   const cell = (
                     <div
                       className="relative w-9 h-9 mx-auto flex items-center justify-center text-xs rounded-full transition-transform hover:scale-110"
@@ -93,24 +186,47 @@ export function BookingsCalendar({ bookings, months: monthsToShow = 6 }: { booki
                         background: colour,
                         color: txtColour,
                         fontWeight: count ? 600 : 400,
-                        outline: c.isToday ? "2px solid var(--sage)" : undefined,
-                        outlineOffset: c.isToday ? "1px" : undefined,
+                        outline: clash
+                          ? "2px solid #b91c1c"
+                          : c.isToday
+                          ? "2px solid var(--sage)"
+                          : undefined,
+                        outlineOffset: clash || c.isToday ? "1px" : undefined,
                       }}
                       title={tooltip || undefined}
                     >
                       {c.day}
-                      {count > 1 && (
+                      {couples > 1 && (
                         <span
                           className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center"
-                          style={{ background: "var(--poppy)", color: "#fff" }}
+                          style={{ background: "#b91c1c", color: "#fff" }}
                         >
-                          {count}
+                          {couples}
+                        </span>
+                      )}
+                      {/* Overlay markers along the bottom of the day cell. */}
+                      {(roomCount > 0 || holdQty > 0) && (
+                        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5">
+                          {roomCount > 0 && (
+                            <span
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ background: "var(--sage)" }}
+                              aria-hidden
+                            />
+                          )}
+                          {holdQty > 0 && (
+                            <span
+                              className="w-1.5 h-1.5"
+                              style={{ background: "var(--ink-2)" }}
+                              aria-hidden
+                            />
+                          )}
                         </span>
                       )}
                     </div>
                   );
                   return (
-                    <div key={c.key}>
+                    <div key={c.key} className="py-0.5">
                       {link ? (
                         <Link href={link} aria-label={tooltip || `${c.day} ${m.label}`}>
                           {cell}
@@ -127,7 +243,7 @@ export function BookingsCalendar({ bookings, months: monthsToShow = 6 }: { booki
         })}
       </div>
 
-      {bookings.length === 0 && (
+      {bookings.length === 0 && !hasOverlays && (
         <div className="vy-empty mt-5 text-xs">
           No bookings yet. Add a wedding from{" "}
           <Link href="/venue/weddings" className="underline" style={{ color: "var(--poppy)" }}>

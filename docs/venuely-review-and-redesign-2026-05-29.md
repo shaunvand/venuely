@@ -173,3 +173,34 @@ Each is a small, contained change:
 6. **Couple access default** — shared password (zero friction) vs magic-link (per-person revocation)? (Recommend password-default, magic-link opt-in.)
 7. **Retire the relational `/portal` tree** in favour of `wedding_state`? (Recommended — couples already edit the blob.) Note this conflicts with the old roadmap's "stop stuffing `wedding_state`" mandate, so it needs an explicit call.
 8. **Pat Busch pilot rate** — waive the fee (`platform_fee_active=false`) during the pilot? The per-venue columns already support it.
+
+---
+
+## 10. Implementation status (2026-05-29)
+
+Built on branch **`venuely-redesign-2026-05-29`** (NOT merged, NOT deployed — master still auto-deploys the live site). Every wave builds green (`npm run build`, exit 0). Decision taken: **1% of platform-transacted spend, no monthly fee, Paystack rail.**
+
+Commits: `d46feb1` (Wave 1) · `1b5dd13` (Wave 2) · `8ec222f` (Wave 3) · `5b8d6e9` (nav).
+
+**Done — Wave 1 (multi-tenant + pricing + security + quick wins):** portal reads injected globals (real couple/date/venue + data-driven Our-Venue); R1499 path deleted, copy reconciled, real "Fees collected (MTD)", `markInvoiced` recomputes server-side, webhook idempotency; storage-RLS scoped to venue, seed precedence fix; rich accommodation fields editable, silent edit-save bug fixed, Select-all scoped, venue description/directions/website + logo upload, live resend/auto-advance check-email, no re-nag modal, couple rentals honour markup.
+
+**Done — Wave 2 (import + onboarding):** DOCX + image-only-PDF vision + website crawl + truncation surfacing + anchor image-matching; full-fidelity review cards; deduped/transactional commit with "what saved" report + 10-min Undo; 4-step `/onboarding/wizard`; editable areas; couple catalogue/accommodation honour markup.
+
+**Done — Wave 3 (funnel + money):** public `/venues` + `/v/[slug]` SEO listing (opt-in via `listed`); `EnquiryForm` + `/api/enquiry` + `/venue/enquiries` CRM with convert-to-portal; `sendPortalInvite` (email/WhatsApp/QR) + `wedding_invites` + `wedding_members` on auth callback + rotate/revoke + `portal_access_log`; password gate hardened (POST + per-wedding salt + throttle); per-guest RSVP sub-link `/[wedding]/rsvp`; Paystack scaffold (env-gated): `paystack.ts`, `/venue/billing` connect-payouts, checkout + webhook, `platform_payments`, non-blocking readiness helper. Sidebar links wired.
+
+**6 new migrations written, NONE applied:** `20260529100000_venue_profile_fields`, `100100_storage_security`, `100200_fix_patbusch_seed_precedence`, `110000_import_dedupe`, `120000_enquiries`, `120100_paystack_platform_payments`, `120200_couple_invites`.
+
+### Go-live checklist (in order)
+1. **Resolve any duplicate `item_code`s** per venue in `catalogue_items`/`rental_items` (the dedupe unique index will fail to create otherwise).
+2. **Apply the 6 migrations in timestamp order** via Supabase. Until applied, the branch must NOT be merged/deployed — code references new columns/tables and would error at runtime.
+3. **Env vars** on Render: confirm `RESEND_API_KEY` (enquiry/invite emails) and add `PAYSTACK_SECRET_KEY` + `PAYSTACK_PUBLIC_KEY` when ready to collect (until then, billing shows "setup coming", build/runtime fine).
+4. **Set `listed=true`** on venues that should appear in the public directory (default false → directory empty until then).
+5. **Review + merge** the branch to master (triggers Render deploy). Smoke-test the couple portal for a non-Pat-Busch venue, the wizard, an enquiry, and an invite.
+
+### Still open (not built this session)
+- **Availability calendar** — activate `rental_holds`/`accommodation_bookings` (double-booking still possible). *(P1)*
+- **Single-source-of-truth reconciliation** — retire the relational `/portal/[venue]/[wedding]` tree and repoint owner-dashboard counts to `wedding_state`. *(P1)*
+- **Wire "Pay deposit" into the couple portal** (Paystack rail is built server-side; the in-portal button + the readiness gate on a live send-payment action remain).
+- **"Get RSVP link" button** in the portal Guest List tab (public RSVP route exists; the in-portal share button lives in `app.js`).
+- **Phase 5 table-stakes** — reviews/testimonials, team seats (multi-manager invite), automated notification lifecycle (deposit/balance reminders), richer analytics, the 3 missing couple tabs (Floor Plans / Rooming List / Layout Planner), POPIA retention. *(P2)*
+- **Import** — ZIP/loose-photo fan-out (skipped to protect the build).

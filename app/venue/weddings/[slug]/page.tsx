@@ -12,7 +12,7 @@ import { addPayment, deletePayment, addCharge, deleteCharge } from "./ledger-act
 import { PortalLinkCard } from "@/components/PortalLinkCard";
 import { SendPortalInvite } from "@/components/SendPortalInvite";
 import { WeddingDocuments } from "@/components/WeddingDocuments";
-import { loadRules, computeTotals, applyMarkup, type Charge, type Payment } from "@/lib/billing/compute";
+import { loadRules, computeTotals, applyMarkup, platformFee, type Charge, type Payment } from "@/lib/billing/compute";
 import { whatsappUrl, bookingNotificationMessage } from "@/lib/whatsapp";
 
 type WeddingState = {
@@ -94,15 +94,18 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     const days = [v.mg ? "M&G" : null, v.wed ? "Wed" : null, v.fb ? "FB" : null].filter(Boolean);
     const dayCount = days.length || 1;
     const qty = v.qty ?? 1;
-    const unit = applyMarkup(Number(item.price), item.commission_value, item.commission_type);
+    const baseUnit = Number(item.price);
+    const unit = applyMarkup(baseUnit, item.commission_value, item.commission_type);
     const included = (item as { cost_treatment?: string }).cost_treatment === "included";
-    const fullAmount = unit * qty * dayCount;
+    const units = qty * dayCount;
+    const fullAmount = unit * units;
     charges.push({
       kind: "rental",
       label: `${item.name}${dayCount > 1 ? ` × ${dayCount} days` : ""}${included ? " (included)" : ""}`,
-      qty: qty * dayCount,
+      qty: units,
       unit_price: unit,
       amount: included ? 0 : fullAmount,
+      base_amount: included ? 0 : baseUnit * units,
       is_refundable: false,
     });
   }
@@ -114,15 +117,18 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     const item = cataMap.get(code); if (!item) continue;
     const days = [v.mg ? "M&G" : null, v.wed ? "Wed" : null, v.fb ? "FB" : null].filter(Boolean);
     const dayCount = days.length || 1;
-    const unit = applyMarkup(Number(item.price), item.commission_value, item.commission_type);
-    const total = unit * dayCount * guestCount;
+    const baseUnit = Number(item.price);
+    const unit = applyMarkup(baseUnit, item.commission_value, item.commission_type);
+    const units = dayCount * guestCount;
+    const total = unit * units;
     const included = (item as { cost_treatment?: string }).cost_treatment === "included";
     charges.push({
       kind: "catalogue",
       label: `${item.name} (${dayCount} day${dayCount>1?"s":""} × ${guestCount} guests)${included ? " (included)" : ""}`,
-      qty: dayCount * guestCount,
+      qty: units,
       unit_price: unit,
       amount: included ? 0 : total,
+      base_amount: included ? 0 : baseUnit * units,
       is_refundable: false,
     });
   }
@@ -130,7 +136,8 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
   // Accommodation
   for (const [roomId, names] of Object.entries(state.roomAssignments ?? {})) {
     const room = accomMap.get(roomId); if (!room || !names.length) continue;
-    const unit = applyMarkup(Number(room.price_per_night), room.commission_value, room.commission_type);
+    const baseUnit = Number(room.price_per_night);
+    const unit = applyMarkup(baseUnit, room.commission_value, room.commission_type);
     const included = (room as { cost_treatment?: string }).cost_treatment === "included";
     charges.push({
       kind: "accommodation",
@@ -138,6 +145,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
       qty: 1,
       unit_price: unit,
       amount: included ? 0 : unit,
+      base_amount: included ? 0 : baseUnit,
       is_refundable: false,
     });
   }
@@ -149,6 +157,9 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     const fallback = v ? applyMarkup(Number(v.price_from ?? 0), v.commission_value, v.commission_type) : 0;
     const cost = parseMoney(s.price) || fallback;
     const included = v && (v as { cost_treatment?: string }).cost_treatment === "included";
+    // Base = the partner's price_from before markup when priced off its catalogue
+    // entry; a manually keyed price carries no separable commission (base = cost).
+    const baseCost = v && !parseMoney(s.price) ? Number(v.price_from ?? 0) : cost;
     if (cost > 0) {
       charges.push({
         kind: "vendor",
@@ -156,6 +167,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
         qty: 1,
         unit_price: cost,
         amount: included ? 0 : cost,
+        base_amount: included ? 0 : baseCost,
         is_refundable: false,
       });
     }
@@ -195,7 +207,9 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
   const totals = computeTotals(rules, charges, payments);
 
   const platformFeeRate = Number((venue as { platform_fee_rate?: number }).platform_fee_rate ?? 0.01);
-  const projectedFee = Math.round(totals.grand_total * platformFeeRate * 100) / 100;
+  // Venuely fee = rate × (grand_total − venue commission); the venue keeps 100%
+  // of its commission. projectedFee is therefore charged on platform_fee_base.
+  const projectedFee = platformFee(totals, platformFeeRate);
 
   return (
     <div className="space-y-8">
@@ -282,7 +296,11 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
               VAT {rules.vat_inclusive ? "inclusive" : "exclusive"} ({(rules.vat_rate * 100).toFixed(0)}%): R{totals.vat_amount.toLocaleString()}
               {totals.breakage > 0 && <> · refundable deposit R{totals.breakage.toLocaleString()}</>}
             </div>
-            <div className="text-xs text-stone-500">Platform fee at {(platformFeeRate * 100).toFixed(2)}%: R{projectedFee.toLocaleString()}</div>
+            <div className="text-xs text-stone-500">
+              Couple pays R{totals.grand_total.toLocaleString()}
+              {totals.commission_total > 0 && <> · Your commission R{totals.commission_total.toLocaleString()} (you keep this)</>}
+              {" · "}Venuely fee {(platformFeeRate * 100).toFixed(2)}% of R{totals.platform_fee_base.toLocaleString()} = R{projectedFee.toLocaleString()}
+            </div>
           </div>
           <div className="flex gap-2 flex-wrap items-center">
             {!wedding.invoiced_at ? (

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createHash, randomBytes } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
-import { loadRules, computeTotals, applyMarkup, type Charge, type Payment } from "@/lib/billing/compute";
+import { loadRules, computeTotals, applyMarkup, platformFee, type Charge, type Payment, type Computed } from "@/lib/billing/compute";
 import { whatsappUrl } from "@/lib/whatsapp";
 
 type WeddingState = {
@@ -28,7 +28,7 @@ async function buildWeddingCharges(
   supabase: Awaited<ReturnType<typeof createClient>>,
   venueId: string,
   weddingId: string,
-): Promise<{ grandTotal: number; feeRate: number }> {
+): Promise<{ grandTotal: number; feeRate: number; totals: Computed }> {
   const { data: wedding } = await supabase
     .from("weddings")
     .select("id, guest_count, wedding_state, area_selections")
@@ -76,9 +76,11 @@ async function buildWeddingCharges(
     const item = rentalMap.get(code); if (!item) continue;
     const dayCount = [v.mg, v.wed, v.fb].filter(Boolean).length || 1;
     const qty = v.qty ?? 1;
-    const unit = applyMarkup(Number(item.price), item.commission_value, item.commission_type);
+    const baseUnit = Number(item.price);
+    const unit = applyMarkup(baseUnit, item.commission_value, item.commission_type);
     const included = (item as { cost_treatment?: string }).cost_treatment === "included";
-    charges.push({ kind: "rental", label: item.name, qty: qty * dayCount, unit_price: unit, amount: included ? 0 : unit * qty * dayCount, is_refundable: false });
+    const units = qty * dayCount;
+    charges.push({ kind: "rental", label: item.name, qty: units, unit_price: unit, amount: included ? 0 : unit * units, base_amount: included ? 0 : baseUnit * units, is_refundable: false });
   }
 
   // Catalogue (per-head)
@@ -87,17 +89,20 @@ async function buildWeddingCharges(
     if (!v.sel && !v.mg && !v.wed && !v.fb) continue;
     const item = cataMap.get(code); if (!item) continue;
     const dayCount = [v.mg, v.wed, v.fb].filter(Boolean).length || 1;
-    const unit = applyMarkup(Number(item.price), item.commission_value, item.commission_type);
+    const baseUnit = Number(item.price);
+    const unit = applyMarkup(baseUnit, item.commission_value, item.commission_type);
     const included = (item as { cost_treatment?: string }).cost_treatment === "included";
-    charges.push({ kind: "catalogue", label: item.name, qty: dayCount * guestCount, unit_price: unit, amount: included ? 0 : unit * dayCount * guestCount, is_refundable: false });
+    const units = dayCount * guestCount;
+    charges.push({ kind: "catalogue", label: item.name, qty: units, unit_price: unit, amount: included ? 0 : unit * units, base_amount: included ? 0 : baseUnit * units, is_refundable: false });
   }
 
   // Accommodation
   for (const [roomId, names] of Object.entries(state.roomAssignments ?? {})) {
     const room = accomMap.get(roomId); if (!room || !names.length) continue;
-    const unit = applyMarkup(Number(room.price_per_night), room.commission_value, room.commission_type);
+    const baseUnit = Number(room.price_per_night);
+    const unit = applyMarkup(baseUnit, room.commission_value, room.commission_type);
     const included = (room as { cost_treatment?: string }).cost_treatment === "included";
-    charges.push({ kind: "accommodation", label: room.name, qty: 1, unit_price: unit, amount: included ? 0 : unit, is_refundable: false });
+    charges.push({ kind: "accommodation", label: room.name, qty: 1, unit_price: unit, amount: included ? 0 : unit, base_amount: included ? 0 : baseUnit, is_refundable: false });
   }
 
   // Vendor partners selected
@@ -107,7 +112,11 @@ async function buildWeddingCharges(
     const fallback = v ? applyMarkup(Number(v.price_from ?? 0), v.commission_value, v.commission_type) : 0;
     const cost = parseMoney(s.price) || fallback;
     const included = v && (v as { cost_treatment?: string }).cost_treatment === "included";
-    if (cost > 0) charges.push({ kind: "vendor", label: s.name, qty: 1, unit_price: cost, amount: included ? 0 : cost, is_refundable: false });
+    // Base = the supplier's price_from before markup when this is a known partner
+    // priced off its catalogue entry. A manually keyed price (parseMoney) carries
+    // no separable commission, so its base equals the charged amount.
+    const baseCost = v && !parseMoney(s.price) ? Number(v.price_from ?? 0) : cost;
+    if (cost > 0) charges.push({ kind: "vendor", label: s.name, qty: 1, unit_price: cost, amount: included ? 0 : cost, base_amount: included ? 0 : baseCost, is_refundable: false });
   });
 
   // Areas (paid extras only)
@@ -142,7 +151,7 @@ async function buildWeddingCharges(
   })) as Payment[];
 
   const totals = computeTotals(rules, charges, payments);
-  return { grandTotal: totals.grand_total, feeRate };
+  return { grandTotal: totals.grand_total, feeRate, totals };
 }
 
 // Lightweight salted hash. The base salt comes from a server-only env var
@@ -434,8 +443,11 @@ export async function markInvoiced(weddingId: string, slug: string, _total?: num
   const { data: wed } = await supabase.from("weddings").select("venue_id").eq("id", weddingId).single();
   if (!wed?.venue_id) throw new Error("Wedding not found");
 
-  const { grandTotal, feeRate } = await buildWeddingCharges(supabase, wed.venue_id as string, weddingId);
-  const fee = Math.round(grandTotal * feeRate * 100) / 100;
+  const { grandTotal, feeRate, totals } = await buildWeddingCharges(supabase, wed.venue_id as string, weddingId);
+  // invoice_total snapshots what the couple pays (the gross grand_total), but the
+  // platform fee is rate × platform_fee_base (= grand_total − venue commission).
+  // Venuely never taxes the venue's commission; the venue keeps 100% of it.
+  const fee = platformFee(totals, feeRate);
 
   const { error } = await supabase.from("weddings").update({
     invoiced_at: new Date().toISOString(),
