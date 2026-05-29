@@ -30,7 +30,9 @@ export async function updateSession(request: NextRequest) {
 
   const protectedPrefixes = ["/admin", "/venue", "/portal"];
   // /[wedding] is handled in its own route handler with custom redirect logic.
-  const isProtected = protectedPrefixes.some((p) => path.startsWith(p));
+  // Match the prefix exactly or as a path segment ("/venue" or "/venue/...") so the
+  // PUBLIC directory "/venues" (and "/v/[slug]") are NOT caught by the "/venue" guard.
+  const isProtected = protectedPrefixes.some((p) => path === p || path.startsWith(p + "/"));
 
   if (isProtected && !user) {
     const url = request.nextUrl.clone();
