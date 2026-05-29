@@ -27,6 +27,14 @@ function admin() {
   );
 }
 
+// Build redirects from the PUBLIC host (x-forwarded-*), not request.nextUrl, which
+// on Render is the internal origin (localhost:10000) and would leak into Location.
+function publicOrigin(request: NextRequest): string {
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || request.nextUrl.host;
+  const proto = request.headers.get("x-forwarded-proto") || "https";
+  return `${proto}://${host}`;
+}
+
 async function logAccess(weddingId: string, via: "password" | "member"): Promise<void> {
   const ad = admin();
   if (!ad) return;
@@ -182,9 +190,7 @@ export async function GET(
         if (hashPassword(supplied, portalSalt) === expectedHash) {
           clearAttempts(rawSlug);
           await logAccess(wedding.id, "password");
-          const cleanUrl = request.nextUrl.clone();
-          cleanUrl.searchParams.delete("p");
-          const res = NextResponse.redirect(cleanUrl);
+          const res = NextResponse.redirect(`${publicOrigin(request)}/${rawSlug}`);
           res.cookies.set(cookieName, expectedHash, {
             httpOnly: true, sameSite: "lax", secure: true,
             maxAge: 60 * 60 * 24 * 30, path: "/", // site-wide so it reaches /api/paystack/checkout; cookie name is wedding-scoped (vy_portal_<id>)
@@ -204,10 +210,7 @@ export async function GET(
     const ssr = await createClient();
     const { data: { user } } = await ssr.auth.getUser();
     if (!user) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.searchParams.set("redirect", `/${rawSlug}`);
-      return NextResponse.redirect(url);
+      return NextResponse.redirect(`${publicOrigin(request)}/login?redirect=${encodeURIComponent(`/${rawSlug}`)}`);
     }
     // Authenticated member/owner/venue-staff grant.
     await logAccess(wedding.id, "member");
@@ -329,9 +332,7 @@ export async function POST(
 
   // No password set → there's nothing to POST; bounce to the GET (auth) flow.
   if (!expectedHash) {
-    const url = request.nextUrl.clone();
-    url.pathname = `/${rawSlug}`;
-    return NextResponse.redirect(url, { status: 303 });
+    return NextResponse.redirect(`${publicOrigin(request)}/${rawSlug}`, { status: 303 });
   }
 
   if (tooManyAttempts(rawSlug)) {
@@ -351,10 +352,7 @@ export async function POST(
   if (supplied && hashPassword(supplied, portalSalt) === expectedHash) {
     clearAttempts(rawSlug);
     await logAccess(wedding.id, "password");
-    const url = request.nextUrl.clone();
-    url.pathname = `/${rawSlug}`;
-    url.search = "";
-    const res = NextResponse.redirect(url, { status: 303 });
+    const res = NextResponse.redirect(`${publicOrigin(request)}/${rawSlug}`, { status: 303 });
     res.cookies.set(`vy_portal_${wedding.id}`, expectedHash, {
       httpOnly: true, sameSite: "lax", secure: true,
       maxAge: 60 * 60 * 24 * 30, path: "/", // site-wide so it reaches /api/paystack/checkout; cookie name is wedding-scoped (vy_portal_<id>)
