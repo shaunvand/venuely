@@ -28,7 +28,7 @@ export default async function DashboardRouter() {
       .select("*", { count: "exact", head: true })
       .eq("user_id", user.id);
     if (count && count > 0) redirect("/venue");
-    redirect("/onboarding/setup-venue");
+    redirect("/onboarding/wizard");
   }
 
   // Couples: look up their first wedding membership.

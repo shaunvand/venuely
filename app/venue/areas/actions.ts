@@ -20,9 +20,11 @@ export async function addArea(venueId: string, formData: FormData) {
     .select("id")
     .single();
   if (error) throw new Error(error.message);
-  const wedding = Number(formData.get("price_wedding") || 0);
-  const mg = Number(formData.get("price_mg") || 0);
-  const farewell = Number(formData.get("price_farewell") || 0);
+  // A single "Hire fee" applies to every day type; otherwise use any per-day-type values given.
+  const hire = Number(formData.get("price_hire") || 0);
+  const wedding = hire || Number(formData.get("price_wedding") || 0);
+  const mg = hire || Number(formData.get("price_mg") || 0);
+  const farewell = hire || Number(formData.get("price_farewell") || 0);
   if (data) {
     await supabase.from("area_pricing").insert([
       { area_id: data.id, day_type: "wedding", price: wedding },
@@ -45,8 +47,27 @@ export async function toggleAreaActive(areaId: string, active: boolean) {
   revalidatePath("/venue/areas");
 }
 
-export async function updateAreaPrice(areaId: string, dayType: string, price: number) {
+export async function updateArea(areaId: string, formData: FormData) {
   const supabase = await createClient();
+  const name = (formData.get("name") as string)?.trim();
+  if (!name) throw new Error("Name required");
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+  const { error } = await supabase
+    .from("venue_areas")
+    .update({
+      name,
+      slug,
+      area_kind: (formData.get("area_kind") as string) || "extra",
+      description: (formData.get("description") as string) || null,
+    })
+    .eq("id", areaId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/venue/areas");
+}
+
+export async function updateAreaPrice(areaId: string, dayType: string, formData: FormData) {
+  const supabase = await createClient();
+  const price = Number(formData.get("price") || 0);
   await supabase.from("area_pricing").upsert({ area_id: areaId, day_type: dayType, price }, { onConflict: "area_id,day_type" });
   revalidatePath("/venue/areas");
 }

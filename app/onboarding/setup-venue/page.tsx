@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { setupVenue } from "./actions";
-import { SetupVenueForm } from "@/components/SetupVenueForm";
 
+// The guided onboarding wizard at /onboarding/wizard is now the canonical entry point.
+// This route stays as a permanent redirect so any old links / bookmarks still land
+// somewhere sensible: the wizard if they still need to create a venue, or /venue if
+// they already have one. The auth/membership gate mirrors the wizard's own gate.
 export default async function SetupVenue() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -14,11 +16,5 @@ export default async function SetupVenue() {
     .eq("user_id", user.id);
   if (memberCount && memberCount > 0) redirect("/venue");
 
-  const mapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? null;
-
-  return (
-    <main className="min-h-screen flex items-center justify-center p-6 bg-stone-50">
-      <SetupVenueForm action={setupVenue} mapsKey={mapsKey} />
-    </main>
-  );
+  redirect("/onboarding/wizard");
 }

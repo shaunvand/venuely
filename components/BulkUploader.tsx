@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, useTransition } from "react";
+import { undoImport } from "@/app/venue/_inventory/actions";
 
 export type BulkUploaderHandle = {
   commit: () => void;
@@ -33,17 +34,39 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_LIST = Object.keys(CATEGORY_LABELS);
 
+// Commit results are keyed by destination table name (multiple vendor categories
+// collapse into vendor_partners), so we label them separately from the categories.
+const TABLE_LABELS: Record<string, string> = {
+  catalogue_items: "Catalogue",
+  rental_items: "Rentals",
+  accommodation_rooms: "Accommodation",
+  vendor_partners: "Vendors",
+};
+
+// Pricing-critical fields are surfaced on the review card so the owner can fix them
+// BEFORE commit (cost_treatment + commission drive what the couple is charged).
+const VENDOR_REVIEW_FIELDS = [
+  "name", "description", "cost_treatment", "price_from",
+  "commission_type", "commission_value", "contact_email", "contact_phone", "website_url",
+];
 const FIELDS_BY_CATEGORY: Record<string, string[]> = {
-  catalogue: ["category", "name", "description", "price", "price_unit"],
-  rentals: ["category", "name", "description", "price", "stock_total"],
-  accommodation: ["name", "room_type", "sleeps", "price_per_night", "description"],
-  caterers: ["name", "description", "price_from", "contact_email", "contact_phone", "website_url"],
-  planners: ["name", "description", "price_from", "contact_email", "contact_phone", "website_url"],
-  florists: ["name", "description", "price_from", "contact_email", "contact_phone", "website_url"],
-  djs: ["name", "description", "price_from", "contact_email", "contact_phone", "website_url"],
-  photographers: ["name", "description", "price_from", "contact_email", "contact_phone", "website_url"],
-  decor: ["name", "description", "price_from", "contact_email", "contact_phone", "website_url"],
-  bar: ["name", "description", "price_from", "contact_email", "contact_phone", "website_url"],
+  catalogue: ["category", "name", "description", "cost_treatment", "price", "price_unit", "commission_type", "commission_value"],
+  rentals: ["category", "name", "description", "cost_treatment", "price", "stock_total", "commission_type", "commission_value"],
+  accommodation: ["name", "room_type", "sleeps", "cost_treatment", "price_per_night", "commission_type", "commission_value", "description"],
+  caterers: VENDOR_REVIEW_FIELDS,
+  planners: VENDOR_REVIEW_FIELDS,
+  florists: VENDOR_REVIEW_FIELDS,
+  djs: VENDOR_REVIEW_FIELDS,
+  photographers: VENDOR_REVIEW_FIELDS,
+  decor: VENDOR_REVIEW_FIELDS,
+  bar: VENDOR_REVIEW_FIELDS,
+};
+
+// Fields that should render as a <select> in the review card, with their options.
+const SELECT_FIELD_OPTIONS: Record<string, string[]> = {
+  cost_treatment: ["included", "extra"],
+  commission_type: ["percent", "fixed"],
+  price_unit: ["fixed", "per_person", "per_hour"],
 };
 
 const BUBBLE = "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition";
@@ -70,9 +93,23 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
   const [items, setItems] = useState<Item[]>([]);
   const [extractedImages, setExtractedImages] = useState<Array<{ url: string; source_file: string; ordinal: number }>>([]);
   const [searchOpen, setSearchOpen] = useState<{ itemId: number; query: string; results: Array<{ url: string; thumb: string; alt: string; photographer_name: string; photographer_profile_url: string; unsplash_url: string; download_location: string }>; busy: boolean; err: string | null } | null>(null);
-  const [fileReports, setFileReports] = useState<Array<{ filename: string; chars: number; items: number; status: string; error?: string }>>([]);
+  const [fileReports, setFileReports] = useState<Array<{ filename: string; chars: number; items: number; status: string; error?: string; stop_reason?: string | null; truncated?: boolean; unsupported?: string }>>([]);
   const [filter, setFilter] = useState<string>("all");
+  const [commitResults, setCommitResults] = useState<Record<string, { added: number; updated: number; failed: number; error?: string }> | null>(null);
+  const [undo, setUndo] = useState<{ batchId: string; expiresAt: number } | null>(null);
+  const [undoBusy, setUndoBusy] = useState(false);
+  const [nowTick, setNowTick] = useState(Date.now());
   const [isPending, startTransition] = useTransition();
+
+  // Tick once a second while an undo window is open so the countdown updates + auto-hides.
+  useEffect(() => {
+    if (!undo) return;
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [undo]);
+  useEffect(() => {
+    if (undo && nowTick >= undo.expiresAt) setUndo(null);
+  }, [undo, nowTick]);
 
   function pickFiles(list: FileList | null) {
     if (!list) return;
@@ -94,7 +131,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
 
   async function parse() {
     if (!files.length) return;
-    setBusy(true); setStatus({ tone: "info", text: `Reading ${files.length} file${files.length === 1 ? "" : "s"} — this can take 30-60 seconds for large PDFs.` }); setMsg(null); setItems([]); setImported(false);
+    setBusy(true); setStatus({ tone: "info", text: `Reading ${files.length} file${files.length === 1 ? "" : "s"} — this can take 30-60 seconds for large PDFs.` }); setMsg(null); setItems([]); setImported(false); setCommitResults(null); setUndo(null);
     try {
       const fd = new FormData();
       files.forEach((f) => fd.append("files", f));
@@ -192,20 +229,59 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
           body: JSON.stringify({ venue_id: venueId, items: payload }),
         });
         const j = await res.json();
-        if (!res.ok || !j.ok) {
+        const results = (j.results ?? null) as Record<string, { added: number; updated: number; failed: number; error?: string }> | null;
+        // Hard failure: route errored outright, or every destination failed and nothing landed.
+        const nothingSaved = results
+          ? Object.values(results).every((r) => r.added + r.updated === 0)
+          : !j.ok;
+        if (!res.ok || (!j.ok && nothingSaved)) {
           setStatus({ tone: "error", text: `Import failed: ${j.error ?? "unknown error"}. Nothing was saved — please try again or contact support.` });
+          setCommitResults(results);
           return;
         }
-        const lines = Object.entries(j.summary as Record<string, number>).map(([k, v]) => `${v} ${CATEGORY_LABELS[k] ?? k}`);
+        setCommitResults(results);
+        // Build a per-destination sentence: "Catalogue 24 added, Rentals 30 (3 updated), …".
+        const lines = results
+          ? Object.entries(results).map(([table, r]) => {
+              const label = TABLE_LABELS[table] ?? table;
+              if (r.failed && r.added + r.updated === 0) return `${label} failed: ${r.error ?? "error"}`;
+              const parts = [`${r.added + r.updated} ${label.toLowerCase()}`];
+              if (r.updated) parts.push(`${r.updated} updated`);
+              if (r.failed) parts.push(`${r.failed} failed`);
+              return parts.join(" — ");
+            })
+          : Object.entries(j.summary as Record<string, number>).map(([k, v]) => `${v} ${CATEGORY_LABELS[k] ?? k}`);
         const skipped = (j.skipped ?? []).length;
+        const anyFailed = results ? Object.values(results).some((r) => r.failed > 0) : false;
         setStatus({
-          tone: "success",
-          text: `Imported successfully: ${lines.join(", ")}.${skipped ? ` (${skipped} skipped — missing required fields.)` : ""} Your dashboard is ready.`,
+          tone: anyFailed ? "info" : "success",
+          text: `Imported: ${lines.join(", ")}.${skipped ? ` (${skipped} skipped — missing required fields.)` : ""} Your dashboard is ready.`,
         });
         setImported(true);
+        // Open a ~10-minute undo window so a wrong import can be reversed in one click.
+        if (j.import_batch_id) setUndo({ batchId: j.import_batch_id as string, expiresAt: Date.now() + 10 * 60 * 1000 });
         setItems([]); setFiles([]); if (fileRef.current) fileRef.current.value = "";
       } catch (e) {
         setStatus({ tone: "error", text: `Import error: ${e instanceof Error ? e.message : String(e)}. Nothing was saved.` });
+      }
+    });
+  }
+
+  function doUndo() {
+    if (!undo) return;
+    const batchId = undo.batchId;
+    setUndoBusy(true);
+    startTransition(async () => {
+      try {
+        const { deleted } = await undoImport(venueId, batchId);
+        setUndo(null);
+        setCommitResults(null);
+        setImported(false);
+        setStatus({ tone: "info", text: `Import undone — ${deleted} item${deleted === 1 ? "" : "s"} removed from your dashboard.` });
+      } catch (e) {
+        setStatus({ tone: "error", text: `Undo failed: ${e instanceof Error ? e.message : String(e)}` });
+      } finally {
+        setUndoBusy(false);
       }
     });
   }
@@ -265,6 +341,40 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
         </div>
       )}
 
+      {/* Per-destination commit breakdown + undo window (shown ~10 min after a commit) */}
+      {(commitResults || undo) && (
+        <div className="rounded-xl px-4 py-3 text-sm space-y-2" style={{ background: "var(--bone)", border: "1px solid var(--line)" }}>
+          {commitResults && (
+            <ul className="space-y-1">
+              {Object.entries(commitResults).map(([table, r]) => (
+                <li key={table} className="flex items-center gap-2 text-xs" style={{ color: "var(--ink)" }}>
+                  <span className="font-medium">{TABLE_LABELS[table] ?? table}:</span>
+                  {r.added > 0 && <span className="text-emerald-700">{r.added} added</span>}
+                  {r.updated > 0 && <span className="text-sky-700">{r.updated} updated</span>}
+                  {r.failed > 0 && <span className="text-red-700">{r.failed} failed{r.error ? ` (${r.error})` : ""}</span>}
+                  {r.added === 0 && r.updated === 0 && r.failed === 0 && <span className="text-stone-500">no rows</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+          {undo && nowTick < undo.expiresAt && (
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={doUndo}
+                disabled={undoBusy || isPending}
+                className={BUBBLE_SECONDARY + " text-xs"}
+              >
+                {undoBusy ? "Undoing…" : "↩ Undo this import"}
+              </button>
+              <span className="text-[11px]" style={{ color: "var(--ink-2)" }}>
+                You can undo for the next {Math.max(0, Math.ceil((undo.expiresAt - nowTick) / 60000))} min.
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex gap-2 items-center flex-wrap">
         <label className={BUBBLE_SECONDARY + " cursor-pointer"}>
           {files.length ? "Change files" : "Choose files (PDF / Excel / CSV)"}
@@ -305,11 +415,16 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
             </thead>
             <tbody>
               {fileReports.map((r) => (
-                <tr key={r.filename} className="border-t border-stone-200">
+                <tr key={r.filename} className="border-t border-stone-200 align-top">
                   <td className="py-1 pr-2 max-w-[260px] truncate" title={r.filename}>{r.filename}</td>
                   <td className="text-stone-600">{r.chars.toLocaleString()}</td>
                   <td className={r.items > 0 ? "text-emerald-700 font-medium" : "text-stone-500"}>{r.items}</td>
-                  <td className={r.error ? "text-red-700" : "text-stone-600"}>{r.error ? r.error : r.status}</td>
+                  <td className={r.error || r.unsupported ? "text-red-700" : "text-stone-600"}>
+                    {r.error ? r.error : r.status}
+                    {r.truncated && (
+                      <div className="text-amber-700 mt-0.5">⚠ List may be truncated — split this file into smaller parts and re-upload to capture the rest.</div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -505,18 +620,33 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                               {CATEGORY_LIST.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
                             </select>
                           </div>
-                          {fields.map((k) => (
-                            <div key={k}>
-                              <label className="block text-[10px] uppercase tracking-wider mb-0.5" style={{ color: "var(--ink-2)" }}>{k.replace(/_/g, " ")}</label>
-                              <input
-                                value={String(it.data[k] ?? "")}
-                                onChange={(e) => updateField(it._id, k, e.target.value)}
-                                placeholder={k}
-                                className="w-full rounded-md px-2 py-1 text-[11px]"
-                                style={{ border: "1px solid var(--line)" }}
-                              />
-                            </div>
-                          ))}
+                          {fields.map((k) => {
+                            const selectOpts = SELECT_FIELD_OPTIONS[k];
+                            return (
+                              <div key={k}>
+                                <label className="block text-[10px] uppercase tracking-wider mb-0.5" style={{ color: "var(--ink-2)" }}>{k.replace(/_/g, " ")}</label>
+                                {selectOpts ? (
+                                  <select
+                                    value={String(it.data[k] ?? "")}
+                                    onChange={(e) => updateField(it._id, k, e.target.value)}
+                                    className="w-full rounded-md px-2 py-1 text-[11px]"
+                                    style={{ border: "1px solid var(--line)", background: "#fff" }}
+                                  >
+                                    <option value="">—</option>
+                                    {selectOpts.map((o) => <option key={o} value={o}>{o.replace(/_/g, " ")}</option>)}
+                                  </select>
+                                ) : (
+                                  <input
+                                    value={String(it.data[k] ?? "")}
+                                    onChange={(e) => updateField(it._id, k, e.target.value)}
+                                    placeholder={k}
+                                    className="w-full rounded-md px-2 py-1 text-[11px]"
+                                    style={{ border: "1px solid var(--line)" }}
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
                           {it.source_file && (
                             <div className="text-[10px] truncate pt-1" style={{ color: "var(--ink-2)" }} title={it.source_file}>
                               Source: {it.source_file}

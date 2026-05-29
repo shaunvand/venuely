@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+// Homepage fetch (≤15s) + bounded sub-page crawl (≤12s) + Claude extraction needs
+// more than the old 30s ceiling on slow venue sites.
+export const maxDuration = 60;
 
 type Imported = {
   name: string | null;
@@ -52,6 +54,31 @@ function extractMeta(html: string, base: string) {
   };
 }
 
+// Find same-origin links whose URL path or anchor text matches `re`, deduped and
+// absolutised. Self / homepage links are dropped so we only crawl real sub-pages.
+function collectSubLinks(html: string, base: URL, re: RegExp): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const anchorRe = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = anchorRe.exec(html))) {
+    const href = m[1].trim();
+    if (!href || href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("javascript:")) continue;
+    const anchorText = m[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    let abs_: URL;
+    try { abs_ = new URL(href, base); } catch { continue; }
+    if (abs_.origin !== base.origin) continue;            // same-origin only
+    const norm = abs_.origin + abs_.pathname.replace(/\/+$/, "");
+    if (norm === base.origin + base.pathname.replace(/\/+$/, "")) continue; // skip self
+    if (norm === base.origin) continue;                   // skip bare homepage
+    if (!re.test(abs_.pathname) && !re.test(anchorText)) continue;
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    out.push(abs_.toString());
+  }
+  return out;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { url } = await req.json();
@@ -70,7 +97,29 @@ export async function POST(req: NextRequest) {
     const html = await res.text();
 
     const meta = extractMeta(html, parsed.origin);
-    const text = stripHtml(html).slice(0, 18000);
+
+    // Bounded same-origin crawl: pull pricing / rooms / menu sub-pages so we capture
+    // pricing-critical content that rarely lives on the homepage. Up to 4 extra pages,
+    // ~12s total budget, errors skipped. Total stripped text capped at ~40k chars.
+    const PAGE_RE = /(rates?|accommodation|stay|menu|pricing|packages?|venue)/i;
+    const crawlStarted = Date.now();
+    const crawlBudgetMs = 12000;
+    const subLinks = collectSubLinks(html, parsed, PAGE_RE).slice(0, 4);
+    const sections: string[] = [stripHtml(html)];
+    for (const link of subLinks) {
+      if (Date.now() - crawlStarted > crawlBudgetMs) break;
+      const remaining = crawlBudgetMs - (Date.now() - crawlStarted);
+      try {
+        const r = await fetch(link, {
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; VenuelyImportBot/1.0)" },
+          signal: AbortSignal.timeout(Math.max(2000, Math.min(6000, remaining))),
+        });
+        if (!r.ok) continue;
+        const subHtml = await r.text();
+        sections.push(`\n\n=== Page: ${link} ===\n${stripHtml(subHtml)}`);
+      } catch { /* skip slow / failed sub-page */ }
+    }
+    const text = sections.join("\n").slice(0, 40000);
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });

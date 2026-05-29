@@ -23,7 +23,7 @@ function fmtRand(n: number): string {
 export default async function VenueOverview() {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
-  const { doneCount, totalCount, pct, counts } = await computeSetupSteps(supabase, venue);
+  const { doneCount, totalCount, pct, counts, hasImported } = await computeSetupSteps(supabase, venue);
   const todayIso = new Date().toISOString().slice(0, 10);
   const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
 
@@ -150,11 +150,12 @@ export default async function VenueOverview() {
     });
   }
 
-  // Nudge if the setup checklist isn't complete OR they haven't run Smart Import yet
-  // (empty catalogue + rentals + rooms = no import has happened). The modal itself
-  // applies a 24-hour cooldown so it isn't shown on every page view.
-  const venueEmpty = counts.catalogue === 0 && counts.rentals === 0 && counts.rooms === 0;
-  const showWelcome = pct < 100 || venueEmpty;
+  // Now that there's a dedicated onboarding wizard, only auto-open the welcome import
+  // modal when setup is still incomplete AND nothing has been imported yet (hasImported
+  // is the catalogue/rentals/rooms signal from computeSetupSteps). Once any inventory
+  // exists we stop nagging here and let the wizard / setup checklist take over. The modal
+  // itself still applies a 24-hour cooldown so it isn't shown on every page view.
+  const showWelcome = pct < 100 && !hasImported;
 
   const stats = [
     { label: "Upcoming weddings", value: (upcoming?.length ?? 0).toString(), sub: `${counts.weddings} total`, href: "/venue/weddings", accent: "var(--poppy)" },

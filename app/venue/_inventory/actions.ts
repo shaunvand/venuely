@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { INVENTORY_TABLES, INVENTORY_PATHS, defaultsFor, type InventoryType } from "@/lib/inventory/schemas";
 
+// Tables a Smart Import can write into — same set the commit route stamps with import_batch_id.
+const IMPORTABLE_TABLES = ["catalogue_items", "rental_items", "accommodation_rooms", "vendor_partners"] as const;
+
 async function client() {
   return await createClient();
 }
@@ -68,6 +71,26 @@ export async function addItem(type: InventoryType, venueId: string, patch: Recor
   const { error } = await supabase.from(INVENTORY_TABLES[type]).insert(row);
   if (error) throw new Error(error.message);
   revalidatePath(INVENTORY_PATHS[type]);
+}
+
+// Reverse a single Smart Import commit: delete every row that carries this batch id
+// across all importable tables. RLS already confines writes to the caller's venue;
+// the explicit venue_id filter is belt-and-braces. Returns rows removed per table.
+export async function undoImport(venueId: string, batchId: string) {
+  if (!venueId || !batchId) return { deleted: 0 };
+  const supabase = await client();
+  let deleted = 0;
+  for (const table of IMPORTABLE_TABLES) {
+    const { data, error } = await supabase
+      .from(table)
+      .delete()
+      .eq("import_batch_id", batchId)
+      .eq("venue_id", venueId)
+      .select("id");
+    if (!error && data) deleted += data.length;
+  }
+  for (const path of new Set(Object.values(INVENTORY_PATHS))) revalidatePath(path);
+  return { deleted };
 }
 
 export async function bulkInsert(type: InventoryType, venueId: string, rows: Array<Record<string, unknown>>) {

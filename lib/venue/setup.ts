@@ -21,6 +21,7 @@ export async function computeSetupSteps(supabase: SupabaseClient, venue: VenueRo
     { count: paymentsCount },
     { count: suppliersCount },
     { count: photosCount },
+    { count: areasCount },
   ] = await Promise.all([
     supabase.from("weddings").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
     supabase.from("catalogue_items").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
@@ -29,9 +30,14 @@ export async function computeSetupSteps(supabase: SupabaseClient, venue: VenueRo
     supabase.from("payments").select("*, wedding:weddings!inner(venue_id)", { count: "exact", head: true }).eq("wedding.venue_id", venue.id),
     supabase.from("suppliers").select("*, wedding:weddings!inner(venue_id)", { count: "exact", head: true }).eq("wedding.venue_id", venue.id),
     supabase.from("media_assets").select("*", { count: "exact", head: true }).eq("venue_id", venue.id).eq("owner_type", "venue"),
+    supabase.from("venue_areas").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
   ]);
 
   const venueDetailsDone = Boolean(venue.address || venue.region);
+  // "Has the owner imported any inventory yet?" — true if any catalogue / rental /
+  // accommodation row exists. The wizard's review step and the dashboard welcome modal
+  // use this to decide whether to keep nudging Smart Import.
+  const hasImported = (catalogueCount ?? 0) > 0 || (rentalsCount ?? 0) > 0 || (roomsCount ?? 0) > 0;
 
   const steps: SetupStep[] = [
     {
@@ -42,6 +48,15 @@ export async function computeSetupSteps(supabase: SupabaseClient, venue: VenueRo
       cta: venueDetailsDone ? "Edit details" : "Add details",
       done: venueDetailsDone,
       hint: venue.address ?? venue.region ?? undefined,
+    },
+    {
+      key: "areas",
+      title: "Add your spaces (areas)",
+      description: "The main areas couples can use across their day — ceremony lawn, reception hall, gardens. Price each per day type (M&G / Wedding / Farewell).",
+      href: "/venue/areas",
+      cta: (areasCount ?? 0) > 0 ? "Manage spaces" : "Add spaces",
+      done: (areasCount ?? 0) > 0,
+      count: areasCount,
     },
     {
       key: "catalogue",
@@ -118,6 +133,7 @@ export async function computeSetupSteps(supabase: SupabaseClient, venue: VenueRo
     doneCount,
     totalCount,
     pct,
+    hasImported,
     counts: {
       weddings: weddingsCount ?? 0,
       catalogue: catalogueCount ?? 0,
@@ -126,6 +142,7 @@ export async function computeSetupSteps(supabase: SupabaseClient, venue: VenueRo
       payments: paymentsCount ?? 0,
       suppliers: suppliersCount ?? 0,
       photos: photosCount ?? 0,
+      areas: areasCount ?? 0,
     },
   };
 }
