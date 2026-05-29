@@ -10,6 +10,7 @@ type Group = { label: string; items: Item[] };
 const TOP_LINKS: Item[] = [
   { href: "/venue", label: "Overview" },
   { href: "/venue/your-venue", label: "Your Venue" },
+  { href: "/venue/enquiries", label: "Enquiries" },
   { href: "/venue/weddings", label: "Weddings" },
   { href: "/venue/uploads", label: "Smart Import" },
 ];
@@ -43,7 +44,7 @@ const GROUPS: Group[] = [
       { href: "/venue/marketplace/bar", label: "Bar services" },
     ],
   },
-  { label: "Money", items: [{ href: "/venue/payments", label: "Payments" }] },
+  { label: "Money", items: [{ href: "/venue/payments", label: "Payments" }, { href: "/venue/billing", label: "Payouts & fees" }] },
   { label: "Setup", items: [{ href: "/venue/setup", label: "Checklist" }, { href: "/venue/settings", label: "Settings" }] },
 ];
 
