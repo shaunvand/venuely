@@ -55,6 +55,7 @@ export default async function YourVenuePage() {
     ? savedTheme
     : { primary: venue.branding_primary || savedTheme.primary, accent: savedTheme.accent, logoUrl: venue.branding_logo_url || null };
   const heroUrl = (clean[0]?.url as string | undefined) ?? null;
+  const hasMedia = clean.length > 0 || planMedia.length > 0;
 
   return (
     <div className="space-y-8">
@@ -68,6 +69,9 @@ export default async function YourVenuePage() {
         </p>
       </header>
 
+      {/* No photos yet → a highlighted call-to-action above the preview. */}
+      {!hasMedia && <ImportPrompt highlighted />}
+
       <PortalDesigner
         venueId={venue.id}
         venueName={venue.name}
@@ -78,11 +82,46 @@ export default async function YourVenuePage() {
         initiallySaved={!!designRow?.portal_theme}
       />
 
-      <YourVenueManager
-        venueId={venue.id}
-        items={clean as never}
-        floorPlans={planMedia as never}
-      />
+      <div id="venue-gallery">
+        <YourVenueManager
+          venueId={venue.id}
+          items={clean as never}
+          floorPlans={planMedia as never}
+        />
+      </div>
+
+      {/* Once photos exist the prompt drops to the bottom, quietly. */}
+      {hasMedia && <ImportPrompt />}
     </div>
+  );
+}
+
+// Call-to-action nudging the venue to import/upload photos. `highlighted` is the
+// attention-grabbing variant shown when no media exists yet.
+function ImportPrompt({ highlighted = false }: { highlighted?: boolean }) {
+  if (highlighted) {
+    return (
+      <a
+        href="#venue-gallery"
+        className="block rounded-2xl p-5 transition hover:shadow-md"
+        style={{ background: "var(--cream)", border: "2px solid var(--peach)" }}
+      >
+        <div className="flex items-center gap-4 flex-wrap">
+          <span className="w-11 h-11 rounded-full flex items-center justify-center text-xl flex-shrink-0" style={{ background: "var(--peach)" }}>📸</span>
+          <div className="flex-1 min-w-0">
+            <div className="font-serif text-lg" style={{ fontWeight: 700 }}>Add your venue photos to bring the preview to life</div>
+            <div className="text-sm" style={{ color: "var(--ink-2)" }}>
+              Couples see these images in their portal. Import them from Google, run Smart Import, or upload your own — it only takes a minute.
+            </div>
+          </div>
+          <span className="vy-btn vy-btn-primary flex-shrink-0">Add photos ↓</span>
+        </div>
+      </a>
+    );
+  }
+  return (
+    <a href="#venue-gallery" className="block text-center text-sm rounded-xl py-3 transition hover:bg-[color:var(--cream)]" style={{ border: "1px dashed var(--line)", color: "var(--ink-2)" }}>
+      Need more photos? <span style={{ color: "var(--poppy)" }}>Import or upload more ↑</span>
+    </a>
   );
 }
