@@ -19,6 +19,7 @@ export function PortalDesigner({
   heroUrl,
   initialTemplate,
   initialTheme,
+  initiallySaved = false,
 }: {
   venueId: string;
   venueName: string;
@@ -26,6 +27,7 @@ export function PortalDesigner({
   heroUrl: string | null;
   initialTemplate: PortalTemplateId;
   initialTheme: PortalTheme;
+  initiallySaved?: boolean;
 }) {
   const [template, setTemplate] = useState<PortalTemplateId>(initialTemplate);
   const [primary, setPrimary] = useState(initialTheme.primary);
@@ -35,9 +37,33 @@ export function PortalDesigner({
   const [pulled, setPulled] = useState<string[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [minimized, setMinimized] = useState(initiallySaved);
   const [isPending, startTransition] = useTransition();
 
   const tokens = resolveTemplate(template);
+
+  // Saved state — the section becomes the full live preview with one button to
+  // jump back into editing / pick another template. Editing collapses it again.
+  if (minimized) {
+    return (
+      <section className="vy-card space-y-4">
+        <div className="flex items-baseline justify-between flex-wrap gap-2">
+          <div>
+            <div className="vy-eyebrow">Couple portal</div>
+            <h2 className="vy-h2 mt-1 flex items-center gap-2">
+              {tokens.name} template
+              <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--leaf)", color: "#1f5d3e" }}>Saved ✓</span>
+            </h2>
+            <p className="text-sm mt-1" style={{ color: "var(--ink-2)" }}>This is how each couple&apos;s dashboard will look when you add their wedding.</p>
+          </div>
+          <button type="button" onClick={() => { setMsg(null); setMinimized(false); }} className="vy-btn vy-btn-secondary">
+            ✎ Edit or change template
+          </button>
+        </div>
+        <PortalPreview tokens={tokens} primary={primary} accent={accent} logoUrl={logoUrl} venueName={venueName} heroUrl={heroUrl} />
+      </section>
+    );
+  }
 
   async function pullColours() {
     setPulling(true);
@@ -84,6 +110,7 @@ export function PortalDesigner({
       try {
         await saveVenuePortalDesign({ template, primary, accent, logoUrl });
         setMsg("Design saved ✓");
+        setMinimized(true);
       } catch (e) {
         setMsg(e instanceof Error ? e.message : "Save failed");
       }

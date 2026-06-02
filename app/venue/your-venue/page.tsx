@@ -75,6 +75,7 @@ export default async function YourVenuePage() {
         heroUrl={heroUrl}
         initialTemplate={initialTemplate}
         initialTheme={initialTheme}
+        initiallySaved={!!designRow?.portal_theme}
       />
 
       <YourVenueManager
