@@ -121,55 +121,66 @@ export function YourVenueManager({
 
   return (
     <div className="space-y-8">
-      <div className="vy-card flex flex-wrap items-end gap-4">
-        <div className="space-y-1">
-          <label className="vy-label">Location</label>
-          <select className="vy-select" value={category} onChange={(e) => setCategory(e.target.value)}>
-            {LOCATIONS.map((l) => (
-              <option key={l} value={l}>{l}</option>
-            ))}
-          </select>
+      <div className="vy-card space-y-4">
+        {/* Primary action — pull the venue's real photos from Google */}
+        <div className="flex flex-col items-center text-center gap-1.5 py-2">
+          <button
+            type="button"
+            onClick={importGoogle}
+            disabled={!!busy || pending}
+            className="vy-btn vy-btn-primary text-base px-7 py-3"
+            style={{ borderRadius: "999px" }}
+            title="Pull your venue's own photos from Google Maps into the gallery"
+          >
+            📍 Import from Google
+          </button>
+          <span className="text-xs" style={{ color: "var(--ink-2)" }}>
+            Recommended — pulls your venue&apos;s real photos straight from Google Maps.
+          </span>
         </div>
-        <div className="space-y-1">
-          <label className="vy-label">Add photos / videos</label>
-          <input
-            ref={fileRef}
-            type="file"
-            multiple
-            accept="image/*,video/*"
-            onChange={(e) => upload(e.target.files)}
-            className="vy-input"
-          />
+
+        {/* Secondary options */}
+        <div className="flex flex-wrap items-end justify-center gap-4 pt-3 border-t" style={{ borderColor: "var(--line)" }}>
+          <div className="space-y-1">
+            <label className="vy-label">Location</label>
+            <select className="vy-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+              {LOCATIONS.map((l) => (
+                <option key={l} value={l}>{l}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="vy-label">Add photos / videos</label>
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              accept="image/*,video/*"
+              onChange={(e) => upload(e.target.files)}
+              className="vy-input"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="vy-label">Add floor plan / layout</label>
+            <input
+              ref={planRef}
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={(e) => upload(e.target.files, FLOORPLAN_CATEGORY, planRef)}
+              className="vy-input"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={smartImport}
+            disabled={!!busy || pending}
+            className="vy-btn vy-btn-ghost"
+          >
+            ✨ Smart Import
+          </button>
         </div>
-        <div className="space-y-1">
-          <label className="vy-label">Add floor plan / layout</label>
-          <input
-            ref={planRef}
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={(e) => upload(e.target.files, FLOORPLAN_CATEGORY, planRef)}
-            className="vy-input"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={smartImport}
-          disabled={!!busy || pending}
-          className="vy-btn vy-btn-ghost"
-        >
-          ✨ Smart Import
-        </button>
-        <button
-          type="button"
-          onClick={importGoogle}
-          disabled={!!busy || pending}
-          className="vy-btn vy-btn-ghost"
-          title="Pull your venue's own photos from Google Maps into the gallery"
-        >
-          📍 Import from Google
-        </button>
-        {busy && <span className="text-sm text-stone-500">{busy}</span>}
+        {busy && <div className="text-sm text-center text-stone-500">{busy}</div>}
       </div>
 
       {err && <div className="text-sm text-[color:var(--poppy)]">{err}</div>}
