@@ -81,6 +81,21 @@ export function YourVenueManager({
     start(() => router.refresh());
   }
 
+  async function importGoogle() {
+    setErr(null);
+    setBusy("Importing your Google photos…");
+    const res = await fetch("/api/venue/places-photos", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ venue_id: venueId }),
+    });
+    const j = await res.json();
+    setBusy(null);
+    if (!res.ok) return setErr(j.error || "Google import failed");
+    setErr(j.added ? null : j.message || "No Google photos found.");
+    start(() => router.refresh());
+  }
+
   async function recategorise(id: string, cat: string) {
     await fetch("/api/venue/gallery", {
       method: "PATCH",
@@ -144,6 +159,15 @@ export function YourVenueManager({
           className="vy-btn vy-btn-ghost"
         >
           ✨ Smart Import
+        </button>
+        <button
+          type="button"
+          onClick={importGoogle}
+          disabled={!!busy || pending}
+          className="vy-btn vy-btn-ghost"
+          title="Pull your venue's own photos from Google Maps into the gallery"
+        >
+          📍 Import from Google
         </button>
         {busy && <span className="text-sm text-stone-500">{busy}</span>}
       </div>

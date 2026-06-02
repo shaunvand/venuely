@@ -92,7 +92,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
   const [imported, setImported] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [extractedImages, setExtractedImages] = useState<Array<{ url: string; source_file: string; ordinal: number }>>([]);
-  const [searchOpen, setSearchOpen] = useState<{ itemId: number; query: string; results: Array<{ url: string; thumb: string; alt: string; photographer_name: string; photographer_profile_url: string; unsplash_url: string; download_location: string }>; busy: boolean; err: string | null } | null>(null);
+  const [searchOpen, setSearchOpen] = useState<{ itemId: number; query: string; results: Array<{ url: string; thumb: string; alt: string; photographer_name: string; photographer_profile_url: string; source?: string; source_url?: string; unsplash_url?: string; download_location?: string }>; busy: boolean; err: string | null } | null>(null);
   const [fileReports, setFileReports] = useState<Array<{ filename: string; chars: number; items: number; status: string; error?: string; stop_reason?: string | null; truncated?: boolean; unsupported?: string }>>([]);
   const [filter, setFilter] = useState<string>("all");
   const [commitResults, setCommitResults] = useState<Record<string, { added: number; updated: number; failed: number; error?: string }> | null>(null);
@@ -701,7 +701,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                 </button>
               </div>
               {searchOpen.err && <p className="text-xs text-red-700">{searchOpen.err}</p>}
-              {searchOpen.busy && <p className="text-xs text-stone-500">Searching Unsplash…</p>}
+              {searchOpen.busy && <p className="text-xs text-stone-500">Searching…</p>}
               {!searchOpen.busy && searchOpen.results.length === 0 && !searchOpen.err && (
                 <p className="text-xs text-stone-500">No results. Try a more generic query like the item type.</p>
               )}
@@ -728,17 +728,19 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                         {r.photographer_name}
                       </a>{" "}
                       on{" "}
-                      <a href={r.unsplash_url} target="_blank" rel="noopener noreferrer" className="underline hover:text-stone-900">
-                        Unsplash
+                      <a href={r.source_url ?? r.unsplash_url} target="_blank" rel="noopener noreferrer" className="underline hover:text-stone-900">
+                        {r.source ?? "Unsplash"}
                       </a>
                     </div>
                   </div>
                 ))}
               </div>
               <p className="text-[10px] text-stone-500 pt-2 border-t border-stone-200">
-                Images hotlinked from <a href="https://unsplash.com/?utm_source=venuely&utm_medium=referral" target="_blank" rel="noopener noreferrer" className="underline">Unsplash</a>.
-                Free for commercial use under the <a href="https://unsplash.com/license" target="_blank" rel="noopener noreferrer" className="underline">Unsplash License</a>.
-                Photographer attribution shown above each image.
+                Free stock photos from{" "}
+                <a href="https://www.pexels.com" target="_blank" rel="noopener noreferrer" className="underline">Pexels</a>
+                {" "}/{" "}
+                <a href="https://unsplash.com/?utm_source=venuely&utm_medium=referral" target="_blank" rel="noopener noreferrer" className="underline">Unsplash</a>,
+                free for commercial use. Photographer attribution shown above each image.
               </p>
             </div>
           </div>
