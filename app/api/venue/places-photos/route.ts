@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import Anthropic from "@anthropic-ai/sdk";
+import { loadImage, createCanvas } from "@napi-rs/canvas";
+import { VENUE_LOCATIONS } from "../gallery/route";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -35,6 +38,76 @@ function admin() {
 // Strip the <a>…</a> wrapper Google returns in html_attributions down to text.
 function plainAttribution(html: string): string {
   return html.replace(/<[^>]+>/g, "").trim();
+}
+
+// Downscale an image buffer to a small JPEG (base64) for cheap/fast vision
+// classification. Returns null if the buffer can't be decoded.
+async function thumbBase64(buf: Buffer): Promise<string | null> {
+  try {
+    const img = await loadImage(buf);
+    const maxW = 512;
+    const scale = Math.min(1, maxW / (img.width || maxW));
+    const w = Math.max(1, Math.round((img.width || maxW) * scale));
+    const h = Math.max(1, Math.round((img.height || maxW) * scale));
+    const canvas = createCanvas(w, h);
+    canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+    return canvas.toBuffer("image/jpeg").toString("base64");
+  } catch {
+    return null;
+  }
+}
+
+// Classify each thumbnail into one of VENUE_LOCATIONS via a single Claude vision
+// call. Best-effort: returns {} (callers fall back to "Outside") if the API key
+// is absent or anything goes wrong. Keys are the thumbnail array index.
+async function classifyByVision(thumbs: Array<string | null>): Promise<Record<number, string>> {
+  const out: Record<number, string> = {};
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const usable = thumbs.filter((t): t is string => !!t).length;
+  if (!apiKey || usable === 0) return out;
+  try {
+    const anthropic = new Anthropic({ apiKey });
+    const content: Anthropic.ContentBlockParam[] = [
+      {
+        type: "text",
+        text:
+          `You are tagging photos for a South African wedding venue's gallery. For EACH image pick the single best ` +
+          `location category from: ${VENUE_LOCATIONS.join(", ")}.\n` +
+          `Guidance: building exteriors / driveways / aerial / parking → Outside; lawns, gardens, trees, flowerbeds, ` +
+          `outdoor greenery → Gardens; ceremony arch / aisle / chapel seating → Ceremony; dining hall / marquee / set ` +
+          `banquet tables / dance floor → Reception; bar counter / drinks station → Bar; indoor lounges / foyers / ` +
+          `interiors not set for dining → Interior; bedrooms / cottages / lodge / guest rooms → Accommodation; unclear → Other.\n` +
+          `Images follow in order from index 0. Output JSONL, one object per image, no prose: {"i":<index>,"category":"<one of the list>"}`,
+      },
+    ];
+    let idx = 0;
+    for (const t of thumbs) {
+      if (!t) { idx++; continue; }
+      content.push({ type: "text", text: `Image ${idx}:` });
+      content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: t } });
+      idx++;
+    }
+    const msg = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      messages: [{ role: "user", content }],
+    });
+    const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+    for (const line of text.split("\n")) {
+      const s = line.trim();
+      if (!s.startsWith("{")) continue;
+      try {
+        const o = JSON.parse(s);
+        if (typeof o.i === "number" && typeof o.category === "string") {
+          const match = VENUE_LOCATIONS.find((v) => v.toLowerCase() === o.category.toLowerCase());
+          if (match) out[o.i] = match;
+        }
+      } catch {}
+    }
+  } catch {
+    // best-effort — leave out empty so callers default the category
+  }
+  return out;
 }
 
 const MAX_PHOTOS = 8;
@@ -107,8 +180,12 @@ export async function POST(req: NextRequest) {
       .eq("owner_type", "venue");
     const haveLabels = (existing ?? []).map((r) => String(r.label ?? ""));
 
-    let added = 0;
     const errors: string[] = [];
+
+    // Phase 1 — download the new photos (skip slots already imported) and build
+    // a downscaled thumbnail of each for vision classification.
+    type Pending = { label: string; buf: Buffer; contentType: string; attribution: string; thumb: string | null };
+    const pending: Pending[] = [];
     for (let i = 0; i < Math.min(photos.length, MAX_PHOTOS); i++) {
       const label = `Google photo ${i + 1}`;
       // Already imported this slot (label may carry an appended attribution).
@@ -123,36 +200,69 @@ export async function POST(req: NextRequest) {
         if (!imgRes.ok) { errors.push(`photo ${i + 1}: ${imgRes.status}`); continue; }
         const buf = Buffer.from(await imgRes.arrayBuffer());
         const contentType = imgRes.headers.get("content-type") || "image/jpeg";
-        const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
+        const attribution = (ph.html_attributions ?? []).map(plainAttribution).filter(Boolean).join(", ");
+        pending.push({ label, buf, contentType, attribution, thumb: await thumbBase64(buf) });
+      } catch (e) {
+        errors.push(`photo ${i + 1}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+
+    if (pending.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        added: 0,
+        available: Math.min(photos.length, MAX_PHOTOS),
+        message: "No new Google photos to import (already imported).",
+        ...(errors.length ? { warnings: errors } : {}),
+      });
+    }
+
+    // Phase 2 — classify each photo into a venue location (best-effort; falls
+    // back to "Outside" when vision is unavailable).
+    const categories = await classifyByVision(pending.map((p) => p.thumb));
+
+    // Phase 3 — upload + insert each photo under its assigned category.
+    let added = 0;
+    const byCategory: Record<string, number> = {};
+    for (let j = 0; j < pending.length; j++) {
+      const p = pending[j];
+      const category = categories[j] || "Outside";
+      try {
+        const ext = p.contentType.includes("png") ? "png" : p.contentType.includes("webp") ? "webp" : "jpg";
         const path = `gallery/${venueId}/google-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-        const { error: upErr } = await sb.storage.from("venue-media").upload(path, buf, { contentType, upsert: false });
-        if (upErr) { errors.push(`photo ${i + 1}: ${upErr.message}`); continue; }
+        const { error: upErr } = await sb.storage.from("venue-media").upload(path, p.buf, { contentType: p.contentType, upsert: false });
+        if (upErr) { errors.push(`${p.label}: ${upErr.message}`); continue; }
         const { data: pub } = sb.storage.from("venue-media").getPublicUrl(path);
         // Google requires showing photo attribution; fold it into the label so
         // it travels with the asset and can be surfaced in the gallery.
-        const attribution = (ph.html_attributions ?? []).map(plainAttribution).filter(Boolean).join(", ");
         const { error: insErr } = await sb.from("media_assets").insert({
           venue_id: venueId,
           owner_type: "venue",
           owner_id: venueId,
           kind: "photo",
           url: pub.publicUrl,
-          label: attribution ? `${label} · © ${attribution}` : label,
-          category: "Outside",
+          label: p.attribution ? `${p.label} · © ${p.attribution}` : p.label,
+          category,
         });
-        if (insErr) { errors.push(`photo ${i + 1}: ${insErr.message}`); continue; }
+        if (insErr) { errors.push(`${p.label}: ${insErr.message}`); continue; }
         added++;
+        byCategory[category] = (byCategory[category] || 0) + 1;
       } catch (e) {
-        errors.push(`photo ${i + 1}: ${e instanceof Error ? e.message : String(e)}`);
+        errors.push(`${p.label}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 
+    const autoTagged = Object.keys(categories).length > 0;
+    const breakdown = Object.entries(byCategory).map(([c, n]) => `${n} ${c}`).join(", ");
     return NextResponse.json({
       ok: true,
       added,
       available: Math.min(photos.length, MAX_PHOTOS),
+      categories: byCategory,
       message: added
-        ? `Imported ${added} photo${added === 1 ? "" : "s"} from Google into “Outside”. Recategorise them as needed.`
+        ? autoTagged
+          ? `Imported ${added} photo${added === 1 ? "" : "s"} from Google${breakdown ? ` (${breakdown})` : ""}. Tweak any categories in the gallery.`
+          : `Imported ${added} photo${added === 1 ? "" : "s"} from Google into “Outside”. Recategorise them as needed.`
         : "No new Google photos to import (already imported).",
       ...(errors.length ? { warnings: errors } : {}),
     });
