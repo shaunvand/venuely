@@ -10,6 +10,7 @@ export type PortalTheme = {
   primary: string;   // brand colour for buttons / accents
   accent: string;    // secondary colour for tints / highlights
   logoUrl?: string | null;
+  coverUrl?: string | null; // hero/cover image for the portal (overrides gallery)
 };
 
 export type TemplateTokens = {
@@ -101,5 +102,6 @@ export function resolveTheme(raw: unknown): PortalTheme {
     primary: typeof t.primary === "string" && t.primary ? t.primary : DEFAULT_PORTAL_THEME.primary,
     accent: typeof t.accent === "string" && t.accent ? t.accent : DEFAULT_PORTAL_THEME.accent,
     logoUrl: typeof t.logoUrl === "string" && t.logoUrl ? t.logoUrl : null,
+    coverUrl: typeof t.coverUrl === "string" && t.coverUrl ? t.coverUrl : null,
   };
 }

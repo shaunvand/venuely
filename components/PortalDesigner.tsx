@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   PORTAL_TEMPLATE_LIST,
   resolveTemplate,
@@ -33,14 +33,43 @@ export function PortalDesigner({
   const [primary, setPrimary] = useState(initialTheme.primary);
   const [accent, setAccent] = useState(initialTheme.accent);
   const [logoUrl, setLogoUrl] = useState<string | null>(initialTheme.logoUrl ?? null);
+  const [coverUrl, setCoverUrl] = useState<string | null>(initialTheme.coverUrl ?? null);
   const [pulling, setPulling] = useState(false);
   const [pulled, setPulled] = useState<string[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
   const [minimized, setMinimized] = useState(initiallySaved);
   const [isPending, startTransition] = useTransition();
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const tokens = resolveTemplate(template);
+  // What the preview shows: the venue's chosen cover, else the first gallery photo.
+  const previewCover = coverUrl ?? heroUrl;
+
+  const COVER_MAX_MB = 5;
+
+  function pickCover() {
+    coverInputRef.current?.click();
+  }
+
+  async function uploadCover(file: File) {
+    if (!file.type.startsWith("image/")) { setMsg("Cover must be an image file."); return; }
+    if (file.size > COVER_MAX_MB * 1024 * 1024) { setMsg(`Cover image is too large — keep it under ${COVER_MAX_MB} MB.`); return; }
+    setMsg(null);
+    setCoverUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("venue_id", venueId);
+      const res = await fetch("/api/venue/inventory/image", { method: "POST", body: fd });
+      const j = await res.json();
+      if (res.ok && j.ok) setCoverUrl(j.url);
+      else setMsg(`Cover upload failed: ${j.error ?? "unknown"}`);
+    } finally {
+      setCoverUploading(false);
+    }
+  }
 
   // Saved state — the section becomes the full live preview with one button to
   // jump back into editing / pick another template. Editing collapses it again.
@@ -60,7 +89,7 @@ export function PortalDesigner({
             ✎ Edit or change template
           </button>
         </div>
-        <PortalPreview tokens={tokens} primary={primary} accent={accent} logoUrl={logoUrl} venueName={venueName} heroUrl={heroUrl} />
+        <PortalPreview tokens={tokens} primary={primary} accent={accent} logoUrl={logoUrl} venueName={venueName} coverUrl={previewCover} onEditCover={() => { setMsg(null); setMinimized(false); }} />
       </section>
     );
   }
@@ -108,7 +137,7 @@ export function PortalDesigner({
     setMsg(null);
     startTransition(async () => {
       try {
-        await saveVenuePortalDesign({ template, primary, accent, logoUrl });
+        await saveVenuePortalDesign({ template, primary, accent, logoUrl, coverUrl });
         setMsg("Design saved ✓");
         setMinimized(true);
       } catch (e) {
@@ -219,6 +248,39 @@ export function PortalDesigner({
             </div>
           </div>
 
+          {/* Cover photo — the hero image at the top of the couple portal */}
+          <div>
+            <div className="vy-label mb-2">Cover photo</div>
+            <button
+              type="button"
+              onClick={pickCover}
+              className="w-full rounded-xl p-3 text-center transition hover:bg-[color:var(--cream)]"
+              style={{ border: "1.5px dashed var(--line)" }}
+            >
+              {coverUrl ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={coverUrl} alt="cover" className="w-full aspect-[16/9] object-cover rounded-lg mb-2" />
+                  <span className="text-xs" style={{ color: "var(--poppy)" }}>{coverUploading ? "Uploading…" : "Click to replace"}</span>
+                </>
+              ) : (
+                <>
+                  <div className="text-2xl">🖼️</div>
+                  <div className="text-sm font-medium mt-1">{coverUploading ? "Uploading…" : "Upload a cover photo"}</div>
+                </>
+              )}
+              <div className="text-[10px] mt-1 leading-snug" style={{ color: "var(--ink-2)" }}>
+                Recommended <strong>1600 × 900&nbsp;px</strong> · <strong>16:9</strong> landscape · JPG/PNG · max <strong>{COVER_MAX_MB}&nbsp;MB</strong>
+              </div>
+            </button>
+            <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadCover(f); e.target.value = ""; }} />
+            {coverUrl && (
+              <button type="button" onClick={() => setCoverUrl(null)} className="text-xs hover:underline mt-1" style={{ color: "var(--ink-2)" }}>
+                Remove cover (use first gallery photo)
+              </button>
+            )}
+          </div>
+
           {msg && <p className="text-xs" style={{ color: msg.includes("✓") ? "#1f5d3e" : "var(--poppy)" }}>{msg}</p>}
         </div>
 
@@ -228,7 +290,7 @@ export function PortalDesigner({
             <span className="vy-label">Live preview</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--cream)", color: "var(--ink-2)" }}>what couples see</span>
           </div>
-          <PortalPreview tokens={tokens} primary={primary} accent={accent} logoUrl={logoUrl} venueName={venueName} heroUrl={heroUrl} />
+          <PortalPreview tokens={tokens} primary={primary} accent={accent} logoUrl={logoUrl} venueName={venueName} coverUrl={previewCover} onEditCover={pickCover} editLabel={coverUploading ? "Uploading…" : "Change cover photo"} />
         </div>
       </div>
     </section>
@@ -266,14 +328,16 @@ function TemplateGlyph({ tokens, primary, accent }: { tokens: TemplateTokens; pr
 
 // Full mock couple portal rendered against the chosen template + theme.
 function PortalPreview({
-  tokens, primary, accent, logoUrl, venueName, heroUrl,
+  tokens, primary, accent, logoUrl, venueName, coverUrl, onEditCover, editLabel = "Change cover photo",
 }: {
   tokens: TemplateTokens;
   primary: string;
   accent: string;
   logoUrl: string | null;
   venueName: string;
-  heroUrl: string | null;
+  coverUrl: string | null;
+  onEditCover?: () => void;
+  editLabel?: string;
 }) {
   const headingStyle: React.CSSProperties = { fontFamily: tokens.headingFont, fontStyle: tokens.headingItalic ? "italic" : "normal" };
   const btn: React.CSSProperties =
@@ -281,17 +345,23 @@ function PortalPreview({
       ? { background: primary, color: "#fff", borderRadius: tokens.buttonRadius }
       : { background: "transparent", color: primary, border: `1.5px solid ${primary}`, borderRadius: tokens.buttonRadius };
 
-  const heroImg = heroUrl
-    ? { backgroundImage: `url(${heroUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+  const heroImg = coverUrl
+    ? { backgroundImage: `url(${coverUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
     : { background: `linear-gradient(120deg, ${primary}, ${accent})` };
+
+  const coverProps = onEditCover
+    ? { onClick: onEditCover, role: "button" as const, tabIndex: 0, title: editLabel, className: "" }
+    : {};
+  const coverEditClass = onEditCover ? "group cursor-pointer" : "";
 
   return (
     <div className="rounded-2xl overflow-hidden shadow-sm" style={{ border: "1px solid var(--line)", background: tokens.surface, fontFamily: tokens.bodyFont }}>
       {/* HERO */}
       {tokens.heroStyle === "split" ? (
         <div className="grid grid-cols-2">
-          <div className="relative h-40" style={heroImg as React.CSSProperties}>
-            <div className="absolute top-3 left-3"><PreviewLogo logoUrl={logoUrl} venueName={venueName} headingStyle={headingStyle} /></div>
+          <div {...coverProps} className={`relative h-40 ${coverEditClass}`} style={heroImg as React.CSSProperties}>
+            <div className="absolute top-3 left-3 z-10"><PreviewLogo logoUrl={logoUrl} venueName={venueName} headingStyle={headingStyle} /></div>
+            {onEditCover && <CoverEditHint label={editLabel} />}
           </div>
           <div className="p-4 flex flex-col justify-center" style={{ background: accent + "33" }}>
             <div className="text-[10px] uppercase tracking-widest" style={{ color: "var(--ink-2)" }}>Wedding portal</div>
@@ -301,8 +371,9 @@ function PortalPreview({
         </div>
       ) : tokens.heroStyle === "framed" ? (
         <div className="p-3">
-          <div className="relative h-36" style={{ ...(heroImg as React.CSSProperties), border: `1px solid var(--line)` }}>
-            <div className="absolute top-3 left-3"><PreviewLogo logoUrl={logoUrl} venueName={venueName} headingStyle={headingStyle} /></div>
+          <div {...coverProps} className={`relative h-36 ${coverEditClass}`} style={{ ...(heroImg as React.CSSProperties), border: `1px solid var(--line)` }}>
+            <div className="absolute top-3 left-3 z-10"><PreviewLogo logoUrl={logoUrl} venueName={venueName} headingStyle={headingStyle} /></div>
+            {onEditCover && <CoverEditHint label={editLabel} />}
           </div>
           <div className="pt-3">
             <div className="text-[10px] uppercase tracking-widest" style={{ color: "var(--ink-2)" }}>Wedding portal</div>
@@ -311,7 +382,7 @@ function PortalPreview({
           </div>
         </div>
       ) : (
-        <div className="relative h-44" style={heroImg as React.CSSProperties}>
+        <div {...coverProps} className={`relative h-44 ${coverEditClass}`} style={heroImg as React.CSSProperties}>
           <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.05), rgba(0,0,0,0.55))" }} />
           <div className="absolute top-3 left-3 z-10"><PreviewLogo logoUrl={logoUrl} venueName={venueName} headingStyle={headingStyle} /></div>
           <div className="absolute bottom-3 left-3 right-3 z-10">
@@ -319,6 +390,7 @@ function PortalPreview({
             <div className="text-xl leading-tight text-white" style={headingStyle}>Alex &amp; Sam</div>
             <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.9)" }}>{venueName} · 14 Dec 2025</div>
           </div>
+          {onEditCover && <CoverEditHint label={editLabel} />}
         </div>
       )}
 
@@ -341,6 +413,14 @@ function PortalPreview({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CoverEditHint({ label }: { label: string }) {
+  return (
+    <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "rgba(0,0,0,0.35)" }}>
+      <span className="text-xs font-medium text-white px-3 py-1.5 rounded-full" style={{ background: "rgba(0,0,0,0.6)" }}>📷 {label}</span>
     </div>
   );
 }

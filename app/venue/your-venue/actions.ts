@@ -12,13 +12,14 @@ export async function saveVenuePortalDesign(input: {
   primary: string;
   accent: string;
   logoUrl: string | null;
+  coverUrl: string | null;
 }): Promise<{ ok: true }> {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
   const template = (Object.prototype.hasOwnProperty.call(PORTAL_TEMPLATES, input.template)
     ? input.template
     : "classic") as PortalTemplateId;
-  const theme = resolveTheme({ primary: input.primary, accent: input.accent, logoUrl: input.logoUrl });
+  const theme = resolveTheme({ primary: input.primary, accent: input.accent, logoUrl: input.logoUrl, coverUrl: input.coverUrl });
   const { error } = await supabase
     .from("venues")
     .update({ portal_template: template, portal_theme: theme })
