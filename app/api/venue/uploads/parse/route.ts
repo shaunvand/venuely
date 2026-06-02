@@ -409,8 +409,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Auto-search Unsplash for items that ended the parse pass without any image.
-    // Concurrency 4 keeps us well under Unsplash demo (50/hr) and production caps.
+    // Auto-search stock photos (Pexels-first, Unsplash fallback) for items that
+    // ended the parse pass without any image. Concurrency 4 keeps us under the
+    // provider rate caps (Pexels 200/hr, Unsplash 50/hr) on large imports.
     const needSearch: number[] = [];
     allItems.forEach((it, i) => { if (!it.data.image_url) needSearch.push(i); });
     if (needSearch.length) {

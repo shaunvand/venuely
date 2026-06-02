@@ -34,6 +34,28 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_LIST = Object.keys(CATEGORY_LABELS);
 
+// Per-category colour coding drawn from the brand palette. `accent` is the strong
+// colour (left bar / active tab / dot), `soft` the tinted badge background, and
+// `text` a readable on-soft tone. Rentals = orange (Poppy), Accommodation =
+// green; Catalogue gets a warm gold and partner vendors a shared terracotta.
+type CatColor = { accent: string; soft: string; text: string };
+const CATEGORY_COLORS: Record<string, CatColor> = {
+  catalogue:     { accent: "#C99A2E", soft: "#FAF2E8", text: "#8a6a1f" },
+  rentals:       { accent: "#FA523C", soft: "#FFEDE7", text: "#E03E28" },
+  accommodation: { accent: "#5F8B6A", soft: "#EBF2ED", text: "#3F6B4D" },
+  caterers:      { accent: "#D98B6A", soft: "#FFF1EA", text: "#B5663F" },
+  planners:      { accent: "#D98B6A", soft: "#FFF1EA", text: "#B5663F" },
+  florists:      { accent: "#D98B6A", soft: "#FFF1EA", text: "#B5663F" },
+  djs:           { accent: "#D98B6A", soft: "#FFF1EA", text: "#B5663F" },
+  photographers: { accent: "#D98B6A", soft: "#FFF1EA", text: "#B5663F" },
+  decor:         { accent: "#D98B6A", soft: "#FFF1EA", text: "#B5663F" },
+  bar:           { accent: "#D98B6A", soft: "#FFF1EA", text: "#B5663F" },
+};
+const FALLBACK_CAT_COLOR: CatColor = { accent: "#8a9a86", soft: "#FFF6F0", text: "#57534e" };
+function catColor(category: string): CatColor {
+  return CATEGORY_COLORS[category] ?? FALLBACK_CAT_COLOR;
+}
+
 // Commit results are keyed by destination table name (multiple vendor categories
 // collapse into vendor_partners), so we label them separately from the categories.
 const TABLE_LABELS: Record<string, string> = {
@@ -464,17 +486,19 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
             {CATEGORY_LIST.filter((c) => items.some((i) => i.category === c)).map((c) => {
               const n = items.filter((i) => i.category === c).length;
               const active = filter === c;
+              const col = catColor(c);
               return (
                 <button
                   key={c}
                   onClick={() => setFilter(c)}
-                  className="rounded-full px-4 py-1.5 text-xs font-medium transition"
+                  className="rounded-full px-4 py-1.5 text-xs font-medium transition inline-flex items-center gap-1.5"
                   style={
                     active
-                      ? { background: "var(--ink)", color: "#fff" }
-                      : { background: "#fff", color: "var(--ink)", border: "1px solid var(--line)" }
+                      ? { background: col.accent, color: "#fff" }
+                      : { background: "#fff", color: "var(--ink)", border: `1px solid ${col.accent}` }
                   }
                 >
+                  {!active && <span aria-hidden className="w-2 h-2 rounded-full" style={{ background: col.accent }} />}
                   {CATEGORY_LABELS[c]} ({n})
                 </button>
               );
@@ -503,19 +527,20 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                       opacity: it._include ? 1 : 0.55,
                     }}
                   >
-                    {/* Left accent bar */}
+                    {/* Left accent bar — category-coloured */}
                     <span
                       aria-hidden
-                      className="absolute left-0 top-0 bottom-0 w-1"
-                      style={{ background: it._include ? "var(--poppy)" : "var(--line)" }}
+                      className="absolute left-0 top-0 bottom-0 w-1.5"
+                      style={{ background: it._include ? catColor(it.category).accent : "var(--line)" }}
                     />
                     <div className="p-4 pl-5 space-y-2.5">
-                      {/* Category badge */}
+                      {/* Category badge — category-coloured */}
                       <div className="flex items-center justify-between gap-2">
                         <span
-                          className="inline-block text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md"
-                          style={{ background: "var(--cream)", color: "var(--poppy-deep)" }}
+                          className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md"
+                          style={{ background: catColor(it.category).soft, color: catColor(it.category).text }}
                         >
+                          <span aria-hidden className="w-2 h-2 rounded-full" style={{ background: catColor(it.category).accent }} />
                           {CATEGORY_LABELS[it.category] ?? it.category}
                         </span>
                         <label className="flex items-center gap-1.5 text-[10px] cursor-pointer select-none" style={{ color: "var(--ink-2)" }}>
@@ -532,29 +557,29 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                       {/* Item name */}
                       <h3 className="font-serif text-lg leading-tight" style={{ fontWeight: 700 }}>{name}</h3>
 
-                      {/* Image strip */}
-                      <div className="flex items-center gap-2">
+                      {/* Image — large + centred, with the pick/find controls underneath */}
+                      <div className="flex flex-col items-center gap-2">
                         {it.data.image_url ? (
-                          <div className="relative flex-shrink-0">
+                          <div className="relative w-full">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={String(it.data.image_url)} alt="" className="h-14 w-14 rounded object-cover" style={{ border: "1px solid var(--line)" }} />
+                            <img src={String(it.data.image_url)} alt="" className="w-full aspect-[4/3] rounded-lg object-cover" style={{ border: "1px solid var(--line)" }} />
                             {includedSource === "online" && (
-                              <span className="absolute -bottom-1 -right-1 text-[9px] px-1 rounded-full" style={{ background: "var(--peach)", color: "var(--poppy-deep)" }} title="Unsplash">🌐</span>
+                              <span className="absolute bottom-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "var(--peach)", color: "var(--poppy-deep)" }} title="Stock photo">🌐</span>
                             )}
                             {includedSource === "embedded" && (
-                              <span className="absolute -bottom-1 -right-1 text-[9px] px-1 rounded-full" style={{ background: "var(--leaf)", color: "#1f5d3e" }} title="From your file">📎</span>
+                              <span className="absolute bottom-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "var(--leaf)", color: "#1f5d3e" }} title="From your file">📎</span>
                             )}
                           </div>
                         ) : (
-                          <div className="h-14 w-14 rounded flex items-center justify-center text-[10px] flex-shrink-0" style={{ border: "1px dashed var(--line)", background: "var(--bone)", color: "var(--ink-2)" }}>
+                          <div className="w-full aspect-[4/3] rounded-lg flex items-center justify-center text-xs" style={{ border: "1px dashed var(--line)", background: "var(--bone)", color: "var(--ink-2)" }}>
                             no image
                           </div>
                         )}
-                        <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-center gap-2 w-full">
                           <select
                             value=""
                             onChange={(e) => { if (e.target.value) updateField(it._id, "image_url", e.target.value); }}
-                            className="border rounded-full px-2 py-0.5 text-[10px] bg-white"
+                            className="border rounded-full px-3 py-1 text-[11px] bg-white"
                             style={{ borderColor: "var(--line)" }}
                           >
                             <option value="">pick from file…</option>
@@ -565,7 +590,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                           <button
                             type="button"
                             onClick={() => findOnline(it._id)}
-                            className="rounded-full px-2 py-0.5 text-[10px]"
+                            className="rounded-full px-3 py-1 text-[11px] whitespace-nowrap"
                             style={{ background: "var(--ink)", color: "#fff" }}
                           >
                             🔍 Find online
