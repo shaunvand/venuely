@@ -152,7 +152,7 @@ export function InvoiceDesigner({
 
         {/* Live preview */}
         <div>
-          <div className="vy-label mb-2">Preview — what the couple receives</div>
+          <div className="vy-label mb-2">What the couple receives</div>
           <InvoicePreview tokens={tokens} accent={accent} logoUrl={logoUrl} venueName={venueName} bank={bank} />
         </div>
       </div>

@@ -284,11 +284,11 @@ export function PortalDesigner({
           {msg && <p className="text-xs" style={{ color: msg.includes("✓") ? "#1f5d3e" : "var(--poppy)" }}>{msg}</p>}
         </div>
 
-        {/* ---- Live preview ---- */}
+        {/* ---- Preview ---- */}
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <span className="vy-label">Live preview</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--cream)", color: "var(--ink-2)" }}>what couples see</span>
+            <span className="vy-label">What couples see</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--cream)", color: "var(--ink-2)" }}>updates as you edit</span>
           </div>
           <PortalPreview tokens={tokens} primary={primary} accent={accent} logoUrl={logoUrl} venueName={venueName} coverUrl={previewCover} onEditCover={pickCover} editLabel={coverUploading ? "Uploading…" : "Change cover photo"} />
         </div>
