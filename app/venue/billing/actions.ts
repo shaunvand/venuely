@@ -30,6 +30,41 @@ export async function resolveAccountName(accountNumber: string, bankCode: string
   return { ok: true, accountName: res.data.account_name };
 }
 
+// Save the venue's EFT banking details (these print on the invoice couples
+// receive, so the venue is paid directly). `verified` is set true when the
+// details came from an AI-read bank statement the venue confirmed.
+export async function saveVenueBanking(
+  venueId: string,
+  fields: {
+    bank_name: string;
+    bank_account_name: string;
+    bank_account_number: string;
+    bank_branch_code: string;
+    bank_swift: string;
+    bank_iban: string;
+  },
+  verified: boolean,
+): Promise<{ ok: true }> {
+  await requireRole(["venue_admin", "owner"]);
+  const supabase = await createClient();
+  const clean = (s: string) => (s ?? "").trim() || null;
+  const { error } = await supabase
+    .from("venues")
+    .update({
+      bank_name: clean(fields.bank_name),
+      bank_account_name: clean(fields.bank_account_name),
+      bank_account_number: clean(fields.bank_account_number),
+      bank_branch_code: clean(fields.bank_branch_code),
+      bank_swift: clean(fields.bank_swift),
+      bank_iban: clean(fields.bank_iban),
+      bank_verified_at: verified ? new Date().toISOString() : null,
+    })
+    .eq("id", venueId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/venue/billing");
+  return { ok: true };
+}
+
 // Create the venue's Paystack subaccount (percentage_charge = the venue's
 // platform_fee_rate, expressed as a percent) and store the payout fields.
 export async function connectPayouts(formData: FormData) {

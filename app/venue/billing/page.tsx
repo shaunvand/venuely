@@ -1,7 +1,9 @@
 import { requireRole } from "@/lib/auth/require-role";
 import { getCurrentVenue, paymentsReady, trialState } from "@/lib/venue/current";
+import { createClient } from "@/lib/supabase/server";
 import { isPaystackConfigured, listBanks } from "@/lib/billing/paystack";
 import { ConnectPayoutsForm } from "./ConnectPayoutsForm";
+import { VenueBankingForm } from "@/components/VenueBankingForm";
 
 export const metadata = {
   title: "Payouts & billing — Venuely",
@@ -30,6 +32,14 @@ export default async function VenueBillingPage({
   // platform_fee_rate is a fraction; show it as a percent.
   const feePercent = Math.round(Number(venue.platform_fee_rate ?? 0.01) * 100 * 100) / 100;
 
+  // EFT banking details (shown on the couple's invoice).
+  const supabase = await createClient();
+  const { data: bank } = await supabase
+    .from("venues")
+    .select("bank_name, bank_account_name, bank_account_number, bank_branch_code, bank_swift, bank_iban, bank_verified_at")
+    .eq("id", venue.id)
+    .single();
+
   // Only call Paystack when we'll actually render the form.
   let banks: { name: string; code: string }[] = [];
   if (configured && !ready) {
@@ -44,9 +54,22 @@ export default async function VenueBillingPage({
       <header>
         <h1 className="vy-h1">Payouts &amp; billing</h1>
         <p className="text-sm text-[color:var(--ink-2)] mt-1">
-          Connect your bank so couples can pay you through Venuely. Money settles to you the next day.
+          Couples pay you directly by EFT using the banking details below. Venuely takes {feePercent}% commission, invoiced to you separately.
         </p>
       </header>
+
+      <VenueBankingForm
+        venueId={venue.id}
+        verifiedAt={bank?.bank_verified_at ?? null}
+        initial={{
+          bank_name: bank?.bank_name ?? "",
+          bank_account_name: bank?.bank_account_name ?? "",
+          bank_account_number: bank?.bank_account_number ?? "",
+          bank_branch_code: bank?.bank_branch_code ?? "",
+          bank_swift: bank?.bank_swift ?? "",
+          bank_iban: bank?.bank_iban ?? "",
+        }}
+      />
 
       {/* Trial / status banner — informational only, never blocks data entry. */}
       {trial.phase === "trialing" && (
