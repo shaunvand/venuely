@@ -65,6 +65,22 @@ export async function saveVenueBanking(
   return { ok: true };
 }
 
+// Save the venue's chosen invoice template + theme (accent + logo).
+export async function saveVenueInvoiceDesign(
+  venueId: string,
+  input: { template: string; accent: string; logoUrl: string | null },
+): Promise<{ ok: true }> {
+  await requireRole(["venue_admin", "owner"]);
+  const supabase = await createClient();
+  const { INVOICE_TEMPLATES, resolveInvoiceTheme } = await import("@/lib/invoice/templates");
+  const template = (Object.prototype.hasOwnProperty.call(INVOICE_TEMPLATES, input.template) ? input.template : "classic");
+  const theme = resolveInvoiceTheme({ accent: input.accent, logoUrl: input.logoUrl });
+  const { error } = await supabase.from("venues").update({ invoice_template: template, invoice_theme: theme }).eq("id", venueId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/venue/billing");
+  return { ok: true };
+}
+
 // Create the venue's Paystack subaccount (percentage_charge = the venue's
 // platform_fee_rate, expressed as a percent) and store the payout fields.
 export async function connectPayouts(formData: FormData) {
