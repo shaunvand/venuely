@@ -41,6 +41,9 @@ export function InventoryManager({
   const [bulkCommission, setBulkCommission] = useState("");
   const [bulkCommissionType, setBulkCommissionType] = useState<"fixed" | "percent">("percent");
   const [query, setQuery] = useState("");
+  // Which card+field is being inline-edited directly on the row (price / stock /
+  // commission), so the owner can tweak money without opening the full editor.
+  const [inlineEdit, setInlineEdit] = useState<{ id: string; field: "price" | "stock" | "commission" } | null>(null);
 
   const displayed = query.trim()
     ? items.filter((i) => {
@@ -179,6 +182,23 @@ export function InventoryManager({
     startTransition(async () => { await bulkSetActive(type, [id], active); });
   }
 
+  // Inline single-field saves (reuse the generic updateItem action).
+  function saveInlinePrice(id: string, v: string) {
+    const n = v.trim() === "" ? null : Number(v);
+    if (n != null && !Number.isFinite(n)) return;
+    startTransition(async () => { await updateItem(type, id, { [priceColumn]: n }); setInlineEdit(null); });
+  }
+  function saveInlineStock(id: string, v: string) {
+    const n = v.trim() === "" ? null : Math.max(0, Math.round(Number(v)));
+    if (n != null && !Number.isFinite(n)) return;
+    startTransition(async () => { await updateItem(type, id, { stock_total: n }); setInlineEdit(null); });
+  }
+  function saveInlineCommission(id: string, v: string, t: "fixed" | "percent") {
+    const n = v.trim() === "" ? 0 : Number(v);
+    if (!Number.isFinite(n)) return;
+    startTransition(async () => { await updateItem(type, id, { commission_value: n, commission_type: t }); setInlineEdit(null); });
+  }
+
   async function onImportFile(f: File) {
     setImporting(true); setImportMsg("Reading sheet & detecting columns…");
     try {
@@ -222,6 +242,8 @@ export function InventoryManager({
   }
 
   const hasCategory = fields.some((f) => f.key === "category");
+  const hasStock = fields.some((f) => f.key === "stock_total");
+  const hasCommission = fields.some((f) => f.key === "commission_value");
 
   return (
     <div className="vy-card space-y-4">
@@ -309,7 +331,6 @@ export function InventoryManager({
               const cv = Number(i.commission_value ?? 0);
               const ct = String(i.commission_type ?? "fixed");
               const commissionAmt = ct === "percent" ? Math.round(base * cv) / 100 : cv;
-              const total = ct === "percent" ? Math.round(base * (1 + cv / 100) * 100) / 100 : Math.round((base + cv) * 100) / 100;
               const stock = Number(i.stock_total ?? 0);
               const isSel = selected.has(i.id);
               return (
@@ -377,22 +398,76 @@ export function InventoryManager({
                     ) : null}
                   </div>
 
-                  {/* Right: price + commission + actions */}
-                  <div className="flex-shrink-0 flex flex-col items-end justify-between gap-2 sm:min-w-[200px] pr-1">
-                    <div className="text-right">
-                      <div className="font-serif text-lg" style={{ color: "var(--poppy)", fontWeight: 700 }}>
-                        R{base.toLocaleString("en-ZA")}
-                      </div>
-                      {showExtraColumns && cv > 0 && (
-                        <div className="text-[10px]" style={{ color: "var(--ink-2)" }}>
-                          +{ct === "percent" ? `${cv}%` : `R${cv.toLocaleString()}`} · total R{total.toLocaleString("en-ZA")}
-                        </div>
+                  {/* Right: editable price / stock / commission + actions */}
+                  <div className="flex-shrink-0 flex flex-col items-end justify-between gap-2 sm:min-w-[220px] pr-1">
+                    <div className="flex flex-col items-end gap-1 text-right">
+                      {/* PRICE — click to edit inline */}
+                      {inlineEdit?.id === i.id && inlineEdit.field === "price" ? (
+                        <InlineNumber
+                          initial={base ? String(base) : ""}
+                          prefix="R"
+                          pending={isPending}
+                          onCancel={() => setInlineEdit(null)}
+                          onSave={(v) => saveInlinePrice(i.id, v)}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setInlineEdit({ id: i.id, field: "price" })}
+                          className="group inline-flex items-center gap-1 font-serif text-lg"
+                          style={{ color: "var(--poppy)", fontWeight: 700 }}
+                          title="Click to edit price"
+                        >
+                          R{base.toLocaleString("en-ZA")}
+                          <span className="opacity-0 group-hover:opacity-60 text-[10px]" aria-hidden>✎</span>
+                        </button>
                       )}
-                      {showExtraColumns && cv > 0 && commissionAmt > 0 && (
-                        <div className="text-[10px]" style={{ color: "var(--sage)" }}>
-                          R{Math.round(commissionAmt).toLocaleString("en-ZA")} commission
-                        </div>
-                      )}
+
+                      {/* STOCK — rentals only */}
+                      {hasStock && (inlineEdit?.id === i.id && inlineEdit.field === "stock" ? (
+                        <InlineNumber
+                          initial={stock ? String(stock) : ""}
+                          suffix="in stock"
+                          pending={isPending}
+                          onCancel={() => setInlineEdit(null)}
+                          onSave={(v) => saveInlineStock(i.id, v)}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setInlineEdit({ id: i.id, field: "stock" })}
+                          className="group inline-flex items-center gap-1 text-[11px]"
+                          style={{ color: stock > 0 ? "#1f5d3e" : "var(--ink-2)" }}
+                          title="Click to edit stock"
+                        >
+                          {stock > 0 ? `${stock} in stock` : "Set stock"}
+                          <span className="opacity-0 group-hover:opacity-60" aria-hidden>✎</span>
+                        </button>
+                      ))}
+
+                      {/* COMMISSION — value + fixed/percent */}
+                      {hasCommission && (inlineEdit?.id === i.id && inlineEdit.field === "commission" ? (
+                        <InlineCommission
+                          initialValue={cv ? String(cv) : ""}
+                          initialType={ct === "percent" ? "percent" : "fixed"}
+                          pending={isPending}
+                          onCancel={() => setInlineEdit(null)}
+                          onSave={(v, t) => saveInlineCommission(i.id, v, t)}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setInlineEdit({ id: i.id, field: "commission" })}
+                          className="group inline-flex items-center gap-1 text-[11px]"
+                          style={{ color: "var(--sage)" }}
+                          title="Click to edit commission"
+                        >
+                          {cv > 0
+                            ? `${ct === "percent" ? `${cv}%` : `R${cv.toLocaleString("en-ZA")}`} commission${commissionAmt > 0 ? ` · R${Math.round(commissionAmt).toLocaleString("en-ZA")}` : ""}`
+                            : "Set commission"}
+                          <span className="opacity-0 group-hover:opacity-60" aria-hidden>✎</span>
+                        </button>
+                      ))}
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -589,6 +664,75 @@ export function InventoryManager({
         </Lightbox>
       )}
     </div>
+  );
+}
+
+// Inline numeric editor used on the item row (price / stock). Holds its own
+// draft so typing doesn't re-render the whole list; Enter saves, Esc cancels.
+function InlineNumber({ initial, prefix, suffix, pending, onSave, onCancel }: {
+  initial: string;
+  prefix?: string;
+  suffix?: string;
+  pending: boolean;
+  onSave: (v: string) => void;
+  onCancel: () => void;
+}) {
+  const [v, setV] = useState(initial);
+  return (
+    <span className="inline-flex items-center gap-1">
+      {prefix && <span className="text-xs" style={{ color: "var(--ink-2)" }}>{prefix}</span>}
+      <input
+        autoFocus
+        type="number"
+        step="0.01"
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") onSave(v); else if (e.key === "Escape") onCancel(); }}
+        className="w-20 border rounded-full px-2 py-0.5 text-sm"
+        style={{ borderColor: "var(--line)" }}
+      />
+      {suffix && <span className="text-[10px]" style={{ color: "var(--ink-2)" }}>{suffix}</span>}
+      <button type="button" disabled={pending} onClick={() => onSave(v)} className="text-[11px] px-1.5 py-0.5 rounded-full" style={{ background: "var(--leaf)", color: "#1f5d3e" }} aria-label="Save">✓</button>
+      <button type="button" onClick={onCancel} className="text-[11px] px-1.5 py-0.5 rounded-full" style={{ color: "var(--ink-2)" }} aria-label="Cancel">✕</button>
+    </span>
+  );
+}
+
+// Inline commission editor: a value plus a fixed (R) / percent (%) toggle.
+function InlineCommission({ initialValue, initialType, pending, onSave, onCancel }: {
+  initialValue: string;
+  initialType: "fixed" | "percent";
+  pending: boolean;
+  onSave: (v: string, t: "fixed" | "percent") => void;
+  onCancel: () => void;
+}) {
+  const [v, setV] = useState(initialValue);
+  const [t, setT] = useState<"fixed" | "percent">(initialType);
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        autoFocus
+        type="number"
+        step="0.01"
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") onSave(v, t); else if (e.key === "Escape") onCancel(); }}
+        className="w-16 border rounded-full px-2 py-0.5 text-sm"
+        style={{ borderColor: "var(--line)" }}
+      />
+      <select
+        value={t}
+        onChange={(e) => setT(e.target.value as "fixed" | "percent")}
+        className="border rounded-full px-1.5 py-0.5 text-xs bg-white"
+        style={{ borderColor: "var(--line)" }}
+        aria-label="Commission type"
+      >
+        <option value="percent">%</option>
+        <option value="fixed">R fixed</option>
+      </select>
+      <button type="button" disabled={pending} onClick={() => onSave(v, t)} className="text-[11px] px-1.5 py-0.5 rounded-full" style={{ background: "var(--leaf)", color: "#1f5d3e" }} aria-label="Save">✓</button>
+      <button type="button" onClick={onCancel} className="text-[11px] px-1.5 py-0.5 rounded-full" style={{ color: "var(--ink-2)" }} aria-label="Cancel">✕</button>
+    </span>
   );
 }
 
