@@ -61,6 +61,7 @@ export default async function VenueBillingPage() {
         initialTemplate={initialTemplate}
         initialAccent={initialAccent}
         initialLogo={initialLogo}
+        initiallySaved={!!row?.invoice_theme}
       />
     </div>
   );

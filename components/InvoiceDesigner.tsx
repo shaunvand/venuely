@@ -27,7 +27,7 @@ const SAMPLE_ITEMS = [
 const rand = (n: number) => `R${Math.round(n).toLocaleString("en-ZA")}`;
 
 export function InvoiceDesigner({
-  venueId, venueName, bank, initialTemplate, initialAccent, initialLogo,
+  venueId, venueName, bank, initialTemplate, initialAccent, initialLogo, initiallySaved = false,
 }: {
   venueId: string;
   venueName: string;
@@ -35,6 +35,7 @@ export function InvoiceDesigner({
   initialTemplate: InvoiceTemplateId;
   initialAccent: string;
   initialLogo: string | null;
+  initiallySaved?: boolean;
 }) {
   const router = useRouter();
   const [template, setTemplate] = useState<InvoiceTemplateId>(initialTemplate);
@@ -42,9 +43,29 @@ export function InvoiceDesigner({
   const [logoUrl, setLogoUrl] = useState<string | null>(initialLogo);
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [minimized, setMinimized] = useState(initiallySaved);
   const [isPending, startTransition] = useTransition();
 
   const tokens = resolveInvoiceTemplate(template);
+
+  // Saved state — collapse to the invoice preview with one button back to editing.
+  if (minimized) {
+    return (
+      <section className="rounded-lg border border-[color:var(--line)] bg-white p-6 space-y-4">
+        <div className="flex items-baseline justify-between flex-wrap gap-2">
+          <div>
+            <h2 className="text-lg font-semibold flex items-center gap-2" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
+              Invoice design — {tokens.name}
+              <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--leaf)", color: "#1f5d3e" }}>Saved ✓</span>
+            </h2>
+            <p className="text-sm text-[color:var(--ink-2)] mt-1">This is the invoice couples receive.</p>
+          </div>
+          <button type="button" onClick={() => { setMsg(null); setMinimized(false); }} className="vy-btn vy-btn-secondary">✎ Edit or change template</button>
+        </div>
+        <InvoicePreview tokens={tokens} accent={accent} logoUrl={logoUrl} venueName={venueName} bank={bank} />
+      </section>
+    );
+  }
 
   async function uploadLogo(file: File) {
     setUploading(true);
@@ -64,6 +85,7 @@ export function InvoiceDesigner({
       try {
         await saveVenueInvoiceDesign(venueId, { template, accent, logoUrl });
         setMsg("Invoice design saved ✓");
+        setMinimized(true);
         router.refresh();
       } catch (e) { setMsg(e instanceof Error ? e.message : "Save failed"); }
     });
