@@ -1,11 +1,13 @@
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
 import { YourVenueManager } from "@/components/YourVenueManager";
+import { PortalDesigner } from "@/components/PortalDesigner";
+import { resolveTemplate, resolveTheme } from "@/lib/portal/templates";
 
 export default async function YourVenuePage() {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
-  const [{ data: media }, { data: floorplans }] = await Promise.all([
+  const [{ data: media }, { data: floorplans }, { data: design }] = await Promise.all([
     supabase
       .from("media_assets")
       .select("id, url, label, kind, category, sort_order")
@@ -24,6 +26,7 @@ export default async function YourVenuePage() {
       .eq("owner_type", "venue")
       .eq("kind", "floorplan")
       .order("sort_order"),
+    supabase.from("venues").select("website, portal_template, portal_theme").eq("id", venue.id).single(),
   ]);
 
   const MEDIA_RE = /\.(jpe?g|png|webp|gif|avif|heic|mp4|mov|webm|m4v)(\?|$)/i;
@@ -43,6 +46,16 @@ export default async function YourVenuePage() {
     ...(media ?? []).filter((m) => isFloorplanCategory(m.category)),
   ].filter((m) => IMAGE_RE.test(String(m.url)));
 
+  // Portal design: chosen template + theme, falling back to the venue's existing
+  // brand primary/logo when no portal theme has been saved yet.
+  const designRow = design as { website: string | null; portal_template: string | null; portal_theme: unknown } | null;
+  const initialTemplate = resolveTemplate(designRow?.portal_template).id;
+  const savedTheme = resolveTheme(designRow?.portal_theme);
+  const initialTheme = designRow?.portal_theme
+    ? savedTheme
+    : { primary: venue.branding_primary || savedTheme.primary, accent: savedTheme.accent, logoUrl: venue.branding_logo_url || null };
+  const heroUrl = (clean[0]?.url as string | undefined) ?? null;
+
   return (
     <div className="space-y-8">
       <header>
@@ -54,6 +67,15 @@ export default async function YourVenuePage() {
           Import to auto-pull and label images already uploaded elsewhere.
         </p>
       </header>
+
+      <PortalDesigner
+        venueId={venue.id}
+        venueName={venue.name}
+        website={designRow?.website ?? null}
+        heroUrl={heroUrl}
+        initialTemplate={initialTemplate}
+        initialTheme={initialTheme}
+      />
 
       <YourVenueManager
         venueId={venue.id}
