@@ -42,7 +42,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
 
   const { data: wedding } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, guest_count, status, total_budget, notes, wedding_state, wedding_state_updated_at, portal_password_hash, invoiced_at, invoice_total, couple_paid_at, platform_fee_owed, platform_fee_paid_at, deposit_due_at, balance_due_at, couple_email, area_selections")
+    .select("id, slug, couple_names, wedding_date, wedding_end_date, guest_count, status, total_budget, notes, wedding_state, wedding_state_updated_at, portal_password_hash, invoiced_at, invoice_total, couple_paid_at, platform_fee_owed, platform_fee_paid_at, deposit_due_at, balance_due_at, couple_email, area_selections")
     .eq("venue_id", venue.id)
     .eq("slug", slug)
     .single();
@@ -234,7 +234,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
           <div className="vy-eyebrow">Wedding</div>
           <h1 className="vy-h1 mt-1">{wedding.couple_names}</h1>
           <p className="text-stone-600 text-sm">
-            {wedding.wedding_date ?? "Date TBD"} · {wedding.guest_count ?? "?"} guests · <span className="vy-tag vy-tag-soft">{wedding.status}</span>
+            {wedding.wedding_date ? (wedding.wedding_end_date ? `${wedding.wedding_date} → ${wedding.wedding_end_date}` : wedding.wedding_date) : "Date TBD"} · {wedding.guest_count ?? "?"} guests · <span className="vy-tag vy-tag-soft">{wedding.status}</span>
           </p>
           {wedding.wedding_state_updated_at && (
             <p className="text-xs text-stone-500 mt-1">
@@ -290,9 +290,10 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
 
       <form action={updateWeddingBasics.bind(null, wedding.id, wedding.slug)} className="vy-card grid gap-3 md:grid-cols-6">
         <div className="md:col-span-3 space-y-1"><label className="vy-label">Couple names</label><input name="couple_names" required defaultValue={wedding.couple_names} className="vy-input" /></div>
-        <div className="md:col-span-2 space-y-1"><label className="vy-label">Date</label><input name="wedding_date" type="date" defaultValue={wedding.wedding_date ?? ""} className="vy-input" /></div>
         <div className="space-y-1"><label className="vy-label">Guests</label><input name="guest_count" type="number" min="0" defaultValue={wedding.guest_count ?? ""} className="vy-input" /></div>
         <div className="md:col-span-2 space-y-1"><label className="vy-label">Total budget (R)</label><input name="total_budget" type="number" step="0.01" defaultValue={wedding.total_budget ?? ""} className="vy-input" /></div>
+        <div className="md:col-span-2 space-y-1"><label className="vy-label">Start date</label><input name="wedding_date" type="date" defaultValue={wedding.wedding_date ?? ""} className="vy-input" /></div>
+        <div className="md:col-span-2 space-y-1"><label className="vy-label">End date <span style={{ color: "var(--ink-2)", fontWeight: 400 }}>(optional)</span></label><input name="wedding_end_date" type="date" defaultValue={wedding.wedding_end_date ?? ""} className="vy-input" /></div>
         <div className="md:col-span-2 space-y-1"><label className="vy-label">Status</label>
           <select name="status" defaultValue={wedding.status} className="vy-select">
             <option value="inquiry">inquiry</option><option value="provisional">provisional</option>

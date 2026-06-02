@@ -1,6 +1,29 @@
 import Link from "next/link";
 
-type Booking = { slug: string; couple_names: string; wedding_date: string };
+type Booking = { slug: string; couple_names: string; wedding_date: string; wedding_end_date?: string | null };
+
+// Expand a booking's wedding_date..wedding_end_date span into one ISO key per
+// day so multi-day weddings light up every day they cover. A null/absent end
+// date (or an end before the start) collapses to the single start day. Capped to
+// keep bad data from runaway expansion.
+function bookingDays(b: Booking): string[] {
+  const start = String(b.wedding_date).slice(0, 10);
+  if (!start) return [];
+  const endRaw = b.wedding_end_date ? String(b.wedding_end_date).slice(0, 10) : "";
+  if (!endRaw || endRaw <= start) return [start];
+  const s = new Date(`${start}T00:00:00`);
+  const e = new Date(`${endRaw}T00:00:00`);
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return [start];
+  const out: string[] = [];
+  const cursor = new Date(s);
+  let guard = 0;
+  while (cursor <= e && guard < 120) {
+    out.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`);
+    cursor.setDate(cursor.getDate() + 1);
+    guard++;
+  }
+  return out;
+}
 
 // Optional overlays for the dedicated availability calendar. The venue
 // dashboard renders BookingsCalendar with just `bookings`, so every new prop
@@ -23,13 +46,15 @@ export function BookingsCalendar({
   rentalHolds?: RentalHold[];
   weddingHref?: string;
 }) {
-  // Group bookings by ISO date (yyyy-mm-dd).
+  // Group bookings by ISO date (yyyy-mm-dd), expanding multi-day spans so each
+  // covered day shows the wedding.
   const byDate = new Map<string, Booking[]>();
   for (const b of bookings) {
-    const k = String(b.wedding_date).slice(0, 10);
-    const list = byDate.get(k) ?? [];
-    list.push(b);
-    byDate.set(k, list);
+    for (const k of bookingDays(b)) {
+      const list = byDate.get(k) ?? [];
+      list.push(b);
+      byDate.set(k, list);
+    }
   }
 
   // Group accommodation room-nights by ISO date.

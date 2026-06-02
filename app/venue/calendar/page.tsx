@@ -91,7 +91,7 @@ export default async function VenueCalendar() {
       )}
 
       <BookingsCalendar
-        bookings={weddings.map((w) => ({ slug: w.slug, couple_names: w.couple_names, wedding_date: w.wedding_date }))}
+        bookings={weddings.map((w) => ({ slug: w.slug, couple_names: w.couple_names, wedding_date: w.wedding_date, wedding_end_date: w.wedding_end_date }))}
         months={6}
         roomNights={roomNights}
         rentalHolds={rentalHolds}

@@ -15,6 +15,23 @@ type WeddingState = {
   suppliers?: Array<{ id: number; name: string; category?: string; status?: string; price?: string; fromVendorId?: string }>;
 };
 
+// Normalise a (start, end) date-range form pair into the columns we store.
+// - blank start  → both null (date TBD)
+// - blank end    → single-day event (end stays null)
+// - end < start  → swap, so the earlier date is always the start
+// - end === start → collapse to single-day (end null) to keep data tidy
+function normaliseDateRange(
+  startRaw: string | null | undefined,
+  endRaw: string | null | undefined,
+): { startDate: string | null; endDate: string | null } {
+  let start = (startRaw || "").trim() || null;
+  let end = (endRaw || "").trim() || null;
+  if (!start) return { startDate: null, endDate: null };
+  if (end && end < start) [start, end] = [end, start];
+  if (end && end === start) end = null;
+  return { startDate: start, endDate: end };
+}
+
 function parseMoney(s: string | undefined | null): number {
   if (!s) return 0;
   const n = Number(String(s).replace(/[^\d.\-]/g, ""));
@@ -211,13 +228,18 @@ export async function createWedding(venueId: string, _venueSlug: string, formDat
   const guestStr = formData.get("guest_count") as string;
   const statusStr = (formData.get("status") as string)?.trim() || "inquiry";
   const passwordStr = (formData.get("portal_password") as string)?.trim() || "";
+  const { startDate, endDate } = normaliseDateRange(
+    formData.get("wedding_date") as string,
+    formData.get("wedding_end_date") as string,
+  );
   const { data, error } = await supabase
     .from("weddings")
     .insert({
       venue_id: venueId,
       slug,
       couple_names: couples,
-      wedding_date: (formData.get("wedding_date") as string) || null,
+      wedding_date: startDate,
+      wedding_end_date: endDate,
       guest_count: guestStr ? Number(guestStr) : null,
       status: statusStr,
       portal_password_hash: passwordStr ? hashPassword(passwordStr) : null,
@@ -234,9 +256,14 @@ export async function updateWeddingBasics(weddingId: string, slug: string, formD
   const supabase = await createClient();
   const guestStr = formData.get("guest_count") as string;
   const budgetStr = formData.get("total_budget") as string;
+  const { startDate, endDate } = normaliseDateRange(
+    formData.get("wedding_date") as string,
+    formData.get("wedding_end_date") as string,
+  );
   const patch: Record<string, unknown> = {
     couple_names: (formData.get("couple_names") as string)?.trim(),
-    wedding_date: (formData.get("wedding_date") as string) || null,
+    wedding_date: startDate,
+    wedding_end_date: endDate,
     guest_count: guestStr ? Number(guestStr) : null,
     total_budget: budgetStr ? Number(budgetStr) : null,
     status: (formData.get("status") as string) || "inquiry",

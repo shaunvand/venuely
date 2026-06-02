@@ -4,7 +4,26 @@ import { createClient } from "@/lib/supabase/server";
 import { computeSetupSteps } from "@/lib/venue/setup";
 import { applyMarkup } from "@/lib/billing/compute";
 import { WelcomeImportModal } from "@/components/WelcomeImportModal";
-import { BookingsCalendar } from "@/components/BookingsCalendar";
+import { OverviewCalendar } from "@/components/OverviewCalendar";
+
+// Expand an accommodation booking's check_in..check_out into one ISO night per
+// row (hotel semantics: occupies check_in through check_out − 1). Capped to keep
+// bad data from blowing up the map.
+function expandNights(checkIn: string, checkOut: string): string[] {
+  const start = new Date(`${String(checkIn).slice(0, 10)}T00:00:00Z`);
+  const end = new Date(`${String(checkOut).slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(start.getTime())) return [];
+  if (Number.isNaN(end.getTime()) || end <= start) return [start.toISOString().slice(0, 10)];
+  const out: string[] = [];
+  const cursor = new Date(start);
+  let guard = 0;
+  while (cursor < end && guard < 90) {
+    out.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    guard++;
+  }
+  return out;
+}
 
 type Commish = { commission_value: number | null; commission_type: string | null };
 type Priced = { price?: number | string | null; price_per_night?: number | string | null; price_from?: number | string | null } & Commish & { active?: boolean | null };
@@ -84,10 +103,12 @@ export default async function VenueOverview() {
     { data: rentalRows },
     { data: roomRows },
     { data: vendorRows },
+    { data: accomRoomRows },
+    { data: accomBookingRows },
   ] = await Promise.all([
     supabase.from("weddings").select("id, slug, couple_names, wedding_date").eq("venue_id", venue.id).gte("wedding_date", todayIso).order("wedding_date").limit(5),
     supabase.from("weddings").select("id, slug, couple_names, wedding_date").eq("venue_id", venue.id).order("created_at", { ascending: false }).limit(5),
-    supabase.from("weddings").select("slug, couple_names, wedding_date").eq("venue_id", venue.id),
+    supabase.from("weddings").select("slug, couple_names, wedding_date, wedding_end_date").eq("venue_id", venue.id),
     // Couple-edited portal state — the single source of truth. We aggregate these
     // blobs for the engagement counts instead of the dead relational tables.
     supabase.from("weddings").select("wedding_state, wedding_state_updated_at").eq("venue_id", venue.id),
@@ -95,7 +116,22 @@ export default async function VenueOverview() {
     supabase.from("rental_items").select("price, commission_value, commission_type, active, stock_total").eq("venue_id", venue.id),
     supabase.from("accommodation_rooms").select("price_per_night, commission_value, commission_type, active").eq("venue_id", venue.id),
     supabase.from("vendor_partners").select("price_from, commission_value, commission_type, active").eq("venue_id", venue.id),
+    supabase.from("accommodation_rooms").select("id, name, sleeps, active, sort_order").eq("venue_id", venue.id).order("sort_order"),
+    supabase.from("accommodation_bookings").select("room_id, check_in, check_out, wedding:weddings!inner(venue_id)").eq("wedding.venue_id", venue.id),
   ]);
+
+  // Active accommodation rooms + the per-night occupancy map that powers the
+  // calendar's live "Rooms available" panel.
+  const activeRooms = ((accomRoomRows ?? []) as Array<{ id: string; name: string; sleeps: number | null; active: boolean | null }>)
+    .filter((r) => r.active !== false)
+    .map((r) => ({ id: r.id, name: r.name, sleeps: Number(r.sleeps ?? 0) }));
+  const roomOccupancy: Record<string, string[]> = {};
+  ((accomBookingRows ?? []) as Array<{ room_id: string; check_in: string; check_out: string }>).forEach((b) => {
+    if (!b.room_id) return;
+    for (const night of expandNights(b.check_in, b.check_out)) {
+      (roomOccupancy[night] ??= []).push(b.room_id);
+    }
+  });
 
   // Roll the per-wedding wedding_state blobs up into venue-wide couple-engagement
   // totals (guests, selections, booked suppliers, checklist progress).
@@ -274,29 +310,17 @@ export default async function VenueOverview() {
         </Link>
       </header>
 
-      {/* Top row — current-month calendar on the left, headline stats stacked on the right */}
-      <div className="grid lg:grid-cols-2 gap-4 items-stretch">
-        <div>
-          <BookingsCalendar
-            bookings={(allWeddings ?? []) as { slug: string; couple_names: string; wedding_date: string }[]}
-            months={1}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4 content-start">
-          {stats.slice(0, 4).map((s) => (
-            <Link key={s.label} href={s.href} className="vy-stat hover:shadow-md transition-shadow relative overflow-hidden">
-              <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: s.accent }} />
-              <div className="vy-stat-label">{s.label}</div>
-              <div className="vy-stat-value" style={{ color: s.accent }}>{s.value}</div>
-              <div className="text-xs mt-1" style={{ color: "var(--ink-2)" }}>{s.sub}</div>
-            </Link>
-          ))}
-        </div>
-      </div>
+      {/* Enlarged calendar across the top — bookings, multi-day spans, and a live
+          availability check driven by selecting dates. */}
+      <OverviewCalendar
+        bookings={(allWeddings ?? []) as { slug: string; couple_names: string; wedding_date: string; wedding_end_date: string | null }[]}
+        rooms={activeRooms}
+        roomOccupancy={roomOccupancy}
+      />
 
-      {/* Remaining stats — secondary row */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {stats.slice(4).map((s) => (
+      {/* Headline stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        {stats.map((s) => (
           <Link key={s.label} href={s.href} className="vy-stat hover:shadow-md transition-shadow relative overflow-hidden">
             <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: s.accent }} />
             <div className="vy-stat-label">{s.label}</div>
@@ -466,9 +490,6 @@ export default async function VenueOverview() {
           </div>
         </section>
       </div>
-
-      {/* Bookings calendar — booked dates highlighted, hover shows couple name */}
-      <BookingsCalendar bookings={(allWeddings ?? []) as { slug: string; couple_names: string; wedding_date: string }[]} />
 
       {/* Upcoming weddings list */}
       <section>

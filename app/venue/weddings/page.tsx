@@ -14,7 +14,7 @@ export default async function VenueWeddings() {
 
   const { data: weddings } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, guest_count, status, portal_password_hash, invoiced_at, couple_paid_at, platform_fee_owed, platform_fee_paid_at")
+    .select("id, slug, couple_names, wedding_date, wedding_end_date, guest_count, status, portal_password_hash, invoiced_at, couple_paid_at, platform_fee_owed, platform_fee_paid_at")
     .eq("venue_id", venue.id)
     .order("wedding_date", { ascending: false });
 
@@ -33,17 +33,21 @@ export default async function VenueWeddings() {
           <label className="vy-label">Couple names</label>
           <input name="couple_names" required placeholder="Alex & Sam" className="vy-input" />
         </div>
-        <div className="md:col-span-2 space-y-1">
-          <label className="vy-label">URL slug (optional)</label>
-          <input name="slug" placeholder="auto-generated" className="vy-input font-mono text-sm" />
-        </div>
         <div className="space-y-1">
           <label className="vy-label">Guests</label>
           <input name="guest_count" type="number" min="0" className="vy-input" />
         </div>
-        <div className="space-y-1">
-          <label className="vy-label">Date</label>
+        <div className="md:col-span-2 space-y-1">
+          <label className="vy-label">URL slug (optional)</label>
+          <input name="slug" placeholder="auto-generated" className="vy-input font-mono text-sm" />
+        </div>
+        <div className="md:col-span-2 space-y-1">
+          <label className="vy-label">Start date</label>
           <input name="wedding_date" type="date" className="vy-input" />
+        </div>
+        <div className="md:col-span-2 space-y-1">
+          <label className="vy-label">End date <span style={{ color: "var(--ink-2)", fontWeight: 400 }}>(multi-day — optional)</span></label>
+          <input name="wedding_end_date" type="date" className="vy-input" />
         </div>
         <div className="md:col-span-2 space-y-1">
           <label className="vy-label">Status</label>
@@ -55,12 +59,12 @@ export default async function VenueWeddings() {
             <option value="cancelled">cancelled</option>
           </select>
         </div>
-        <div className="md:col-span-3 space-y-1">
+        <div className="md:col-span-4 space-y-1">
           <label className="vy-label">Portal password (optional)</label>
           <input name="portal_password" type="text" placeholder="Leave blank for Supabase login access" className="vy-input" autoComplete="off" />
         </div>
-        <div className="md:col-span-6 flex justify-end">
-          <button className="vy-btn vy-btn-primary">+ Add wedding</button>
+        <div className="md:col-span-2 flex items-end justify-end">
+          <button className="vy-btn vy-btn-primary w-full md:w-auto">+ Add wedding</button>
         </div>
       </form>
 
@@ -86,7 +90,7 @@ export default async function VenueWeddings() {
                 return (
                   <tr key={w.id} className="align-top">
                     <td><div className="font-medium">{w.couple_names}</div></td>
-                    <td>{w.wedding_date ?? "—"}</td>
+                    <td className="whitespace-nowrap">{w.wedding_date ? (w.wedding_end_date ? `${w.wedding_date} → ${w.wedding_end_date}` : w.wedding_date) : "—"}</td>
                     <td>{w.guest_count ?? "—"}</td>
                     <td><span className="vy-tag vy-tag-soft">{w.status}</span></td>
                     <td className="font-mono text-xs text-stone-500 max-w-[180px] truncate" title={portalUrl}>{portalUrl}</td>

@@ -22,6 +22,7 @@ export type CalendarWedding = {
   slug: string;
   couple_names: string;
   wedding_date: string; // yyyy-mm-dd
+  wedding_end_date: string | null; // yyyy-mm-dd, inclusive — null = single day
   status: string | null;
   guest_count: number | null;
 };
@@ -82,7 +83,7 @@ export async function getVenueCalendar(): Promise<CalendarData> {
 
   const { data: weddingRows } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, status, guest_count")
+    .select("id, slug, couple_names, wedding_date, wedding_end_date, status, guest_count")
     .eq("venue_id", venue.id)
     .order("wedding_date", { ascending: true });
 
@@ -93,6 +94,7 @@ export async function getVenueCalendar(): Promise<CalendarData> {
       slug: w.slug,
       couple_names: w.couple_names,
       wedding_date: isoSlice(w.wedding_date),
+      wedding_end_date: w.wedding_end_date ? isoSlice(w.wedding_end_date) : null,
       status: w.status ?? null,
       guest_count: w.guest_count ?? null,
     }));
