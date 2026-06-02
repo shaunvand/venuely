@@ -365,7 +365,7 @@ function PortalPreview({
           </div>
           <div className="p-4 flex flex-col justify-center" style={{ background: accent + "33" }}>
             <div className="text-[10px] uppercase tracking-widest" style={{ color: "var(--ink-2)" }}>Wedding portal</div>
-            <div className="text-2xl leading-tight" style={{ ...headingStyle, color: "var(--ink)" }}>Alex &amp; Sam</div>
+            <div className="text-2xl leading-tight" style={{ ...headingStyle, color: "var(--ink)" }}>Adam &amp; Eve</div>
             <div className="text-[11px]" style={{ color: "var(--ink-2)" }}>{venueName} · 14 Dec 2025</div>
           </div>
         </div>
@@ -377,7 +377,7 @@ function PortalPreview({
           </div>
           <div className="pt-3">
             <div className="text-[10px] uppercase tracking-widest" style={{ color: "var(--ink-2)" }}>Wedding portal</div>
-            <div className="text-2xl leading-tight" style={{ ...headingStyle, color: "var(--ink)" }}>Alex &amp; Sam</div>
+            <div className="text-2xl leading-tight" style={{ ...headingStyle, color: "var(--ink)" }}>Adam &amp; Eve</div>
             <div className="text-[11px]" style={{ color: "var(--ink-2)" }}>{venueName} · 14 Dec 2025</div>
           </div>
         </div>
@@ -387,7 +387,7 @@ function PortalPreview({
           <div className="absolute top-3 left-3 z-10"><PreviewLogo logoUrl={logoUrl} venueName={venueName} headingStyle={headingStyle} /></div>
           <div className="absolute bottom-3 left-3 right-3 z-10">
             <div className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.85)" }}>Wedding portal</div>
-            <div className="text-xl leading-tight text-white" style={headingStyle}>Alex &amp; Sam</div>
+            <div className="text-xl leading-tight text-white" style={headingStyle}>Adam &amp; Eve</div>
             <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.9)" }}>{venueName} · 14 Dec 2025</div>
           </div>
           {onEditCover && <CoverEditHint label={editLabel} />}
