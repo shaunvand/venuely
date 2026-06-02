@@ -252,6 +252,15 @@ export async function createWedding(venueId: string, _venueSlug: string, formDat
   if (data) redirect(`/venue/weddings/${data.slug}`);
 }
 
+// Permanently delete a wedding (e.g. cancelled). FK cascades remove the couple's
+// portal state, charges, payments, members, invites, etc. Irreversible.
+export async function deleteWedding(weddingId: string, _slug: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("weddings").delete().eq("id", weddingId);
+  if (error) throw new Error(`Could not delete wedding: ${error.message}`);
+  revalidatePath("/venue/weddings");
+}
+
 export async function updateWeddingBasics(weddingId: string, slug: string, formData: FormData) {
   const supabase = await createClient();
   const guestStr = formData.get("guest_count") as string;

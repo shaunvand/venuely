@@ -9,16 +9,20 @@ export function WeddingRowActions({
   passwordSet,
   invoicedAt,
   couplePaidAt,
+  coupleNames,
   setPasswordAction,
   markCouplePaidAction,
+  deleteAction,
 }: {
   portalUrl: string;
   slug: string;
   passwordSet: boolean;
   invoicedAt: string | null;
   couplePaidAt: string | null;
+  coupleNames?: string;
   setPasswordAction: (formData: FormData) => void;
   markCouplePaidAction: () => void;
+  deleteAction?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
@@ -43,6 +47,11 @@ export function WeddingRowActions({
   function markPaid() {
     if (!confirm("Mark this couple as paid?")) return;
     startTransition(async () => { await markCouplePaidAction(); });
+  }
+  function remove() {
+    if (!deleteAction) return;
+    if (!confirm(`Delete ${coupleNames ? `${coupleNames}'s` : "this"} wedding?\n\nThis permanently removes their portal and all planning data. This cannot be undone.`)) return;
+    startTransition(async () => { await deleteAction(); });
   }
 
   return (
@@ -86,6 +95,11 @@ export function WeddingRowActions({
         )}
         <Link href={`/venue/weddings/${slug}`} className="px-2 py-1 rounded-full border border-stone-300 bg-white hover:bg-stone-100">Manage</Link>
         <Link href={`/${slug}`} target="_blank" className="px-2 py-1 rounded-full bg-stone-900 text-white hover:bg-stone-700">Open ↗</Link>
+        {deleteAction && (
+          <button onClick={remove} disabled={isPending} className="px-2 py-1 rounded-full border border-red-200 text-red-700 bg-white hover:bg-red-50 disabled:opacity-50" title="Delete wedding">
+            Delete
+          </button>
+        )}
       </div>
     </div>
   );

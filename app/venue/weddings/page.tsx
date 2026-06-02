@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
-import { createWedding, setPortalPassword, markCouplePaid } from "./actions";
+import { createWedding, setPortalPassword, markCouplePaid, deleteWedding } from "./actions";
 import { WeddingRowActions } from "@/components/WeddingRowActions";
 
 export default async function VenueWeddings() {
@@ -106,8 +106,10 @@ export default async function VenueWeddings() {
                         passwordSet={!!w.portal_password_hash}
                         invoicedAt={w.invoiced_at}
                         couplePaidAt={w.couple_paid_at}
+                        coupleNames={w.couple_names}
                         setPasswordAction={setPortalPassword.bind(null, w.id, w.slug)}
                         markCouplePaidAction={markCouplePaid.bind(null, w.id, w.slug)}
+                        deleteAction={deleteWedding.bind(null, w.id, w.slug)}
                       />
                     </td>
                   </tr>
