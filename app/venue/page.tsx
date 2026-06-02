@@ -105,6 +105,8 @@ export default async function VenueOverview() {
     { data: vendorRows },
     { data: accomRoomRows },
     { data: accomBookingRows },
+    { data: cataCatRows },
+    { data: rentalCatRows },
   ] = await Promise.all([
     supabase.from("weddings").select("id, slug, couple_names, wedding_date").eq("venue_id", venue.id).gte("wedding_date", todayIso).order("wedding_date").limit(5),
     supabase.from("weddings").select("id, slug, couple_names, wedding_date").eq("venue_id", venue.id).order("created_at", { ascending: false }).limit(5),
@@ -118,7 +120,29 @@ export default async function VenueOverview() {
     supabase.from("vendor_partners").select("price_from, commission_value, commission_type, active").eq("venue_id", venue.id),
     supabase.from("accommodation_rooms").select("id, name, sleeps, active, sort_order").eq("venue_id", venue.id).order("sort_order"),
     supabase.from("accommodation_bookings").select("room_id, check_in, check_out, wedding:weddings!inner(venue_id)").eq("wedding.venue_id", venue.id),
+    supabase.from("catalogue_items").select("category").eq("venue_id", venue.id),
+    supabase.from("rental_items").select("category").eq("venue_id", venue.id),
   ]);
+
+  // Marketplace snapshot — listing counts per type + how many distinct product
+  // categories the venue has populated across catalogue + rentals.
+  const cataCount = ((cataCatRows ?? []) as Array<{ category: string | null }>).length;
+  const rentalCount = ((rentalCatRows ?? []) as Array<{ category: string | null }>).length;
+  const accomUploaded = ((accomRoomRows ?? []) as Array<unknown>).length;
+  const vendorCount = ((vendorRows ?? []) as Array<unknown>).length;
+  const marketplaceTotal = cataCount + rentalCount + accomUploaded + vendorCount;
+  const distinctCategories = new Set(
+    [...((cataCatRows ?? []) as Array<{ category: string | null }>), ...((rentalCatRows ?? []) as Array<{ category: string | null }>)]
+      .map((r) => String(r.category ?? "").trim().toLowerCase())
+      .filter(Boolean),
+  ).size;
+  const marketplaceBreakdown = [
+    { label: "Catalogue", value: cataCount, grad: "linear-gradient(90deg, var(--poppy), #ffb199)" },
+    { label: "Rentals", value: rentalCount, grad: "linear-gradient(90deg, #C99A2E, #f0d28a)" },
+    { label: "Accommodation", value: accomUploaded, grad: "linear-gradient(90deg, #5F8B6A, #a9c9b1)" },
+    { label: "Partner vendors", value: vendorCount, grad: "linear-gradient(90deg, #D98B6A, #f3c3ac)" },
+  ];
+  const marketplaceMax = Math.max(1, ...marketplaceBreakdown.map((b) => b.value));
 
   // Active accommodation rooms + the per-night occupancy map that powers the
   // calendar's live "Rooms available" panel.
@@ -330,6 +354,36 @@ export default async function VenueOverview() {
         ))}
       </div>
 
+      {/* Marketplace at a glance — listing counts per type with gradient bars,
+          plus how many distinct product categories the venue has populated. */}
+      <section className="vy-card">
+        <div className="flex items-baseline justify-between flex-wrap gap-2">
+          <div>
+            <div className="vy-eyebrow">Marketplace</div>
+            <h2 className="vy-h2 mt-1">
+              {marketplaceTotal} listing{marketplaceTotal === 1 ? "" : "s"} · {distinctCategories} categor{distinctCategories === 1 ? "y" : "ies"}
+            </h2>
+          </div>
+          <Link href="/venue/catalogue" className="text-sm hover:underline" style={{ color: "var(--poppy)" }}>Manage →</Link>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3 mt-4">
+          {marketplaceBreakdown.map((b) => (
+            <Link key={b.label} href={b.label === "Partner vendors" ? "/venue/marketplace/caterers" : b.label === "Accommodation" ? "/venue/accommodation" : b.label === "Rentals" ? "/venue/rentals" : "/venue/catalogue"} className="block group">
+              <div className="flex justify-between text-xs mb-1">
+                <span style={{ color: "var(--ink-2)" }}>{b.label}</span>
+                <span className="font-medium tabular-nums">{b.value}</span>
+              </div>
+              <div className="h-2.5 rounded-full overflow-hidden" style={{ background: "var(--line)" }}>
+                <div className="h-full rounded-full transition-all group-hover:brightness-105" style={{ width: `${(b.value / marketplaceMax) * 100}%`, backgroundImage: b.grad, minWidth: b.value > 0 ? "6px" : "0" }} />
+              </div>
+            </Link>
+          ))}
+        </div>
+        <div className="text-xs mt-4" style={{ color: "var(--ink-2)" }}>
+          <strong style={{ color: "var(--ink)" }}>{accomUploaded}</strong> accommodation{accomUploaded === 1 ? "" : "s"} uploaded · <strong style={{ color: "var(--ink)" }}>{distinctCategories}</strong> product categor{distinctCategories === 1 ? "y" : "ies"} across catalogue &amp; rentals
+        </div>
+      </section>
+
       {/* Couple activity — derived from wedding_state (what couples actually edit
           in their /{slug} portal), not the dead relational tables. */}
       <section className="vy-card">
@@ -455,7 +509,7 @@ export default async function VenueOverview() {
             {bookingBuckets.map((b) => (
               <div key={b.key} className="flex-1 flex flex-col items-center gap-1.5">
                 <div className="text-[10px] tabular-nums font-medium" style={{ color: b.count ? "var(--poppy)" : "var(--ink-2)" }}>{b.count || ""}</div>
-                <div className="w-full rounded-t-md" style={{ height: `${(b.count / maxBookings) * 90}%`, background: b.count ? "var(--poppy)" : "var(--line)", minHeight: "4px" }} />
+                <div className="w-full rounded-t-md" style={{ height: `${(b.count / maxBookings) * 90}%`, backgroundImage: b.count ? "linear-gradient(180deg, #ff8a6e, var(--poppy))" : undefined, background: b.count ? undefined : "var(--line)", minHeight: "4px" }} />
                 <div className="text-[10px]" style={{ color: "var(--ink-2)" }}>{b.label}</div>
               </div>
             ))}
