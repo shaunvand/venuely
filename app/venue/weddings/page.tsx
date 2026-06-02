@@ -3,13 +3,14 @@ import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
 import { createWedding, setPortalPassword, markCouplePaid, deleteWedding } from "./actions";
 import { WeddingRowActions } from "@/components/WeddingRowActions";
+import { statusColor } from "@/lib/wedding/status";
 
 export default async function VenueWeddings() {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
   const h = await headers();
-  const host = h.get("host") ?? "venuely.co.za";
-  const proto = h.get("x-forwarded-proto") ?? "https";
+  const host = h.get("x-forwarded-host") || h.get("host") || "venuely.co.za";
+  const proto = h.get("x-forwarded-proto") || "https";
   const base = `${proto}://${host}`;
 
   const { data: weddings } = await supabase
@@ -92,7 +93,7 @@ export default async function VenueWeddings() {
                     <td><div className="font-medium">{w.couple_names}</div></td>
                     <td className="whitespace-nowrap">{w.wedding_date ? (w.wedding_end_date ? `${w.wedding_date} → ${w.wedding_end_date}` : w.wedding_date) : "—"}</td>
                     <td>{w.guest_count ?? "—"}</td>
-                    <td><span className="vy-tag vy-tag-soft">{w.status}</span></td>
+                    <td><span className="text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-full" style={{ background: statusColor(w.status).bg, color: statusColor(w.status).text }}>{w.status}</span></td>
                     <td className="font-mono text-xs text-stone-500 max-w-[180px] truncate" title={portalUrl}>{portalUrl}</td>
                     <td className="text-xs">
                       {w.platform_fee_paid_at ? <span className="text-emerald-700">✓ settled</span>

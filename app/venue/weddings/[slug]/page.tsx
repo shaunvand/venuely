@@ -8,6 +8,7 @@ import {
   markInvoiced, markCouplePaid, markPlatformFeePaid,
   sendPortalInvite, rotatePortalAccess, revokeCoupleAccess,
 } from "../actions";
+import { statusColor } from "@/lib/wedding/status";
 import { addPayment, deletePayment, addCharge, deleteCharge } from "./ledger-actions";
 import { sendDepositReminder, sendBalanceReminder } from "../reminder-actions";
 import { depositReminder, balanceReminder } from "@/lib/notifications";
@@ -36,8 +37,10 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
   const venue = await getCurrentVenue();
   const supabase = await createClient();
   const h = await headers();
-  const host = h.get("host") ?? "venuely.co.za";
-  const proto = h.get("x-forwarded-proto") ?? "https";
+  // Prefer x-forwarded-host so links use the public domain, not Render's internal
+  // dyno host (localhost:10000).
+  const host = h.get("x-forwarded-host") || h.get("host") || "venuely.co.za";
+  const proto = h.get("x-forwarded-proto") || "https";
   const portalUrl = `${proto}://${host}/${slug}`;
 
   const { data: wedding } = await supabase
@@ -234,7 +237,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
           <div className="vy-eyebrow">Wedding</div>
           <h1 className="vy-h1 mt-1">{wedding.couple_names}</h1>
           <p className="text-stone-600 text-sm">
-            {wedding.wedding_date ? (wedding.wedding_end_date ? `${wedding.wedding_date} → ${wedding.wedding_end_date}` : wedding.wedding_date) : "Date TBD"} · {wedding.guest_count ?? "?"} guests · <span className="vy-tag vy-tag-soft">{wedding.status}</span>
+            {wedding.wedding_date ? (wedding.wedding_end_date ? `${wedding.wedding_date} → ${wedding.wedding_end_date}` : wedding.wedding_date) : "Date TBD"} · {wedding.guest_count ?? "?"} guests · <span className="text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-full" style={{ background: statusColor(wedding.status).bg, color: statusColor(wedding.status).text }}>{wedding.status}</span>
           </p>
           {wedding.wedding_state_updated_at && (
             <p className="text-xs text-stone-500 mt-1">
