@@ -174,6 +174,10 @@ export function OverviewCalendar({ bookings, rooms, roomOccupancy, weddingHref =
       ? `${fmtShort(range.start)} – ${fmtShort(range.end)}`
       : fmtShort(range.start)
     : null;
+  const isRange = !!(range.end && range.end !== range.start);
+  const addHref = range.start
+    ? `/venue/weddings?date=${range.start}${isRange ? `&end=${range.end}` : ""}`
+    : "/venue/weddings";
 
   return (
     <div className="space-y-4">
@@ -294,6 +298,17 @@ export function OverviewCalendar({ bookings, rooms, roomOccupancy, weddingHref =
             );
           })}
         </div>
+
+        {/* Selection action bar — add a wedding/booking on the picked date(s) */}
+        {range.start && (
+          <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-3 border-t" style={{ borderColor: "var(--line)" }}>
+            <span className="text-xs" style={{ color: "var(--ink-2)" }}>Selected: <strong style={{ color: "var(--ink)" }}>{rangeLabel}</strong></span>
+            <div className="flex items-center gap-3">
+              <Link href={addHref} className="vy-btn vy-btn-primary text-xs">+ Add wedding on {isRange ? "these dates" : "this date"}</Link>
+              <button type="button" onClick={() => setRange({ start: null, end: null })} className="text-xs hover:underline" style={{ color: "var(--ink-2)" }}>Clear</button>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ---- Availability panels ---- */}

@@ -198,11 +198,13 @@ export function BookingsCalendar({
                       ...c.holds.slice(0, 6).map((h) => `· ${h.rental_name ?? "Rental"} ×${h.quantity}${h.couple_names ? ` (${h.couple_names})` : ""}`)
                     );
                   }
+                  // Empty days are a shortcut to add a wedding for that date.
+                  if (count === 0) tipLines.push("+ Add a wedding on this date");
                   const tooltip = tipLines.join("\n");
 
                   const colour = count === 0 ? "transparent" : couples === 1 ? "var(--poppy)" : "var(--peach)";
                   const txtColour = count === 0 ? "var(--ink)" : couples === 1 ? "#fff" : "var(--ink)";
-                  const link = count === 1 ? `/venue/weddings/${c.bookings[0].slug}` : count > 1 ? weddingHref : null;
+                  const link = count === 1 ? `/venue/weddings/${c.bookings[0].slug}` : count > 1 ? weddingHref : `/venue/weddings?date=${c.key}`;
 
                   const cell = (
                     <div

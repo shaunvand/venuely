@@ -5,9 +5,16 @@ import { createWedding, setPortalPassword, markCouplePaid, deleteWedding } from 
 import { WeddingRowActions } from "@/components/WeddingRowActions";
 import { statusColor } from "@/lib/wedding/status";
 
-export default async function VenueWeddings() {
+export default async function VenueWeddings({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string; end?: string }>;
+}) {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
+  const sp = await searchParams;
+  const prefillDate = (sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date)) ? sp.date : "";
+  const prefillEnd = (sp.end && /^\d{4}-\d{2}-\d{2}$/.test(sp.end)) ? sp.end : "";
   const h = await headers();
   const host = h.get("x-forwarded-host") || h.get("host") || "venuely.co.za";
   const proto = h.get("x-forwarded-proto") || "https";
@@ -27,6 +34,11 @@ export default async function VenueWeddings() {
         <p className="text-stone-600 text-sm mt-1">
           Add a booked couple to generate their private portal URL.
         </p>
+        {prefillDate && (
+          <p className="text-sm mt-2 font-medium" style={{ color: "var(--poppy)" }}>
+            New wedding for {prefillDate}{prefillEnd ? ` → ${prefillEnd}` : ""} — just add the couple below.
+          </p>
+        )}
       </header>
 
       <form action={createWedding.bind(null, venue.id, venue.slug)} className="vy-card grid gap-3 md:grid-cols-6">
@@ -44,11 +56,11 @@ export default async function VenueWeddings() {
         </div>
         <div className="md:col-span-2 space-y-1">
           <label className="vy-label">Start date</label>
-          <input name="wedding_date" type="date" className="vy-input" />
+          <input name="wedding_date" type="date" defaultValue={prefillDate} className="vy-input" />
         </div>
         <div className="md:col-span-2 space-y-1">
           <label className="vy-label">End date <span style={{ color: "var(--ink-2)", fontWeight: 400 }}>(multi-day — optional)</span></label>
-          <input name="wedding_end_date" type="date" className="vy-input" />
+          <input name="wedding_end_date" type="date" defaultValue={prefillEnd} className="vy-input" />
         </div>
         <div className="md:col-span-2 space-y-1">
           <label className="vy-label">Status</label>
