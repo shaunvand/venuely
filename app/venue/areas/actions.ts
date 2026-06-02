@@ -2,6 +2,46 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdmin } from "@supabase/supabase-js";
+
+// Service-role client for media_assets writes (RLS-restricted table). Every call
+// below first confirms the target area is visible to the user via RLS, so this
+// stays scoped to areas the venue admin actually owns.
+function admin() {
+  return createAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+export async function addAreaImages(areaId: string, urls: string[]) {
+  const supabase = await createClient();
+  const { data: area } = await supabase.from("venue_areas").select("id, venue_id").eq("id", areaId).single();
+  if (!area) throw new Error("Area not found");
+  const rows = (urls || []).filter(Boolean).map((url) => ({
+    venue_id: area.venue_id as string,
+    owner_type: "area",
+    owner_id: areaId,
+    kind: "photo",
+    url,
+  }));
+  if (rows.length) {
+    const { error } = await admin().from("media_assets").insert(rows);
+    if (error) throw new Error(error.message);
+  }
+  revalidatePath("/venue/areas");
+}
+
+export async function deleteAreaImage(mediaId: string) {
+  const supabase = await createClient();
+  const sb = admin();
+  const { data: m } = await sb.from("media_assets").select("id, owner_id, owner_type").eq("id", mediaId).single();
+  if (!m || m.owner_type !== "area") throw new Error("Image not found");
+  // Confirm the owning area is visible to this user before deleting.
+  const { data: area } = await supabase.from("venue_areas").select("id").eq("id", m.owner_id as string).single();
+  if (!area) throw new Error("Forbidden");
+  await sb.from("media_assets").delete().eq("id", mediaId);
+  revalidatePath("/venue/areas");
+}
 
 export async function addArea(venueId: string, formData: FormData) {
   const supabase = await createClient();
