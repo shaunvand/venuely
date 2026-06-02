@@ -414,12 +414,12 @@ export function InventoryManager({
                         <button
                           type="button"
                           onClick={() => setInlineEdit({ id: i.id, field: "price" })}
-                          className="group inline-flex items-center gap-1 font-serif text-lg"
-                          style={{ color: "var(--poppy)", fontWeight: 700 }}
+                          className="group rounded-full px-3 py-1 text-sm font-semibold transition hover:shadow-sm inline-flex items-center gap-1.5"
+                          style={{ background: "var(--cream)", color: "var(--poppy-deep)", border: "1px solid #f3d2cd" }}
                           title="Click to edit price"
                         >
                           R{base.toLocaleString("en-ZA")}
-                          <span className="opacity-0 group-hover:opacity-60 text-[10px]" aria-hidden>✎</span>
+                          <span className="opacity-40 group-hover:opacity-80 text-[10px]" aria-hidden>✎</span>
                         </button>
                       )}
 
@@ -436,12 +436,14 @@ export function InventoryManager({
                         <button
                           type="button"
                           onClick={() => setInlineEdit({ id: i.id, field: "stock" })}
-                          className="group inline-flex items-center gap-1 text-[11px]"
-                          style={{ color: stock > 0 ? "#1f5d3e" : "var(--ink-2)" }}
+                          className="group rounded-full px-3 py-1 text-[11px] font-medium transition hover:shadow-sm inline-flex items-center gap-1.5"
+                          style={stock > 0
+                            ? { background: "var(--leaf)", color: "#1f5d3e", border: "1px solid #c2dbcf" }
+                            : { background: "var(--bone)", color: "var(--ink-2)", border: "1px solid var(--line)" }}
                           title="Click to edit stock"
                         >
                           {stock > 0 ? `${stock} in stock` : "Set stock"}
-                          <span className="opacity-0 group-hover:opacity-60" aria-hidden>✎</span>
+                          <span className="opacity-40 group-hover:opacity-80 text-[10px]" aria-hidden>✎</span>
                         </button>
                       ))}
 
@@ -458,14 +460,17 @@ export function InventoryManager({
                         <button
                           type="button"
                           onClick={() => setInlineEdit({ id: i.id, field: "commission" })}
-                          className="group inline-flex items-center gap-1 text-[11px]"
-                          style={{ color: "var(--sage)" }}
+                          className="group rounded-full px-3 py-1 text-[11px] font-medium transition hover:shadow-sm inline-flex items-center gap-1.5"
+                          style={cv > 0
+                            ? { background: "var(--sage-2)", color: "#3F6B4D", border: "1px solid #c2cdbc" }
+                            : { background: "#fff", color: "var(--ink-2)", border: "1px solid var(--line)" }}
                           title="Click to edit commission"
                         >
+                          <span aria-hidden className="w-1.5 h-1.5 rounded-full" style={{ background: cv > 0 ? "#5F8B6A" : "var(--sage)" }} />
                           {cv > 0
                             ? `${ct === "percent" ? `${cv}%` : `R${cv.toLocaleString("en-ZA")}`} commission${commissionAmt > 0 ? ` · R${Math.round(commissionAmt).toLocaleString("en-ZA")}` : ""}`
                             : "Set commission"}
-                          <span className="opacity-0 group-hover:opacity-60" aria-hidden>✎</span>
+                          <span className="opacity-40 group-hover:opacity-80 text-[10px]" aria-hidden>✎</span>
                         </button>
                       ))}
                     </div>
