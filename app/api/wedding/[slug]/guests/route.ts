@@ -11,14 +11,16 @@ function admin() {
   });
 }
 
-const COLS = "id, full_name, email, phone, rsvp_status, table_number, dietary, accessibility_needs, plus_one, is_child, side, notes, rsvp_token, invited_at, responded_at, party_size, rsvp_message";
-const ALLOWED = new Set(["full_name", "email", "phone", "rsvp_status", "table_number", "dietary", "accessibility_needs", "plus_one", "is_child", "side", "notes"]);
+const COLS = "id, full_name, email, phone, rsvp_status, table_number, dietary, accessibility_needs, plus_one, is_child, side, notes, rsvp_token, invited_at, responded_at, party_size, rsvp_message, amount_due, amount_paid, payment_note";
+const ALLOWED = new Set(["full_name", "email", "phone", "rsvp_status", "table_number", "dietary", "accessibility_needs", "plus_one", "is_child", "side", "notes", "amount_due", "amount_paid", "payment_note"]);
+const NUMERIC = new Set(["amount_due", "amount_paid"]);
 
 function clean(body: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(body)) {
     if (!ALLOWED.has(k)) continue;
     if (k === "table_number") out[k] = v === "" || v == null ? null : Number(v);
+    else if (NUMERIC.has(k)) out[k] = v === "" || v == null ? 0 : Number(v);
     else if (k === "plus_one" || k === "is_child") out[k] = !!v;
     else out[k] = v === "" ? null : v;
   }

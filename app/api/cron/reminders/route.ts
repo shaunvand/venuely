@@ -6,6 +6,57 @@ import {
 } from "@/lib/billing/compute";
 import { sendEmail, depositReminder, balanceReminder } from "@/lib/notifications";
 
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://venuely.co.za";
+const escH = (v: unknown) => String(v ?? "").replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] || c));
+const randsH = (n: number) => `R${Math.round(Number(n) || 0).toLocaleString("en-ZA")}`;
+
+// Auto guest reminders (RSVP not-responded + unpaid contributions), per wedding,
+// gated by each couple's reminder_settings toggles + interval. Runs alongside the
+// couple->venue deposit/balance reminders above.
+async function runGuestReminders(supabase: SupabaseClient): Promise<{ rsvp: number; payment: number }> {
+  if (!process.env.RESEND_API_KEY) return { rsvp: 0, payment: 0 };
+  const nowMs = Date.now();
+  const nowIso = new Date().toISOString();
+  let rsvp = 0, payment = 0;
+
+  const { data: weddings } = await supabase
+    .from("weddings")
+    .select("id, couple_names, reminder_settings")
+    .or("reminder_settings->>autoRsvpReminders.eq.true,reminder_settings->>autoPaymentReminders.eq.true");
+
+  for (const w of weddings ?? []) {
+    const s = (w.reminder_settings ?? {}) as { autoRsvpReminders?: boolean; autoPaymentReminders?: boolean; intervalDays?: number; paymentTemplate?: string; paymentInstructions?: string };
+    const intervalMs = Math.max(1, Number(s.intervalDays) || 30) * 86400000;
+    const due = (stamp: string | null) => !stamp || (nowMs - new Date(stamp).getTime()) >= intervalMs;
+    const couple = w.couple_names || "the couple";
+
+    const { data: guests } = await supabase.from("guests")
+      .select("id, full_name, email, rsvp_status, responded_at, invited_at, amount_due, amount_paid, rsvp_reminder_at, payment_reminder_at, rsvp_token")
+      .eq("wedding_id", w.id).not("email", "is", null);
+
+    for (const g of guests ?? []) {
+      const first = g.full_name?.split(" ")[0] || "there";
+      // RSVP reminder: invited, no response yet, due for a nudge.
+      if (s.autoRsvpReminders && g.invited_at && !g.responded_at && due(g.rsvp_reminder_at)) {
+        const link = `${SITE}/rsvp/${g.rsvp_token}`;
+        const html = `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;background:#FFF6F0;border-radius:16px;padding:32px"><h1 style="font-family:Georgia,serif;font-size:22px;margin:0 0 12px">A gentle RSVP reminder</h1><p style="color:#57534e">Hi ${escH(first)}, we'd still love to know if you can join ${escH(couple)}. It only takes a moment.</p><p style="margin:20px 0"><a href="${link}" style="background:#FA523C;color:#fff;text-decoration:none;border-radius:999px;padding:12px 26px;font-weight:600;display:inline-block">RSVP now</a></p></div>`;
+        const r = await sendEmail(g.email, `Friendly reminder — please RSVP for ${couple}`, html);
+        if (r.sent) { await supabase.from("guests").update({ rsvp_reminder_at: nowIso }).eq("id", g.id); rsvp++; }
+      }
+      // Payment reminder: attending, owes a balance, due for a nudge.
+      const outstanding = Number(g.amount_due || 0) - Number(g.amount_paid || 0);
+      if (s.autoPaymentReminders && g.rsvp_status === "attending" && outstanding > 0 && due(g.payment_reminder_at)) {
+        const text = (s.paymentTemplate || `Hi {name}, a friendly reminder for your contribution towards {couple}'s wedding. Outstanding: {amount}.`)
+          .replace(/\{name\}/g, first).replace(/\{couple\}/g, couple).replace(/\{amount\}/g, randsH(outstanding));
+        const html = `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;background:#FFF6F0;border-radius:16px;padding:32px"><h1 style="font-family:Georgia,serif;font-size:22px;margin:0 0 12px">A gentle reminder</h1><p style="color:#57534e;white-space:pre-wrap">${escH(text)}</p>${s.paymentInstructions ? `<div style="margin-top:16px;padding:14px;background:#fff;border-radius:10px;white-space:pre-wrap;font-size:14px">${escH(s.paymentInstructions)}</div>` : ""}</div>`;
+        const r = await sendEmail(g.email, `Payment reminder — ${couple}'s wedding`, html);
+        if (r.sent) { await supabase.from("guests").update({ payment_reminder_at: nowIso }).eq("id", g.id); payment++; }
+      }
+    }
+  }
+  return { rsvp, payment };
+}
+
 // Automated reminder runner. A Render Cron / pg_cron job (wired by the founder)
 // hits POST /api/cron/reminders with the `x-cron-secret` header once a day. We
 // find weddings whose deposit / balance is coming due in the next 7 days, email
@@ -273,6 +324,10 @@ async function run(): Promise<RunSummary> {
     await supabase.from("weddings").update({ balance_reminder_at: nowIso }).eq("id", w.id);
     summary.sent += 1;
   }
+
+  // Guest-facing auto reminders (RSVP + contributions), per couple's settings.
+  const guestRem = await runGuestReminders(supabase);
+  summary.sent += guestRem.rsvp + guestRem.payment;
 
   return summary;
 }

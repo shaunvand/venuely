@@ -11,6 +11,7 @@ import { DocumentManager } from "@/components/DocumentManager";
 import { AddToCalendar } from "@/components/AddToCalendar";
 import { GuestInvites } from "@/components/GuestInvites";
 import { AiPlanner } from "@/components/AiPlanner";
+import { PaymentsManager } from "@/components/PaymentsManager";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -77,7 +78,7 @@ type GalleryItem = { url: string; category: string; label: string };
 type TableItem = { id: string; label: string; shape: string; seats: number; quantity: number };
 type Venue = { name: string; region: string | null; address: string | null; description: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
 
-const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Invites", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Documents"] as const;
+const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Invites", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Payments", "Documents"] as const;
 type Tab = (typeof TABS)[number];
 
 // Grouped navigation — keeps the portal simple: 5 top sections, sub-tabs below.
@@ -86,7 +87,7 @@ const SECTIONS: { name: string; icon: string; tabs: Tab[] }[] = [
   { name: "Choose", icon: "🍽️", tabs: ["Catalogue & Rentals", "Accommodation", "Suppliers"] },
   { name: "Guests", icon: "💌", tabs: ["Guests", "Invites", "Seating"] },
   { name: "Details", icon: "📝", tabs: ["Flowers", "Dress", "Décor", "Timeline", "Music", "Checklist", "Contacts"] },
-  { name: "Money & Docs", icon: "📄", tabs: ["Budget", "Documents"] },
+  { name: "Money & Docs", icon: "📄", tabs: ["Budget", "Payments", "Documents"] },
 ];
 
 const VENDOR_LABELS: Record<string, string> = { caterer: "Caterers", planner: "Planners", florist: "Florists", dj: "DJs", photographer: "Photographers", decor: "Décor", bar: "Bar services" };
@@ -432,6 +433,9 @@ export function CouplePortal({
         )}
         {tab === "Budget" && (
           <ListManager slug={slug} kind="budget" title="Your budget" sub="Track your own spend — separate from the venue invoice" fields={BUDGET_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        )}
+        {tab === "Payments" && (
+          <PaymentsManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
       </main>
 
