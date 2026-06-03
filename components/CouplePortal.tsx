@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { TemplateTokens, PortalTheme } from "@/lib/portal/templates";
+
+type WState = {
+  catalogueSelections?: Record<string, { sel?: boolean; mg?: boolean; wed?: boolean; fb?: boolean }>;
+  rentalSelections?: Record<string, { sel?: boolean; qty?: number }>;
+  roomAssignments?: Record<string, string[]>;
+  [k: string]: unknown;
+};
 
 type CatItem = { id: string; category: string; name: string; description: string; img: string | null };
 type RentItem = CatItem & { price: number };
@@ -23,8 +31,9 @@ function groupBy<T extends { category?: string; type?: string }>(items: T[], key
 }
 
 export function CouplePortal({
-  tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, catalogue, rentals, rooms, vendors, gallery,
+  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, totalDue, initialState, catalogue, rentals, rooms, vendors, gallery,
 }: {
+  slug: string;
   tokens: TemplateTokens;
   theme: PortalTheme;
   cover: string | null;
@@ -33,6 +42,8 @@ export function CouplePortal({
   coupleNames: string;
   daysToGo: number | null;
   dateLabel: string;
+  totalDue: number;
+  initialState: WState;
   catalogue: CatItem[];
   rentals: RentItem[];
   rooms: RoomItem[];
@@ -40,9 +51,64 @@ export function CouplePortal({
   gallery: GalleryItem[];
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
+  const router = useRouter();
+  const [state, setState] = useState<WState>(initialState ?? {});
+  const [busy, setBusy] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [, startTransition] = useTransition();
   const primary = theme.primary;
   const accent = theme.accent;
   const heading: React.CSSProperties = { fontFamily: tokens.headingFont, fontStyle: tokens.headingItalic ? "italic" : "normal" };
+
+  const catSel = state.catalogueSelections ?? {};
+  const rentSel = state.rentalSelections ?? {};
+  const rooms_ = state.roomAssignments ?? {};
+  const selectedCount = Object.values(catSel).filter((v) => v?.sel).length
+    + Object.values(rentSel).filter((v) => v?.sel).length
+    + Object.values(rooms_).filter((a) => Array.isArray(a) && a.length).length;
+
+  async function persist(next: WState) {
+    setState(next);
+    setBusy(true);
+    try {
+      await fetch(`/api/wedding/${slug}/state`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(next),
+      });
+      startTransition(() => router.refresh()); // recompute the authoritative total
+    } finally {
+      setBusy(false);
+    }
+  }
+  function toggleCat(id: string) {
+    const cur = { ...(state.catalogueSelections ?? {}) };
+    if (cur[id]?.sel) delete cur[id]; else cur[id] = { sel: true };
+    persist({ ...state, catalogueSelections: cur });
+  }
+  function toggleRent(id: string) {
+    const cur = { ...(state.rentalSelections ?? {}) };
+    if (cur[id]?.sel) delete cur[id]; else cur[id] = { sel: true, qty: 1 };
+    persist({ ...state, rentalSelections: cur });
+  }
+  function toggleRoom(id: string) {
+    const cur = { ...(state.roomAssignments ?? {}) };
+    if (Array.isArray(cur[id]) && cur[id].length) delete cur[id]; else cur[id] = ["Reserved"];
+    persist({ ...state, roomAssignments: cur });
+  }
+  async function submitToVenue() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/wedding/${slug}/submit`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "full", state, totals: { grandTotal: totalDue } }),
+      });
+      if (res.ok) setSubmitted(true);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const btn: React.CSSProperties = tokens.buttonStyle === "solid"
     ? { background: primary, color: "#fff", borderRadius: tokens.buttonRadius }
@@ -135,7 +201,7 @@ export function CouplePortal({
             {catalogue.length === 0 ? <Empty>Nothing here yet.</Empty> : groupBy(catalogue, (c) => c.category).map(([catName, items]) => (
               <div key={catName} style={{ marginBottom: 22 }}>
                 <div style={{ ...heading, fontSize: 17, marginBottom: 10 }}>{catName}</div>
-                <div style={grid}>{items.map((it) => <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} badge="Included" {...itemProps} />)}</div>
+                <div style={grid}>{items.map((it) => <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} badge="Included" selected={!!catSel[it.id]?.sel} onToggle={() => toggleCat(it.id)} {...itemProps} />)}</div>
               </div>
             ))}
           </Section>
@@ -146,7 +212,7 @@ export function CouplePortal({
             {rentals.length === 0 ? <Empty>Nothing here yet.</Empty> : groupBy(rentals, (r) => r.category).map(([catName, items]) => (
               <div key={catName} style={{ marginBottom: 22 }}>
                 <div style={{ ...heading, fontSize: 17, marginBottom: 10 }}>{catName}</div>
-                <div style={grid}>{items.map((it) => <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} price={it.price} {...itemProps} />)}</div>
+                <div style={grid}>{items.map((it) => <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} price={it.price} selected={!!rentSel[it.id]?.sel} onToggle={() => toggleRent(it.id)} {...itemProps} />)}</div>
               </div>
             ))}
           </Section>
@@ -155,7 +221,7 @@ export function CouplePortal({
         {tab === "Accommodation" && (
           <Section heading={heading} title="Accommodation" sub="On-site stays for you and your guests">
             {rooms.length === 0 ? <Empty>No accommodation listed.</Empty> : (
-              <div style={grid}>{rooms.map((r) => <PortalItemCard key={r.id} name={r.name} description={`Sleeps ${r.sleeps}${r.description ? ` · ${r.description}` : ""}`} img={r.img} price={r.price} {...itemProps} />)}</div>
+              <div style={grid}>{rooms.map((r) => <PortalItemCard key={r.id} name={r.name} description={`Sleeps ${r.sleeps}${r.description ? ` · ${r.description}` : ""}`} img={r.img} price={r.price} selected={!!(rooms_[r.id]?.length)} onToggle={() => toggleRoom(r.id)} {...itemProps} />)}</div>
             )}
           </Section>
         )}
@@ -188,6 +254,24 @@ export function CouplePortal({
           </Section>
         )}
       </main>
+
+      {/* Running total + submit */}
+      <div style={{ position: "sticky", bottom: 0, zIndex: 20, background: "#fff", borderTop: "1px solid rgba(0,0,0,0.1)", boxShadow: "0 -4px 16px rgba(0,0,0,0.06)" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#57534e" }}>Estimated total{busy ? " · updating…" : ""}</div>
+            <div style={{ ...heading, fontSize: 24, color: primary }}>{rZA(totalDue)}</div>
+            <div style={{ fontSize: 11, color: "#8a8a8a" }}>{selectedCount} item{selectedCount === 1 ? "" : "s"} selected · final quote confirmed by {venue.name}</div>
+          </div>
+          {submitted ? (
+            <span style={{ background: "#dcefe2", color: "#1f5d3e", padding: "10px 20px", borderRadius: tokens.buttonRadius, fontWeight: 600 }}>✓ Sent to {venue.name} for review</span>
+          ) : (
+            <button onClick={submitToVenue} disabled={busy || selectedCount === 0} style={{ ...btn, padding: "12px 26px", fontWeight: 700, cursor: busy || selectedCount === 0 ? "not-allowed" : "pointer", opacity: busy || selectedCount === 0 ? 0.55 : 1 }}>
+              Submit to {venue.name} →
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -225,8 +309,9 @@ function PortalLogo({ logoUrl, venueName, heading, light }: { logoUrl: string | 
   return <span style={{ ...heading, color: light ? "#fff" : "var(--ink)", fontWeight: 700 }}>{venueName}</span>;
 }
 
-function PortalItemCard({ name, description, img, price, badge, primary, accent, heading, cardRadius }: {
+function PortalItemCard({ name, description, img, price, badge, selected, onToggle, primary, accent, heading, cardRadius }: {
   name: string; description: string; img: string | null; price?: number; badge?: string;
+  selected?: boolean; onToggle?: () => void;
   primary: string; accent: string; heading: React.CSSProperties; cardRadius: string;
 }) {
   return (
@@ -244,6 +329,11 @@ function PortalItemCard({ name, description, img, price, badge, primary, accent,
           {price != null ? <span style={{ color: primary, fontWeight: 700 }}>{price > 0 ? rZA(price) : "Included"}</span> : <span />}
           {badge && <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, background: `${accent}40`, color: "#5a4", padding: "2px 8px", borderRadius: 999 }}>{badge}</span>}
         </div>
+        {onToggle && (
+          <button onClick={onToggle} style={{ marginTop: 8, padding: "7px 0", width: "100%", borderRadius: cardRadius, border: `1.5px solid ${primary}`, background: selected ? primary : "transparent", color: selected ? "#fff" : primary, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+            {selected ? "✓ Added" : "+ Add to my wedding"}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -627,3 +627,17 @@ export async function approveSubmission(submissionId: string, weddingId: string,
 
   revalidatePath(`/venue/weddings/${slug}`);
 }
+
+// Authoritative current total for a wedding's saved selections — same calc the
+// venue proforma uses. Admin client so the (anonymous) couple portal can read it.
+export async function getWeddingTotals(weddingId: string): Promise<{ grandTotal: number }> {
+  const sb = adminClient() as unknown as Awaited<ReturnType<typeof createClient>>;
+  const { data: wed } = await sb.from("weddings").select("venue_id").eq("id", weddingId).single();
+  if (!wed?.venue_id) return { grandTotal: 0 };
+  try {
+    const { grandTotal } = await buildWeddingCharges(sb, wed.venue_id as string, weddingId);
+    return { grandTotal };
+  } catch {
+    return { grandTotal: 0 };
+  }
+}

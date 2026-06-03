@@ -194,7 +194,7 @@ export async function GET(
         if (hashPassword(supplied, portalSalt) === expectedHash) {
           clearAttempts(rawSlug);
           await logAccess(wedding.id, "password");
-          const res = NextResponse.redirect(`${publicOrigin(request)}/${rawSlug}`);
+          const res = NextResponse.redirect(`${publicOrigin(request)}/p/${rawSlug}`);
           res.cookies.set(cookieName, expectedHash, {
             httpOnly: true, sameSite: "lax", secure: true,
             maxAge: 60 * 60 * 24 * 30, path: "/", // site-wide so it reaches /api/paystack/checkout; cookie name is wedding-scoped (vy_portal_<id>)
@@ -220,133 +220,10 @@ export async function GET(
     await logAccess(wedding.id, "member");
   }
 
-  const venue = (wedding as unknown as {
-    venue: {
-      id: string; name: string; slug: string;
-      description: string | null; directions: string | null; website: string | null;
-      included_items: unknown; contact_email: string | null; contact_phone: string | null;
-      google_maps_url: string | null;
-      portal_template: string | null; portal_theme: unknown; branding_logo_url: string | null;
-    } | null
-  }).venue;
-  const venueId = venue?.id;
+  // Access granted → serve the new templated couple portal (/p/<slug>). The
+  // legacy static-HTML build below is retained but no longer reached.
+  return NextResponse.redirect(`${publicOrigin(request)}/p/${rawSlug}`);
 
-  // Pull venue inventory in parallel.
-  const [{ data: catRaw }, { data: rentRaw }, { data: roomRaw }, { data: vendorRaw }, { data: galleryRaw }, { data: areaRaw }, { data: floorplanRaw }] = await Promise.all([
-    supabase.from("catalogue_items").select("id, category, name, description, sort_order, image_url").eq("venue_id", venueId).eq("active", true).order("sort_order"),
-    supabase.from("rental_items").select("id, category, name, description, price, stock_total, sort_order, commission_value, commission_type, image_url").eq("venue_id", venueId).eq("active", true).order("sort_order"),
-    supabase.from("accommodation_rooms").select("id, name, room_type, sleeps, description, sort_order, price_per_night, floor_plan_url, hero_image_url, image_url, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
-    supabase.from("vendor_partners").select("id, vendor_type, name, description, contact_email, contact_phone, website_url, price_from, image_url, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
-    supabase.from("media_assets").select("url, label, kind, category, sort_order").eq("venue_id", venueId).eq("owner_type", "venue").in("kind", ["photo", "video", "hero"]).order("sort_order"),
-    supabase.from("venue_areas").select("name, description, sort_order").eq("venue_id", venueId).eq("active", true).order("sort_order"),
-    // Floor-plan / layout images live as media_assets with kind='floorplan'. Kept
-    // out of the photo gallery query above so the "Our Venue" gallery stays photos
-    // only; surfaced on the new Floor Plans tab via window.VENUE_FLOORPLANS.
-    supabase.from("media_assets").select("url, label, category, sort_order").eq("venue_id", venueId).eq("owner_type", "venue").eq("kind", "floorplan").order("sort_order"),
-  ]);
-
-  const shaped = shapeForApp((catRaw ?? []) as Catalogue[], (rentRaw ?? []) as Rental[], (roomRaw ?? []) as Room[]);
-  const wState = (wedding as unknown as { wedding_state: object }).wedding_state ?? {};
-
-  const initScript = `
-<script>
-  window.WEDDING_SLUG    = ${JSON.stringify(wedding.slug)};
-  window.WEDDING_ID      = ${JSON.stringify(wedding.id)};
-  window.WEDDING_COUPLE  = ${JSON.stringify(wedding.couple_names)};
-  window.WEDDING_DATE    = ${JSON.stringify(wedding.wedding_date)};
-  window.WEDDING_VENUE   = ${JSON.stringify({ id: venue?.id, name: venue?.name, slug: venue?.slug })};
-  window.VENUE_DESCRIPTION = ${JSON.stringify(venue?.description ?? null)};
-  window.VENUE_DIRECTIONS  = ${JSON.stringify(venue?.directions ?? null)};
-  window.VENUE_WEBSITE     = ${JSON.stringify(venue?.website ?? null)};
-  window.VENUE_INCLUDED    = ${JSON.stringify(Array.isArray(venue?.included_items) ? venue?.included_items : [])};
-  window.VENUE_CONTACT     = ${JSON.stringify({ email: venue?.contact_email ?? null, phone: venue?.contact_phone ?? null })};
-  window.VENUE_MAP_URL     = ${JSON.stringify(venue?.google_maps_url ?? null)};
-  window.VENUE_AREAS       = ${JSON.stringify((areaRaw ?? []).map((a) => {
-    const aa = a as Record<string, unknown>;
-    return { name: aa.name ?? "", description: aa.description ?? "" };
-  }))};
-  window.VENUE_CATALOGUE_ITEMS = ${JSON.stringify(shaped.CATALOGUE_ITEMS)};
-  window.VENUE_CATALOGUE_CATS  = ${JSON.stringify(shaped.CATALOGUE_CATS)};
-  window.VENUE_RENTAL_ITEMS    = ${JSON.stringify(shaped.RENTAL_ITEMS)};
-  window.VENUE_RENTAL_CATS     = ${JSON.stringify(shaped.RENTAL_CATS)};
-  window.VENUE_ACCOMMODATION   = ${JSON.stringify(shaped.ACCOMMODATION)};
-  window.VENUE_ACCOMMODATION_LINK = ${JSON.stringify(`/booking/${wedding.slug}/accommodation`)};
-  window.VENUE_VENDORS         = ${JSON.stringify((vendorRaw ?? []).map((v) => {
-    const vv = v as Record<string, unknown>;
-    return {
-      ...vv,
-      price_from: vv.price_from == null ? null : applyMarkup(Number(vv.price_from), vv.commission_value as number | null, vv.commission_type as string | null),
-    };
-  }))};
-  window.VENUE_GALLERY = ${JSON.stringify(
-    (galleryRaw ?? [])
-      .filter((g) => /\.(jpe?g|png|webp|gif|avif|heic|mp4|mov|webm|m4v)(\?|$)/i.test(String((g as Record<string, unknown>).url)))
-      .map((g) => {
-        const gg = g as Record<string, unknown>;
-        return { src: gg.url, kind: gg.kind, category: gg.category ?? "Other", label: gg.label ?? "" };
-      })
-  )};
-  window.VENUE_FLOORPLANS = ${JSON.stringify(
-    (floorplanRaw ?? [])
-      .filter((g) => /\.(jpe?g|png|webp|gif|avif|heic|svg)(\?|$)/i.test(String((g as Record<string, unknown>).url)))
-      .map((g) => {
-        const gg = g as Record<string, unknown>;
-        return { src: gg.url, category: gg.category ?? "Floor plan", label: gg.label ?? "" };
-      })
-  )};
-  window.WEDDING_INITIAL_STATE = ${JSON.stringify(wState)};
-  window.WEDDING_USE_SERVER    = true;
-</script>
-`;
-
-  let html = readTemplate();
-  html = html.replace(
-    /<script src="\/wedding-portal\/app\.js"/,
-    `${initScript}<script src="/wedding-portal/app.js"`
-  );
-
-  // Apply the venue's chosen portal theme (set in Your Venue → portal designer):
-  // remap the portal's brand CSS variables to the venue's primary/accent and swap
-  // the header logo, so the couple portal matches the design the venue configured.
-  const theme = resolvePortalTheme(venue?.portal_theme);
-  const themePrimary = theme.primary;
-  const themeAccent = theme.accent;
-  const themeLogo = theme.logoUrl || venue?.branding_logo_url || null;
-  // Cover photo for the hero — chosen cover, else the first gallery image (matches
-  // the portal-designer preview's fallback). With a cover we lay a dark scrim under
-  // it so the white hero text stays readable.
-  const firstGalleryUrl = (galleryRaw ?? [])
-    .map((g) => String((g as Record<string, unknown>).url ?? ""))
-    .find((u) => /\.(jpe?g|png|webp|gif|avif|heic)(\?|$)/i.test(u)) || null;
-  const coverForHero = theme.coverUrl || firstGalleryUrl;
-  const heroBg = coverForHero
-    ? `linear-gradient(rgba(0,0,0,0.42),rgba(0,0,0,0.42)),url('${coverForHero}') center/cover no-repeat`
-    : `linear-gradient(155deg,${themePrimary} 0%,${themePrimary} 55%,${themeAccent} 130%)`;
-  const themeStyle = `<style id="vy-venue-theme">`
-    + `:root{--forest:${themePrimary} !important;--gold:${themeAccent} !important;--gold-light:${themeAccent} !important;--sage:${themeAccent}33 !important;}`
-    // Hero: show the cover photo (or brand gradient) — the base CSS hardcodes green.
-    + `header{background:${heroBg} !important;}header::before{opacity:.25 !important;}`
-    // Drop the billing (Committed) + checklist (Tasks done) stat cards from the couple dashboard.
-    + `#dashStats>*:nth-child(3),#dashStats>*:nth-child(4){display:none !important;}`
-    // Per-template structure: button/tab shape from the chosen template.
-    + (() => {
-        const t = resolvePortalTemplate(venue?.portal_template);
-        const r = t.buttonRadius;
-        return `.nav-btn{border-radius:${r} !important;}`
-          + `.rental-checkbox+label,.cat-thumb-wrap,.rental-thumb-wrap,.sup-card,.vy-btn,button.primary,.btn{border-radius:${t.cardRadius} !important;}`
-          + (t.tabStyle === "pill" ? `.nav-btn.active{background:${themePrimary} !important;color:#fff !important;}` : "")
-          + (t.tabStyle === "segmented" ? `.nav{gap:2px !important;}.nav-btn{border:1px solid ${themeAccent}55 !important;}` : "");
-      })()
-    + `</style>`;
-  html = html.replace("</head>", `${themeStyle}</head>`);
-  if (themeLogo) {
-    html = html.replace(/(<img class="header-logo" src=")[^"]*(")/, `$1${themeLogo}$2`);
-  }
-
-  return new NextResponse(html, {
-    status: 200,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  });
 }
 
 // Preferred password-gate path: the unlock form POSTs here. On success we set
@@ -395,7 +272,7 @@ export async function POST(
   if (supplied && hashPassword(supplied, portalSalt) === expectedHash) {
     clearAttempts(rawSlug);
     await logAccess(wedding.id, "password");
-    const res = NextResponse.redirect(`${publicOrigin(request)}/${rawSlug}`, { status: 303 });
+    const res = NextResponse.redirect(`${publicOrigin(request)}/p/${rawSlug}`, { status: 303 });
     res.cookies.set(`vy_portal_${wedding.id}`, expectedHash, {
       httpOnly: true, sameSite: "lax", secure: true,
       maxAge: 60 * 60 * 24 * 30, path: "/", // site-wide so it reaches /api/paystack/checkout; cookie name is wedding-scoped (vy_portal_<id>)

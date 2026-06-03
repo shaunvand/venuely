@@ -3,6 +3,7 @@ import { portalAccess } from "@/lib/portal/access";
 import { createAdminClient } from "@/lib/supabase/server";
 import { resolveTemplate, resolveTheme } from "@/lib/portal/templates";
 import { applyMarkup } from "@/lib/billing/compute";
+import { getWeddingTotals } from "@/app/venue/weddings/actions";
 import { CouplePortal } from "@/components/CouplePortal";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
   const vId = access.wedding.venue_id;
 
   const [wedRes, venRes, catRes, rentRes, roomRes, vendRes, galRes] = await Promise.all([
-    db.from("weddings").select("id, slug, couple_names, wedding_date, wedding_end_date").eq("id", wId).single(),
+    db.from("weddings").select("id, slug, couple_names, wedding_date, wedding_end_date, wedding_state").eq("id", wId).single(),
     db.from("venues").select("name, region, address, portal_template, portal_theme, branding_logo_url, contact_email, contact_phone, google_maps_url, description").eq("id", vId).single(),
     db.from("catalogue_items").select("id, category, name, description, image_url, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
     db.from("rental_items").select("id, category, name, description, price, image_url, commission_value, commission_type, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
@@ -63,8 +64,12 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
     }
   }
 
+  const totals = await getWeddingTotals(wId);
+  const state = (wedding.wedding_state ?? {}) as Record<string, unknown>;
+
   return (
     <CouplePortal
+      slug={slug}
       tokens={tokens}
       theme={theme}
       cover={cover}
@@ -73,6 +78,8 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
       coupleNames={wedding.couple_names}
       daysToGo={daysToGo}
       dateLabel={dateLabel}
+      totalDue={totals.grandTotal}
+      initialState={state}
       catalogue={catalogue}
       rentals={rentals}
       rooms={rooms}
