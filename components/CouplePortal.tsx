@@ -15,7 +15,7 @@ const DAY_TYPES: { key: "mg" | "wed" | "fb"; label: string }[] = [
   { key: "mg", label: "M&G" }, { key: "wed", label: "Wedding" }, { key: "fb", label: "Farewell" },
 ];
 
-type CatItem = { id: string; category: string; name: string; description: string; img: string | null; included: boolean };
+type CatItem = { id: string; category: string; name: string; description: string; img: string | null; included: boolean; eventPart?: string | null };
 type RentItem = CatItem & { price: number };
 type RoomItem = { id: string; name: string; type: string; sleeps: number; description: string; img: string | null; price: number };
 type VendorItem = { id: string; type: string; name: string; description: string; img: string | null; price: number | null; email: string | null; phone: string | null; website: string | null };
@@ -69,7 +69,9 @@ export function CouplePortal({
   const rooms_ = state.roomAssignments ?? {};
   // Included catalogue items are selected by DEFAULT (couples deselect to opt out);
   // extras are off until added.
-  const catIsSelected = (it: CatItem) => { const e = catSel[it.id]; return e ? !!e.sel : it.included; };
+  // Included items are checked by default (deselect to opt out) unless explicitly
+  // turned off; extras are off until added.
+  const catIsSelected = (it: CatItem) => { const e = catSel[it.id]; return it.included ? (e ? e.sel !== false : true) : !!e?.sel; };
   const selectedCount = catalogue.filter(catIsSelected).length
     + Object.values(rentSel).filter((v) => v?.sel).length
     + Object.values(rooms_).filter((a) => Array.isArray(a) && a.length).length;
@@ -151,7 +153,7 @@ export function CouplePortal({
     ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.45),rgba(0,0,0,0.45)),url('${cover}')`, backgroundSize: "cover", backgroundPosition: "center" }
     : { background: `linear-gradient(135deg, ${primary}, ${accent})` };
 
-  const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 14 };
+  const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 14 };
   const itemProps = { primary, accent, heading, cardRadius: tokens.cardRadius };
 
   return (
@@ -239,7 +241,7 @@ export function CouplePortal({
                     <div key={String(grp.inc)} style={{ marginBottom: 28 }}>
                       <div style={{ ...heading, fontSize: 20 }}>{grp.label}</div>
                       <div style={{ fontSize: 12, color: "#8a8a8a", marginBottom: 12 }}>{grp.note}</div>
-                      {groupBy(groupItems, (c) => c.category).map(([catName, items]) => (
+                      {groupBy(groupItems, (c) => c.eventPart || c.category).map(([catName, items]) => (
                         <div key={catName} style={{ marginBottom: 18 }}>
                           <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: accent === "#FFC6AD" ? "var(--ink-2)" : primary, fontWeight: 700, marginBottom: 8 }}>{catName}</div>
                           <div style={grid}>{items.map((it) => (
@@ -368,9 +370,9 @@ function PortalItemCard({ name, description, img, price, badge, selected, onTogg
     <div style={{ background: "#fff", border: selected ? `2px solid ${primary}` : "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius, overflow: "hidden", display: "flex", flexDirection: "column" }}>
       {img ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={img} alt="" style={{ width: "100%", aspectRatio: "4 / 3", objectFit: "cover" }} />
+        <img src={img} alt="" style={{ width: "100%", height: 120, objectFit: "cover" }} />
       ) : (
-        <div style={{ width: "100%", aspectRatio: "4 / 3", background: `${accent}33`, display: "flex", alignItems: "center", justifyContent: "center", color: "#9a8", fontSize: 12 }}>No image</div>
+        <div style={{ width: "100%", height: 120, background: `${accent}33`, display: "flex", alignItems: "center", justifyContent: "center", color: "#9a8", fontSize: 12 }}>No image</div>
       )}
       <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
         <div style={{ ...heading, fontWeight: 700, fontSize: 16 }}>{name}</div>

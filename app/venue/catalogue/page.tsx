@@ -2,6 +2,7 @@ import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
 import { InventoryManager } from "@/components/InventoryManager";
 import { INVENTORY_FIELDS } from "@/lib/inventory/schemas";
+import { autoCategoriseCatalogue } from "./actions";
 
 export default async function VenueCatalogue() {
   const venue = await getCurrentVenue();
@@ -15,12 +16,19 @@ export default async function VenueCatalogue() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <div className="vy-eyebrow">Marketplace</div>
-        <h1 className="vy-h1 mt-1">Catalogue</h1>
-        <p className="text-stone-600 text-sm mt-1">
-          Items included with your booking. Couples tick which days they need each.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="vy-eyebrow">Marketplace</div>
+          <h1 className="vy-h1 mt-1">Catalogue</h1>
+          <p className="text-stone-600 text-sm mt-1">
+            Items included with your booking. Couples tick which days they need each.
+          </p>
+        </div>
+        <form action={autoCategoriseCatalogue.bind(null, venue.id)}>
+          <button className="vy-btn vy-btn-secondary text-sm" title="Use AI to group menu items into Breakfast / Lunch / Dinner / Drinks for the couple portal">
+            ✨ Auto-group by course (AI)
+          </button>
+        </form>
       </header>
 
       <InventoryManager
