@@ -1,0 +1,152 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+type Pin = { id: string; note: string | null; url: string | null; source: string | null; created_at: string };
+type Result = { url: string; thumb: string; alt: string; source: string };
+
+const CATEGORIES = ["Boho", "Rustic", "Classic", "Modern", "Garden", "Vineyard", "Beach", "Fairytale", "Minimalist", "Luxe", "Vintage", "Romantic"];
+const SWATCHES = ["#D8A7B1", "#E8C8B0", "#B7C9A8", "#9CAFB7", "#C8B6E2", "#E6D3A3", "#A88B6A", "#2E2A26", "#FFFFFF", "#C04B4B"];
+
+// Inspiration board. Pinterest has no public keyword-search API for third parties,
+// so couples search our licensed image library by aesthetic (e.g. "Boho"), pin the
+// ones they love into a unified board, and can also paste real Pinterest links or
+// upload their own. The colour palette is saved on the wedding (wedding_state).
+export function InspirationBoard({ slug, initialPalette, primary, accent, heading, cardRadius }: {
+  slug: string; initialPalette: string[]; primary: string; accent: string; heading: React.CSSProperties; cardRadius: string;
+}) {
+  const [pins, setPins] = useState<Pin[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("Boho");
+  const [results, setResults] = useState<Result[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [palette, setPalette] = useState<string[]>(initialPalette ?? []);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [pinning, setPinning] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { fetch(`/api/wedding/${slug}/files/inspiration`).then((r) => r.json()).then((j) => { setPins(j.rows ?? []); setLoading(false); }).catch(() => setLoading(false)); }, [slug]);
+
+  async function search(term: string) {
+    setQ(term); setSearching(true);
+    try { const r = await fetch(`/api/wedding/${slug}/inspiration-search?q=${encodeURIComponent(term)}`); const j = await r.json(); setResults(j.results ?? []); }
+    finally { setSearching(false); }
+  }
+  useEffect(() => { search("Boho"); /* initial */ }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pinned = new Set(pins.map((p) => p.url));
+
+  async function pin(url: string, source: string, note?: string) {
+    setPinning(url);
+    const r = await fetch(`/api/wedding/${slug}/files/inspiration`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source_url: url, source, note }) });
+    const j = await r.json(); if (j.ok) setPins((p) => [j.row, ...p]);
+    setPinning(null);
+  }
+  async function unpin(id: string) {
+    setPins((p) => p.filter((x) => x.id !== id));
+    await fetch(`/api/wedding/${slug}/files/inspiration`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }) });
+  }
+  async function uploadOwn(files: FileList | null) {
+    if (!files?.length) return;
+    for (const f of Array.from(files)) {
+      const fd = new FormData(); fd.append("file", f); fd.append("note", "My upload");
+      const r = await fetch(`/api/wedding/${slug}/files/inspiration`, { method: "POST", body: fd });
+      const j = await r.json(); if (j.ok) setPins((p) => [j.row, ...p]);
+    }
+    if (fileRef.current) fileRef.current.value = "";
+  }
+  async function savePalette(next: string[]) {
+    setPalette(next);
+    await fetch(`/api/wedding/${slug}/state`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ patch: { palette: next } }) });
+  }
+  function toggleSwatch(hex: string) { savePalette(palette.includes(hex) ? palette.filter((c) => c !== hex) : [...palette, hex]); }
+
+  const card: React.CSSProperties = { background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius };
+  const chip = (active: boolean): React.CSSProperties => ({ border: `1px solid ${active ? primary : "rgba(0,0,0,0.15)"}`, background: active ? primary : "#fff", color: active ? "#fff" : "#44403c", borderRadius: 999, padding: "5px 13px", fontSize: 12.5, cursor: "pointer", fontWeight: 600 });
+
+  return (
+    <div style={{ display: "grid", gap: 18 }}>
+      <div>
+        <h2 style={{ ...heading, fontSize: 26, margin: 0 }}>Inspiration board</h2>
+        <div style={{ color: "#57534e", fontSize: 13, marginTop: 2 }}>Search a look you love, pin your favourites, and shape your wedding&apos;s style — your venue sees this board to bring your vision to life.</div>
+      </div>
+
+      {/* Palette */}
+      <div style={{ ...card, padding: 14 }}>
+        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: primary, fontWeight: 700, marginBottom: 8 }}>Colour palette</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          {SWATCHES.map((hex) => (
+            <button key={hex} onClick={() => toggleSwatch(hex)} title={hex} style={{ width: 30, height: 30, borderRadius: "50%", background: hex, cursor: "pointer", border: palette.includes(hex) ? `3px solid ${primary}` : "1px solid rgba(0,0,0,0.15)" }} />
+          ))}
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#8a8a8a", cursor: "pointer" }}>
+            <input type="color" onChange={(e) => { if (!palette.includes(e.target.value)) savePalette([...palette, e.target.value]); }} style={{ width: 30, height: 30, border: "none", background: "none", cursor: "pointer" }} />
+            custom
+          </label>
+        </div>
+        {palette.length > 0 && <div style={{ fontSize: 11.5, color: "#8a8a8a", marginTop: 8 }}>{palette.length} colour{palette.length > 1 ? "s" : ""} chosen — saved to your wedding.</div>}
+      </div>
+
+      {/* Search */}
+      <div style={{ display: "grid", gap: 10 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") search(q); }} placeholder="Search a style, e.g. boho arch, rustic table…" style={{ flex: 1, border: "1px solid rgba(0,0,0,0.15)", borderRadius: 999, padding: "9px 16px", fontSize: 14 }} />
+          <button onClick={() => search(q)} style={{ background: primary, color: "#fff", border: "none", borderRadius: 999, padding: "9px 20px", fontWeight: 600, cursor: "pointer" }}>Search</button>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {CATEGORIES.map((cat) => <button key={cat} onClick={() => search(cat)} style={chip(q.toLowerCase() === cat.toLowerCase())}>{cat}</button>)}
+        </div>
+      </div>
+
+      {/* Results (masonry) */}
+      {searching ? <span style={{ color: "#8a8a8a", fontSize: 13 }}>Searching…</span> : (
+        <div style={{ columns: "160px 4", columnGap: 10 }}>
+          {results.map((r) => {
+            const isPinned = pinned.has(r.url);
+            return (
+              <div key={r.url} style={{ breakInside: "avoid", marginBottom: 10, position: "relative", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(0,0,0,0.06)" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={r.thumb} alt={r.alt} loading="lazy" style={{ width: "100%", display: "block" }} />
+                <button onClick={() => !isPinned && pin(r.url, r.source, q)} disabled={isPinned || pinning === r.url}
+                  style={{ position: "absolute", top: 8, right: 8, background: isPinned ? "#1a7f4b" : primary, color: "#fff", border: "none", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: isPinned ? "default" : "pointer" }}>
+                  {isPinned ? "✓ Pinned" : pinning === r.url ? "…" : "Pin"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add your own + Pinterest link */}
+      <div style={{ ...card, padding: 14, display: "grid", gap: 10 }}>
+        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: primary, fontWeight: 700 }}>Add your own</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input ref={fileRef} type="file" accept="image/*" multiple onChange={(e) => uploadOwn(e.target.files)} style={{ display: "none" }} />
+          <button onClick={() => fileRef.current?.click()} style={{ border: `1px solid ${primary}`, background: "#fff", color: primary, borderRadius: 999, padding: "8px 16px", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>⬆ Upload image</button>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Paste a Pinterest (or any) image link…" style={{ flex: 1, border: "1px solid rgba(0,0,0,0.15)", borderRadius: 999, padding: "8px 14px", fontSize: 13 }} />
+          <button onClick={() => { if (/^https?:\/\//i.test(linkUrl)) { pin(linkUrl, "Pinterest"); setLinkUrl(""); } }} style={{ background: accent, color: "#fff", border: "none", borderRadius: 999, padding: "8px 16px", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>Pin link</button>
+        </div>
+      </div>
+
+      {/* My board */}
+      <div>
+        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: primary, fontWeight: 700, marginBottom: 10 }}>My board ({pins.length})</div>
+        {loading ? <span style={{ color: "#8a8a8a", fontSize: 13 }}>Loading…</span> : pins.length === 0 ? (
+          <div style={{ padding: 24, textAlign: "center", color: "#8a8a8a", border: "1px dashed rgba(0,0,0,0.12)", borderRadius: 12 }}>Pin images above to start your board.</div>
+        ) : (
+          <div style={{ columns: "160px 4", columnGap: 10 }}>
+            {pins.map((p) => (
+              <div key={p.id} style={{ breakInside: "avoid", marginBottom: 10, position: "relative", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(0,0,0,0.06)" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {p.url && <img src={p.url} alt={p.note || "inspiration"} loading="lazy" style={{ width: "100%", display: "block" }} />}
+                <button onClick={() => unpin(p.id)} title="Remove" style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", borderRadius: 999, width: 26, height: 26, cursor: "pointer", fontSize: 13 }}>✕</button>
+                {p.source && <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, fontSize: 10, color: "#fff", background: "linear-gradient(transparent,rgba(0,0,0,0.55))", padding: "12px 8px 4px" }}>{p.source}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

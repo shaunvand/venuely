@@ -6,6 +6,8 @@ import type { TemplateTokens, PortalTheme } from "@/lib/portal/templates";
 import { GuestManager } from "@/components/GuestManager";
 import { ListManager, type ListField } from "@/components/ListManager";
 import { SeatingPlanner } from "@/components/SeatingPlanner";
+import { InspirationBoard } from "@/components/InspirationBoard";
+import { DocumentManager } from "@/components/DocumentManager";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -72,7 +74,7 @@ type GalleryItem = { url: string; category: string; label: string };
 type TableItem = { id: string; label: string; shape: string; seats: number; quantity: number };
 type Venue = { name: string; region: string | null; address: string | null; description: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
 
-const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget"] as const;
+const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Documents"] as const;
 type Tab = (typeof TABS)[number];
 
 const VENDOR_LABELS: Record<string, string> = { caterer: "Caterers", planner: "Planners", florist: "Florists", dj: "DJs", photographer: "Photographers", decor: "Décor", bar: "Bar services" };
@@ -361,6 +363,12 @@ export function CouplePortal({
         )}
         {tab === "Seating" && (
           <SeatingPlanner slug={slug} tables={tables} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        )}
+        {tab === "Inspiration" && (
+          <InspirationBoard slug={slug} initialPalette={(state as Record<string, unknown>).palette as string[] ?? []} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        )}
+        {tab === "Documents" && (
+          <DocumentManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Timeline" && (
           <ListManager slug={slug} kind="timeline" title="Day timeline" sub="Your run sheet — when and where everything happens" fields={TIMELINE_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
