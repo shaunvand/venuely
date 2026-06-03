@@ -254,6 +254,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
           )}
         </div>
         <Link href={`/${wedding.slug}`} target="_blank" className="vy-btn vy-btn-secondary">Open couple portal →</Link>
+        <Link href={`/p/${wedding.slug}`} target="_blank" className="vy-btn vy-btn-secondary">View new design (beta) →</Link>
       </div>
 
       <PortalLinkCard

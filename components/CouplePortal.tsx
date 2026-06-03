@@ -1,0 +1,250 @@
+"use client";
+
+import { useState } from "react";
+import type { TemplateTokens, PortalTheme } from "@/lib/portal/templates";
+
+type CatItem = { id: string; category: string; name: string; description: string; img: string | null };
+type RentItem = CatItem & { price: number };
+type RoomItem = { id: string; name: string; type: string; sleeps: number; description: string; img: string | null; price: number };
+type VendorItem = { id: string; type: string; name: string; description: string; img: string | null; price: number | null; email: string | null; phone: string | null; website: string | null };
+type GalleryItem = { url: string; category: string; label: string };
+type Venue = { name: string; region: string | null; address: string | null; description: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
+
+const TABS = ["Overview", "Our Venue", "Catalogue", "Rentals", "Accommodation", "Suppliers"] as const;
+type Tab = (typeof TABS)[number];
+
+const VENDOR_LABELS: Record<string, string> = { caterer: "Caterers", planner: "Planners", florist: "Florists", dj: "DJs", photographer: "Photographers", decor: "Décor", bar: "Bar services" };
+const rZA = (n: number) => `R${Math.round(n).toLocaleString("en-ZA")}`;
+
+function groupBy<T extends { category?: string; type?: string }>(items: T[], key: (t: T) => string): [string, T[]][] {
+  const m = new Map<string, T[]>();
+  for (const it of items) { const k = key(it) || "Other"; (m.get(k) ?? m.set(k, []).get(k)!).push(it); }
+  return [...m.entries()];
+}
+
+export function CouplePortal({
+  tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, catalogue, rentals, rooms, vendors, gallery,
+}: {
+  tokens: TemplateTokens;
+  theme: PortalTheme;
+  cover: string | null;
+  logoUrl: string | null;
+  venue: Venue;
+  coupleNames: string;
+  daysToGo: number | null;
+  dateLabel: string;
+  catalogue: CatItem[];
+  rentals: RentItem[];
+  rooms: RoomItem[];
+  vendors: VendorItem[];
+  gallery: GalleryItem[];
+}) {
+  const [tab, setTab] = useState<Tab>("Overview");
+  const primary = theme.primary;
+  const accent = theme.accent;
+  const heading: React.CSSProperties = { fontFamily: tokens.headingFont, fontStyle: tokens.headingItalic ? "italic" : "normal" };
+
+  const btn: React.CSSProperties = tokens.buttonStyle === "solid"
+    ? { background: primary, color: "#fff", borderRadius: tokens.buttonRadius }
+    : { background: "transparent", color: primary, border: `1.5px solid ${primary}`, borderRadius: tokens.buttonRadius };
+
+  const card = (extra?: React.CSSProperties): React.CSSProperties => ({ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: tokens.cardRadius, ...extra });
+
+  const heroImg: React.CSSProperties = cover
+    ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.45),rgba(0,0,0,0.45)),url('${cover}')`, backgroundSize: "cover", backgroundPosition: "center" }
+    : { background: `linear-gradient(135deg, ${primary}, ${accent})` };
+
+  const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 14 };
+  const itemProps = { primary, accent, heading, cardRadius: tokens.cardRadius };
+
+  return (
+    <div style={{ minHeight: "100vh", background: tokens.surface, fontFamily: tokens.bodyFont, color: "var(--ink, #1c1917)" }}>
+      {/* HERO */}
+      <header style={{ ...heroImg, position: "relative", color: "#fff" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 24px 36px" }}>
+          <PortalLogo logoUrl={logoUrl} venueName={venue.name} heading={heading} light />
+          <div style={{ textAlign: "center", padding: "40px 0 8px" }}>
+            <div style={{ fontSize: 12, letterSpacing: 3, textTransform: "uppercase", opacity: 0.9 }}>{venue.name}</div>
+            <h1 style={{ ...heading, fontSize: 44, margin: "8px 0", color: "#fff", lineHeight: 1.05 }}>{coupleNames}</h1>
+            <div style={{ opacity: 0.95 }}>{dateLabel}</div>
+            {daysToGo != null && (
+              <div style={{ marginTop: 18, ...heading, fontSize: 30 }}>{daysToGo}<span style={{ fontSize: 12, letterSpacing: 2, marginLeft: 8, opacity: 0.9 }}>DAYS TO GO</span></div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* NAV */}
+      <nav style={{ position: "sticky", top: 0, zIndex: 10, background: "#fffdfb", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "10px 16px", display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+          {TABS.map((t) => {
+            const active = t === tab;
+            const base: React.CSSProperties = { fontSize: 13, padding: "6px 14px", cursor: "pointer", border: "none", background: "transparent", color: active ? primary : "#57534e", fontWeight: active ? 700 : 500 };
+            const styled: React.CSSProperties =
+              tokens.tabStyle === "pill" ? { ...base, borderRadius: 999, background: active ? primary : "transparent", color: active ? "#fff" : "#57534e", border: active ? "none" : "1px solid rgba(0,0,0,0.12)" }
+              : tokens.tabStyle === "segmented" ? { ...base, border: "1px solid rgba(0,0,0,0.12)", borderRadius: tokens.buttonRadius, background: active ? primary : "#fff", color: active ? "#fff" : "#57534e" }
+              : { ...base, borderBottom: active ? `2px solid ${primary}` : "2px solid transparent", borderRadius: 0 };
+            return <button key={t} onClick={() => setTab(t)} style={styled}>{t}</button>;
+          })}
+        </div>
+      </nav>
+
+      {/* BODY */}
+      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 16px 60px" }}>
+        {tab === "Overview" && (
+          <div style={{ display: "grid", gap: 16 }}>
+            <div style={card({ padding: 22 })}>
+              <div style={{ ...heading, fontSize: 22 }}>Welcome to your planning portal</div>
+              <p style={{ color: "#57534e", marginTop: 6 }}>Browse everything {venue.name} offers — catalogue, rentals, accommodation and trusted suppliers — and plan your day in one place.</p>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14 }}>
+              <Stat label="Days to go" value={daysToGo != null ? String(daysToGo) : "—"} heading={heading} accent={accent} primary={primary} />
+              <Stat label="Catalogue items" value={String(catalogue.length)} heading={heading} accent={accent} primary={primary} />
+              <Stat label="Rentals" value={String(rentals.length)} heading={heading} accent={accent} primary={primary} />
+              <Stat label="Rooms" value={String(rooms.length)} heading={heading} accent={accent} primary={primary} />
+            </div>
+            {(venue.email || venue.phone) && (
+              <div style={card({ padding: 18 })}>
+                <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: primary, fontWeight: 700 }}>Your venue coordinator</div>
+                <div style={{ ...heading, fontSize: 18, marginTop: 4 }}>{venue.name}</div>
+                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                  {venue.email && <a href={`mailto:${venue.email}`} style={{ ...btn, padding: "8px 16px", fontSize: 13, textDecoration: "none" }}>✉ Email us</a>}
+                  {venue.phone && <a href={`tel:${venue.phone}`} style={{ ...btn, padding: "8px 16px", fontSize: 13, textDecoration: "none" }}>📞 Call</a>}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "Our Venue" && (
+          <Section heading={heading} title="Our Venue" sub={venue.address || venue.region || ""}>
+            {venue.description && <p style={{ color: "#57534e", maxWidth: 720, marginBottom: 16 }}>{venue.description}</p>}
+            {gallery.length === 0 ? <Empty>No photos yet.</Empty> : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 10 }}>
+                {gallery.map((g, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={i} src={g.url} alt={g.label} style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "cover", borderRadius: tokens.cardRadius }} />
+                ))}
+              </div>
+            )}
+          </Section>
+        )}
+
+        {tab === "Catalogue" && (
+          <Section heading={heading} title="Catalogue" sub="Items included with your booking">
+            {catalogue.length === 0 ? <Empty>Nothing here yet.</Empty> : groupBy(catalogue, (c) => c.category).map(([catName, items]) => (
+              <div key={catName} style={{ marginBottom: 22 }}>
+                <div style={{ ...heading, fontSize: 17, marginBottom: 10 }}>{catName}</div>
+                <div style={grid}>{items.map((it) => <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} badge="Included" {...itemProps} />)}</div>
+              </div>
+            ))}
+          </Section>
+        )}
+
+        {tab === "Rentals" && (
+          <Section heading={heading} title="Rentals" sub="Optional extras to hire">
+            {rentals.length === 0 ? <Empty>Nothing here yet.</Empty> : groupBy(rentals, (r) => r.category).map(([catName, items]) => (
+              <div key={catName} style={{ marginBottom: 22 }}>
+                <div style={{ ...heading, fontSize: 17, marginBottom: 10 }}>{catName}</div>
+                <div style={grid}>{items.map((it) => <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} price={it.price} {...itemProps} />)}</div>
+              </div>
+            ))}
+          </Section>
+        )}
+
+        {tab === "Accommodation" && (
+          <Section heading={heading} title="Accommodation" sub="On-site stays for you and your guests">
+            {rooms.length === 0 ? <Empty>No accommodation listed.</Empty> : (
+              <div style={grid}>{rooms.map((r) => <PortalItemCard key={r.id} name={r.name} description={`Sleeps ${r.sleeps}${r.description ? ` · ${r.description}` : ""}`} img={r.img} price={r.price} {...itemProps} />)}</div>
+            )}
+          </Section>
+        )}
+
+        {tab === "Suppliers" && (
+          <Section heading={heading} title="Suppliers" sub={`Trusted partners recommended by ${venue.name}`}>
+            {vendors.length === 0 ? <Empty>No suppliers listed.</Empty> : groupBy(vendors, (v) => VENDOR_LABELS[v.type] || v.type).map(([label, items]) => (
+              <div key={label} style={{ marginBottom: 22 }}>
+                <div style={{ ...heading, fontSize: 17, marginBottom: 10 }}>{label}</div>
+                <div style={grid}>{items.map((v) => (
+                  <div key={v.id} style={card({ overflow: "hidden" })}>
+                    {v.img && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={v.img} alt="" style={{ width: "100%", height: 110, objectFit: "cover" }} />
+                    )}
+                    <div style={{ padding: 14 }}>
+                      <div style={{ ...heading, fontWeight: 700 }}>{v.name}</div>
+                      {v.description && <div style={{ fontSize: 12.5, color: "#57534e", margin: "4px 0" }}>{v.description}</div>}
+                      {v.price != null && <div style={{ color: primary, fontWeight: 700, fontSize: 13 }}>From {rZA(v.price)}</div>}
+                      <div style={{ fontSize: 12, color: "#57534e", marginTop: 6, display: "grid", gap: 2 }}>
+                        {v.phone && <span>📞 {v.phone}</span>}
+                        {v.email && <span>✉ {v.email}</span>}
+                        {v.website && <a href={v.website} target="_blank" rel="noopener noreferrer" style={{ color: primary }}>↗ Website</a>}
+                      </div>
+                    </div>
+                  </div>
+                ))}</div>
+              </div>
+            ))}
+          </Section>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function Stat({ label, value, heading, accent, primary }: { label: string; value: string; heading: React.CSSProperties; accent: string; primary: string }) {
+  return (
+    <div style={{ background: `${accent}2e`, borderRadius: 14, padding: 16, textAlign: "center" }}>
+      <div style={{ ...heading, fontSize: 26, color: primary }}>{value}</div>
+      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#57534e", marginTop: 2 }}>{label}</div>
+    </div>
+  );
+}
+
+function Section({ title, sub, heading, children }: { title: string; sub?: string; heading: React.CSSProperties; children: React.ReactNode }) {
+  return (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <h2 style={{ ...heading, fontSize: 26, margin: 0 }}>{title}</h2>
+        {sub && <div style={{ color: "#57534e", fontSize: 13, marginTop: 2 }}>{sub}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return <div style={{ padding: 24, textAlign: "center", color: "#8a8a8a", border: "1px dashed rgba(0,0,0,0.12)", borderRadius: 12 }}>{children}</div>;
+}
+
+function PortalLogo({ logoUrl, venueName, heading, light }: { logoUrl: string | null; venueName: string; heading: React.CSSProperties; light: boolean }) {
+  if (logoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={logoUrl} alt="" style={{ height: 34, maxWidth: 150, objectFit: "contain" }} />;
+  }
+  return <span style={{ ...heading, color: light ? "#fff" : "var(--ink)", fontWeight: 700 }}>{venueName}</span>;
+}
+
+function PortalItemCard({ name, description, img, price, badge, primary, accent, heading, cardRadius }: {
+  name: string; description: string; img: string | null; price?: number; badge?: string;
+  primary: string; accent: string; heading: React.CSSProperties; cardRadius: string;
+}) {
+  return (
+    <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      {img ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={img} alt="" style={{ width: "100%", aspectRatio: "4 / 3", objectFit: "cover" }} />
+      ) : (
+        <div style={{ width: "100%", aspectRatio: "4 / 3", background: `${accent}33`, display: "flex", alignItems: "center", justifyContent: "center", color: "#9a8", fontSize: 12 }}>No image</div>
+      )}
+      <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
+        <div style={{ ...heading, fontWeight: 700, fontSize: 16 }}>{name}</div>
+        {description && <div style={{ fontSize: 12.5, color: "#57534e", lineHeight: 1.5, flex: 1 }}>{description}</div>}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+          {price != null ? <span style={{ color: primary, fontWeight: 700 }}>{price > 0 ? rZA(price) : "Included"}</span> : <span />}
+          {badge && <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, background: `${accent}40`, color: "#5a4", padding: "2px 8px", borderRadius: 999 }}>{badge}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
