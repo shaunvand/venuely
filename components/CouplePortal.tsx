@@ -55,6 +55,10 @@ export function CouplePortal({
   gallery: GalleryItem[];
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
+  const [catFilter, setCatFilter] = useState("All");
+  const [rentFilter, setRentFilter] = useState("All");
+  const [rentFolder, setRentFolder] = useState<"all" | "included" | "extra">("all");
+  const [supFilter, setSupFilter] = useState("All");
   const router = useRouter();
   const [state, setState] = useState<WState>(initialState ?? {});
   const [busy, setBusy] = useState(false);
@@ -231,11 +235,13 @@ export function CouplePortal({
 
         {tab === "Catalogue" && (
           <Section heading={heading} title="Catalogue" sub="Included with your booking — tick what you'd like; add optional extras">
+            <FilterChips primary={primary} value={catFilter} onChange={setCatFilter}
+              options={["All", ...Array.from(new Set(catalogue.map((c) => c.eventPart || c.category)))]} />
             {catalogue.length === 0 ? <Empty>Nothing here yet.</Empty> : (
               <>
                 {([{ inc: true, label: "Included with your booking", note: "Selected by default — deselect anything you don't need." },
                    { inc: false, label: "Optional extras", note: "Add these to your day for an extra charge." }] as const).map((grp) => {
-                  const groupItems = catalogue.filter((c) => c.included === grp.inc);
+                  const groupItems = catalogue.filter((c) => c.included === grp.inc && (catFilter === "All" || (c.eventPart || c.category) === catFilter));
                   if (groupItems.length === 0) return null;
                   return (
                     <div key={String(grp.inc)} style={{ marginBottom: 28 }}>
@@ -258,13 +264,26 @@ export function CouplePortal({
         )}
 
         {tab === "Rentals" && (
-          <Section heading={heading} title="Rentals" sub="Optional extras to hire">
-            {rentals.length === 0 ? <Empty>Nothing here yet.</Empty> : groupBy(rentals, (r) => r.category).map(([catName, items]) => (
-              <div key={catName} style={{ marginBottom: 22 }}>
-                <div style={{ ...heading, fontSize: 17, marginBottom: 10 }}>{catName}</div>
-                <div style={grid}>{items.map((it) => <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} price={it.price} selected={!!rentSel[it.id]?.sel} onToggle={() => toggleRent(it.id)} days={rentSel[it.id]} onDay={(d) => toggleRentDay(it.id, d)} qty={rentSel[it.id]?.qty} onQty={(n) => setRentQty(it.id, n)} {...itemProps} />)}</div>
-              </div>
-            ))}
+          <Section heading={heading} title="Rentals" sub="Browse what's included and the optional extras to hire">
+            {/* Folders: Included with booking vs To pay for */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+              {([["all", "All rentals"], ["included", "📁 Included with booking"], ["extra", "📁 To pay for"]] as const).map(([key, label]) => {
+                const on = rentFolder === key;
+                return <button key={key} onClick={() => setRentFolder(key)} style={{ fontSize: 12.5, padding: "7px 14px", borderRadius: tokens.cardRadius, cursor: "pointer", border: `1px solid ${on ? primary : "rgba(0,0,0,0.15)"}`, background: on ? `${primary}1f` : "#fff", color: on ? primary : "#57534e", fontWeight: on ? 700 : 500 }}>{label}</button>;
+              })}
+            </div>
+            <FilterChips primary={primary} value={rentFilter} onChange={setRentFilter}
+              options={["All", ...Array.from(new Set(rentals.map((r) => r.category)))]} />
+            {(() => {
+              const shown = rentals.filter((r) => (rentFolder === "all" || (rentFolder === "included") === r.included) && (rentFilter === "All" || r.category === rentFilter));
+              if (shown.length === 0) return <Empty>Nothing in this folder.</Empty>;
+              return groupBy(shown, (r) => r.category).map(([catName, items]) => (
+                <div key={catName} style={{ marginBottom: 22 }}>
+                  <div style={{ ...heading, fontSize: 17, marginBottom: 10 }}>{catName}</div>
+                  <div style={grid}>{items.map((it) => <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} price={it.included ? 0 : it.price} badge={it.included ? "Included" : undefined} selected={!!rentSel[it.id]?.sel} onToggle={() => toggleRent(it.id)} days={rentSel[it.id]} onDay={(d) => toggleRentDay(it.id, d)} qty={rentSel[it.id]?.qty} onQty={(n) => setRentQty(it.id, n)} {...itemProps} />)}</div>
+                </div>
+              ));
+            })()}
           </Section>
         )}
 
@@ -278,7 +297,9 @@ export function CouplePortal({
 
         {tab === "Suppliers" && (
           <Section heading={heading} title="Suppliers" sub={`Trusted partners recommended by ${venue.name}`}>
-            {vendors.length === 0 ? <Empty>No suppliers listed.</Empty> : groupBy(vendors, (v) => VENDOR_LABELS[v.type] || v.type).map(([label, items]) => (
+            <FilterChips primary={primary} value={supFilter} onChange={setSupFilter}
+              options={["All", ...Array.from(new Set(vendors.map((v) => VENDOR_LABELS[v.type] || v.type)))]} />
+            {vendors.length === 0 ? <Empty>No suppliers listed.</Empty> : groupBy(vendors.filter((v) => supFilter === "All" || (VENDOR_LABELS[v.type] || v.type) === supFilter), (v) => VENDOR_LABELS[v.type] || v.type).map(([label, items]) => (
               <div key={label} style={{ marginBottom: 22 }}>
                 <div style={{ ...heading, fontSize: 17, marginBottom: 10 }}>{label}</div>
                 <div style={grid}>{items.map((v) => (
@@ -343,6 +364,20 @@ function Section({ title, sub, heading, children }: { title: string; sub?: strin
         {sub && <div style={{ color: "#57534e", fontSize: 13, marginTop: 2 }}>{sub}</div>}
       </div>
       {children}
+    </div>
+  );
+}
+
+function FilterChips({ options, value, onChange, primary }: { options: string[]; value: string; onChange: (v: string) => void; primary: string }) {
+  if (options.length <= 2) return null;
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+      {options.map((o) => {
+        const on = o === value;
+        return (
+          <button key={o} onClick={() => onChange(o)} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 999, cursor: "pointer", border: `1px solid ${on ? primary : "rgba(0,0,0,0.15)"}`, background: on ? primary : "#fff", color: on ? "#fff" : "#57534e", fontWeight: on ? 700 : 500 }}>{o}</button>
+        );
+      })}
     </div>
   );
 }
