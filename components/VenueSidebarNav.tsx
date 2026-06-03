@@ -36,6 +36,7 @@ const GROUPS: Group[] = [
       },
       { href: "/venue/accommodation", label: "Accommodation" },
       { href: "/venue/areas", label: "Areas" },
+      { href: "/venue/seating", label: "Seating & tables" },
     ],
   },
   {

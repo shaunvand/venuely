@@ -48,9 +48,10 @@ type RentItem = CatItem & { price: number };
 type RoomItem = { id: string; name: string; type: string; sleeps: number; description: string; img: string | null; price: number };
 type VendorItem = { id: string; type: string; name: string; description: string; img: string | null; price: number | null; email: string | null; phone: string | null; website: string | null };
 type GalleryItem = { url: string; category: string; label: string };
+type TableItem = { id: string; label: string; shape: string; seats: number; quantity: number };
 type Venue = { name: string; region: string | null; address: string | null; description: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
 
-const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Accommodation", "Suppliers", "Guests", "Timeline", "Contacts", "Music", "Budget"] as const;
+const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Accommodation", "Suppliers", "Guests", "Seating", "Timeline", "Contacts", "Music", "Budget"] as const;
 type Tab = (typeof TABS)[number];
 
 const VENDOR_LABELS: Record<string, string> = { caterer: "Caterers", planner: "Planners", florist: "Florists", dj: "DJs", photographer: "Photographers", decor: "Décor", bar: "Bar services" };
@@ -63,7 +64,7 @@ function groupBy<T>(items: T[], key: (t: T) => string): [string, T[]][] {
 }
 
 export function CouplePortal({
-  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, totalDue, initialState, catalogue, rentals, rooms, vendors, gallery,
+  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, totalDue, initialState, catalogue, rentals, rooms, vendors, gallery, tables,
 }: {
   slug: string;
   tokens: TemplateTokens;
@@ -81,6 +82,7 @@ export function CouplePortal({
   rooms: RoomItem[];
   vendors: VendorItem[];
   gallery: GalleryItem[];
+  tables: TableItem[];
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
   const [rentFilter, setRentFilter] = useState("All");
@@ -335,6 +337,37 @@ export function CouplePortal({
 
         {tab === "Guests" && (
           <GuestManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        )}
+        {tab === "Seating" && (
+          <Section heading={heading} title="Seating" sub="The tables your venue offers — assign each guest a table number in the Guests tab">
+            {tables.length === 0 ? <Empty>Your venue hasn&apos;t set up seating yet.</Empty> : (() => {
+              const totalSeats = tables.reduce((s, t) => s + t.seats * t.quantity, 0);
+              const totalTables = tables.reduce((s, t) => s + t.quantity, 0);
+              return (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 16 }}>
+                    <div style={{ background: `${accent}2e`, borderRadius: 14, padding: 16, textAlign: "center" }}>
+                      <div style={{ ...heading, fontSize: 26, color: primary }}>{totalTables}</div>
+                      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#57534e" }}>Tables available</div>
+                    </div>
+                    <div style={{ background: `${accent}2e`, borderRadius: 14, padding: 16, textAlign: "center" }}>
+                      <div style={{ ...heading, fontSize: 26, color: primary }}>{totalSeats}</div>
+                      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#57534e" }}>Seats in total</div>
+                    </div>
+                  </div>
+                  <div style={grid}>{tables.map((t) => (
+                    <div key={t.id} style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: tokens.cardRadius, padding: 16, textAlign: "center" }}>
+                      <div style={{ fontSize: 34, lineHeight: 1 }}>{t.shape === "round" ? "⭕" : t.shape === "long" ? "▬" : t.shape === "square" ? "⬜" : "🪑"}</div>
+                      <div style={{ ...heading, fontWeight: 700, marginTop: 8 }}>{t.label}</div>
+                      <div style={{ fontSize: 12.5, color: "#57534e", marginTop: 2 }}>{t.shape} · seats {t.seats}</div>
+                      <div style={{ fontSize: 12, color: primary, fontWeight: 700, marginTop: 4 }}>×{t.quantity} available</div>
+                    </div>
+                  ))}</div>
+                  <p style={{ fontSize: 12, color: "#8a8a8a", marginTop: 14 }}>Tip: open the <strong>Guests</strong> tab and set each guest&apos;s table number to build your seating plan. A visual drag-and-drop planner is coming soon.</p>
+                </>
+              );
+            })()}
+          </Section>
         )}
         {tab === "Timeline" && (
           <ListManager slug={slug} kind="timeline" title="Day timeline" sub="Your run sheet — when and where everything happens" fields={TIMELINE_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />

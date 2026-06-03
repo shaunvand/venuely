@@ -26,7 +26,7 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
   const wId = access.wedding.id;
   const vId = access.wedding.venue_id;
 
-  const [wedRes, venRes, catRes, rentRes, roomRes, vendRes, galRes] = await Promise.all([
+  const [wedRes, venRes, catRes, rentRes, roomRes, vendRes, galRes, tableRes] = await Promise.all([
     db.from("weddings").select("id, slug, couple_names, wedding_date, wedding_end_date, wedding_state").eq("id", wId).single(),
     db.from("venues").select("name, region, address, portal_template, portal_theme, branding_logo_url, contact_email, contact_phone, google_maps_url, description").eq("id", vId).single(),
     db.from("catalogue_items").select("id, category, name, description, image_url, cost_treatment, event_part, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
@@ -34,6 +34,7 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
     db.from("accommodation_rooms").select("id, name, room_type, sleeps, description, price_per_night, hero_image_url, image_url, commission_value, commission_type, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
     db.from("vendor_partners").select("id, vendor_type, name, description, price_from, image_url, contact_email, contact_phone, website_url, commission_value, commission_type, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
     db.from("media_assets").select("url, category, kind, label, sort_order").eq("venue_id", vId).eq("owner_type", "venue").in("kind", ["photo", "video", "hero"]).order("sort_order"),
+    db.from("venue_tables").select("id, label, shape, seats, quantity").eq("venue_id", vId).eq("active", true).order("sort_order"),
   ]);
 
   const wedding = wedRes.data;
@@ -85,6 +86,7 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
       rooms={rooms}
       vendors={vendors}
       gallery={gallery}
+      tables={(tableRes.data ?? []).map((t) => ({ id: t.id as string, label: t.label as string, shape: t.shape as string, seats: Number(t.seats), quantity: Number(t.quantity) }))}
     />
   );
 }
