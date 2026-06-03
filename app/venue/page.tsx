@@ -157,6 +157,19 @@ export default async function VenueOverview() {
     }
   });
 
+  // Couple submissions awaiting venue review (across all weddings).
+  const { data: pendingSubsRaw } = await supabase
+    .from("submissions")
+    .select("id, kind, created_at, totals, wedding:weddings!inner(slug, couple_names, venue_id)")
+    .eq("wedding.venue_id", venue.id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+  const pendingSubs = (pendingSubsRaw ?? []).map((s) => {
+    const w = (s as { wedding?: unknown }).wedding;
+    const single = Array.isArray(w) ? (w[0] ?? null) : (w ?? null);
+    return { id: s.id as string, kind: s.kind as string, created_at: s.created_at as string, totals: (s as { totals?: unknown }).totals, wedding: single as { slug: string; couple_names: string } | null };
+  });
+
   // Roll the per-wedding wedding_state blobs up into venue-wide couple-engagement
   // totals (guests, selections, booked suppliers, checklist progress).
   const engagementRows = (stateRows ?? []) as Array<{ wedding_state: unknown; wedding_state_updated_at: string | null }>;
@@ -333,6 +346,33 @@ export default async function VenueOverview() {
           </div>
         </Link>
       </header>
+
+      {/* Couple submissions awaiting review — the couple → venue feedback loop */}
+      {pendingSubs.length > 0 && (
+        <section className="vy-card" style={{ border: "2px solid var(--peach)" }}>
+          <div className="flex items-center gap-2">
+            <span className="vy-eyebrow">Action needed</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--peach)", color: "var(--poppy-deep)" }}>{pendingSubs.length} to review</span>
+          </div>
+          <h2 className="vy-h2 mt-1 mb-3">Couples submitted their selections</h2>
+          <div className="space-y-2">
+            {pendingSubs.map((s) => {
+              const total = Number((s.totals as { grandTotal?: number } | null)?.grandTotal ?? 0);
+              return (
+                <Link key={s.id} href={`/venue/weddings/${s.wedding?.slug ?? ""}`} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 hover:bg-[color:var(--cream)] transition-colors" style={{ border: "1px solid var(--line)" }}>
+                  <div>
+                    <div className="font-medium text-sm">{s.wedding?.couple_names ?? "Wedding"}</div>
+                    <div className="text-xs" style={{ color: "var(--ink-2)" }}>
+                      {s.kind} selection · {new Date(s.created_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}{total > 0 ? ` · R${Math.round(total).toLocaleString("en-ZA")}` : ""}
+                    </div>
+                  </div>
+                  <span className="vy-btn vy-btn-primary text-xs flex-shrink-0">Review &amp; invoice →</span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Enlarged calendar across the top — bookings, multi-day spans, and a live
           availability check driven by selecting dates. */}
