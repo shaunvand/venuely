@@ -20,11 +20,11 @@ const cormorant = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "Venuely — Wedding venue software for South Africa",
+  title: "Venuely — Weddings Made Easy",
   description:
     "Run your wedding venue like a hotel. Branded couple portals, catalogue + rentals + accommodation tracking, ZAR billing. 1% of wedding spend — no monthly fee.",
   openGraph: {
-    title: "Venuely — Wedding venue software for South Africa",
+    title: "Venuely — Weddings Made Easy",
     description:
       "Branded couple portals, catalogue + rentals + accommodation tracking, billed in rand.",
     url: "https://venuely.co.za",

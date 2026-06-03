@@ -33,8 +33,11 @@ export function VenueSidebar() {
         <Link href="/venue" className="flex items-center gap-2.5" title="Venuely">
           <LogoMark size={collapsed ? 36 : 44} />
           {!collapsed && (
-            <span className="text-2xl font-bold tracking-tight" style={{ color: "var(--poppy)", fontFamily: "'Fraunces', Georgia, serif" }}>
-              Venuely.
+            <span className="flex flex-col leading-none">
+              <span className="text-2xl font-bold tracking-tight" style={{ color: "var(--poppy)", fontFamily: "'Fraunces', Georgia, serif" }}>
+                Venuely.
+              </span>
+              <span className="text-[10px] tracking-wide" style={{ color: "var(--ink-2)" }}>Weddings Made Easy</span>
             </span>
           )}
         </Link>

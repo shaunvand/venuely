@@ -91,11 +91,14 @@ function Nav({ signedIn }: { signedIn: boolean }) {
       <div className="max-w-7xl mx-auto px-6 lg:px-10 py-5 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
           <LogoMark size={52} />
-          <span
-            className="font-serif text-3xl"
-            style={{ color: "var(--poppy)", fontWeight: 900, letterSpacing: "-0.03em" }}
-          >
-            Venuely.
+          <span className="flex flex-col leading-none">
+            <span
+              className="font-serif text-3xl"
+              style={{ color: "var(--poppy)", fontWeight: 900, letterSpacing: "-0.03em" }}
+            >
+              Venuely.
+            </span>
+            <span className="text-[11px] tracking-wide" style={{ color: "var(--ink-2)" }}>Weddings Made Easy</span>
           </span>
         </Link>
         <nav className="hidden md:flex items-center gap-8 text-sm" style={{ color: "var(--ink)" }}>
