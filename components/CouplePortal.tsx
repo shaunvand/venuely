@@ -9,6 +9,7 @@ import { FloorPlanner } from "@/components/FloorPlanner";
 import { InspirationBoard } from "@/components/InspirationBoard";
 import { DocumentManager } from "@/components/DocumentManager";
 import { AddToCalendar } from "@/components/AddToCalendar";
+import { GuestInvites } from "@/components/GuestInvites";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -75,7 +76,7 @@ type GalleryItem = { url: string; category: string; label: string };
 type TableItem = { id: string; label: string; shape: string; seats: number; quantity: number };
 type Venue = { name: string; region: string | null; address: string | null; description: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
 
-const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Documents"] as const;
+const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Invites", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Documents"] as const;
 type Tab = (typeof TABS)[number];
 
 const VENDOR_LABELS: Record<string, string> = { caterer: "Caterers", planner: "Planners", florist: "Florists", dj: "DJs", photographer: "Photographers", decor: "Décor", bar: "Bar services" };
@@ -368,6 +369,9 @@ export function CouplePortal({
 
         {tab === "Guests" && (
           <GuestManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        )}
+        {tab === "Invites" && (
+          <GuestInvites slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Seating" && (
           <FloorPlanner slug={slug} tables={tables} initialPositions={((state as Record<string, unknown>).floorplan as { positions?: Record<number, { x: number; y: number }> })?.positions ?? {}} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />

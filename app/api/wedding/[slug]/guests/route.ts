@@ -11,7 +11,7 @@ function admin() {
   });
 }
 
-const COLS = "id, full_name, email, phone, rsvp_status, table_number, dietary, accessibility_needs, plus_one, is_child, side, notes";
+const COLS = "id, full_name, email, phone, rsvp_status, table_number, dietary, accessibility_needs, plus_one, is_child, side, notes, rsvp_token, invited_at, responded_at, party_size, rsvp_message";
 const ALLOWED = new Set(["full_name", "email", "phone", "rsvp_status", "table_number", "dietary", "accessibility_needs", "plus_one", "is_child", "side", "notes"]);
 
 function clean(body: Record<string, unknown>): Record<string, unknown> {
