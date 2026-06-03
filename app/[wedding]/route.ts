@@ -5,7 +5,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { applyMarkup } from "@/lib/billing/compute";
-import { resolveTheme as resolvePortalTheme } from "@/lib/portal/templates";
+import { resolveTheme as resolvePortalTheme, resolveTemplate as resolvePortalTemplate } from "@/lib/portal/templates";
 
 // Salted hash. Folds in the per-wedding portal_salt when present so a rotated
 // salt invalidates old cookies. Must stay in lock-step with the helper in
@@ -312,12 +312,31 @@ export async function GET(
   const themePrimary = theme.primary;
   const themeAccent = theme.accent;
   const themeLogo = theme.logoUrl || venue?.branding_logo_url || null;
+  // Cover photo for the hero — chosen cover, else the first gallery image (matches
+  // the portal-designer preview's fallback). With a cover we lay a dark scrim under
+  // it so the white hero text stays readable.
+  const firstGalleryUrl = (galleryRaw ?? [])
+    .map((g) => String((g as Record<string, unknown>).url ?? ""))
+    .find((u) => /\.(jpe?g|png|webp|gif|avif|heic)(\?|$)/i.test(u)) || null;
+  const coverForHero = theme.coverUrl || firstGalleryUrl;
+  const heroBg = coverForHero
+    ? `linear-gradient(rgba(0,0,0,0.42),rgba(0,0,0,0.42)),url('${coverForHero}') center/cover no-repeat`
+    : `linear-gradient(155deg,${themePrimary} 0%,${themePrimary} 55%,${themeAccent} 130%)`;
   const themeStyle = `<style id="vy-venue-theme">`
     + `:root{--forest:${themePrimary} !important;--gold:${themeAccent} !important;--gold-light:${themeAccent} !important;--sage:${themeAccent}33 !important;}`
-    // The hero gradient is hardcoded green in the base CSS — repaint it in the venue's primary.
-    + `header{background:linear-gradient(155deg,${themePrimary} 0%,${themePrimary} 55%,${themeAccent} 130%) !important;}`
+    // Hero: show the cover photo (or brand gradient) — the base CSS hardcodes green.
+    + `header{background:${heroBg} !important;}header::before{opacity:.25 !important;}`
     // Drop the billing (Committed) + checklist (Tasks done) stat cards from the couple dashboard.
     + `#dashStats>*:nth-child(3),#dashStats>*:nth-child(4){display:none !important;}`
+    // Per-template structure: button/tab shape from the chosen template.
+    + (() => {
+        const t = resolvePortalTemplate(venue?.portal_template);
+        const r = t.buttonRadius;
+        return `.nav-btn{border-radius:${r} !important;}`
+          + `.rental-checkbox+label,.cat-thumb-wrap,.rental-thumb-wrap,.sup-card,.vy-btn,button.primary,.btn{border-radius:${t.cardRadius} !important;}`
+          + (t.tabStyle === "pill" ? `.nav-btn.active{background:${themePrimary} !important;color:#fff !important;}` : "")
+          + (t.tabStyle === "segmented" ? `.nav{gap:2px !important;}.nav-btn{border:1px solid ${themeAccent}55 !important;}` : "");
+      })()
     + `</style>`;
   html = html.replace("</head>", `${themeStyle}</head>`);
   if (themeLogo) {

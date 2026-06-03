@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   updateWeddingBasics, setPortalPassword,
   markInvoiced, markCouplePaid, markPlatformFeePaid,
-  sendPortalInvite, rotatePortalAccess, revokeCoupleAccess,
+  sendPortalInvite, rotatePortalAccess, revokeCoupleAccess, approveSubmission,
 } from "../actions";
 import { statusColor } from "@/lib/wedding/status";
 import { addPayment, deletePayment, addCharge, deleteCharge } from "./ledger-actions";
@@ -57,6 +57,14 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     supabase.from("wedding_members").select("user_id, profiles:profiles(id, full_name)").eq("wedding_id", wedding.id),
   ]);
   const lastOpenedAt = (lastOpenedRes.data?.[0]?.accessed_at as string | undefined) ?? null;
+  // Couple submissions awaiting venue review.
+  const { data: submissionRows } = await supabase
+    .from("submissions")
+    .select("id, kind, message, totals, status, created_at")
+    .eq("wedding_id", wedding.id)
+    .order("created_at", { ascending: false });
+  const submissions = (submissionRows ?? []) as Array<{ id: string; kind: string; message: string | null; totals: unknown; status: string | null; created_at: string }>;
+  const pendingSubmissions = submissions.filter((s) => (s.status ?? "pending") === "pending");
   const coupleMembers = (coupleMembersRes.data ?? []) as unknown as Array<{
     user_id: string;
     profiles: { id: string; full_name: string | null } | null;
@@ -305,6 +313,34 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
         <div className="md:col-span-2 space-y-1"><label className="vy-label">Notes</label><input name="notes" defaultValue={wedding.notes ?? ""} className="vy-input" /></div>
         <div className="md:col-span-6"><button className="vy-btn vy-btn-primary">Save changes</button></div>
       </form>
+
+      {/* Couple submissions awaiting review → approve sends the EFT invoice */}
+      {pendingSubmissions.length > 0 && (
+        <div className="vy-card space-y-3" style={{ border: "2px solid var(--peach)" }}>
+          <div className="flex items-center gap-2">
+            <span className="vy-eyebrow">Action needed</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--peach)", color: "var(--poppy-deep)" }}>{pendingSubmissions.length} to review</span>
+          </div>
+          <h2 className="vy-h2">Couple submitted their selections</h2>
+          <p className="text-sm" style={{ color: "var(--ink-2)" }}>
+            Review the proforma above, then approve to email the couple their EFT invoice and record your 1% Venuely commission.
+          </p>
+          <div className="space-y-2">
+            {pendingSubmissions.map((s) => (
+              <div key={s.id} className="flex items-center justify-between gap-3 flex-wrap rounded-lg px-3 py-2" style={{ border: "1px solid var(--line)" }}>
+                <div className="text-sm">
+                  <span className="font-medium capitalize">{s.kind}</span> selection
+                  <span className="text-xs ml-2" style={{ color: "var(--ink-2)" }}>{new Date(s.created_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}</span>
+                  {s.message && <div className="text-xs mt-0.5" style={{ color: "var(--ink-2)" }}>“{s.message}”</div>}
+                </div>
+                <form action={approveSubmission.bind(null, s.id, wedding.id, wedding.slug)}>
+                  <button className="vy-btn vy-btn-primary text-xs">Approve &amp; send invoice</button>
+                </form>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Financial summary card */}
       <div className="vy-card space-y-4">
