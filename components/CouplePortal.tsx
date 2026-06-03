@@ -11,7 +11,7 @@ type WState = {
   [k: string]: unknown;
 };
 
-type CatItem = { id: string; category: string; name: string; description: string; img: string | null };
+type CatItem = { id: string; category: string; name: string; description: string; img: string | null; included: boolean };
 type RentItem = CatItem & { price: number };
 type RoomItem = { id: string; name: string; type: string; sleeps: number; description: string; img: string | null; price: number };
 type VendorItem = { id: string; type: string; name: string; description: string; img: string | null; price: number | null; email: string | null; phone: string | null; website: string | null };
@@ -63,7 +63,10 @@ export function CouplePortal({
   const catSel = state.catalogueSelections ?? {};
   const rentSel = state.rentalSelections ?? {};
   const rooms_ = state.roomAssignments ?? {};
-  const selectedCount = Object.values(catSel).filter((v) => v?.sel).length
+  // Included catalogue items are selected by DEFAULT (couples deselect to opt out);
+  // extras are off until added.
+  const catIsSelected = (it: CatItem) => { const e = catSel[it.id]; return e ? !!e.sel : it.included; };
+  const selectedCount = catalogue.filter(catIsSelected).length
     + Object.values(rentSel).filter((v) => v?.sel).length
     + Object.values(rooms_).filter((a) => Array.isArray(a) && a.length).length;
 
@@ -81,9 +84,9 @@ export function CouplePortal({
       setBusy(false);
     }
   }
-  function toggleCat(id: string) {
+  function toggleCat(it: CatItem) {
     const cur = { ...(state.catalogueSelections ?? {}) };
-    if (cur[id]?.sel) delete cur[id]; else cur[id] = { sel: true };
+    cur[it.id] = { sel: !catIsSelected(it) };
     persist({ ...state, catalogueSelections: cur });
   }
   function toggleRent(id: string) {
@@ -99,10 +102,15 @@ export function CouplePortal({
   async function submitToVenue() {
     setBusy(true);
     try {
+      // Materialise default-selected included items so the venue sees them.
+      const cat = { ...(state.catalogueSelections ?? {}) };
+      catalogue.forEach((it) => { if (cat[it.id] === undefined) cat[it.id] = { sel: it.included }; });
+      const full = { ...state, catalogueSelections: cat };
+      await fetch(`/api/wedding/${slug}/state`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(full) });
       const res = await fetch(`/api/wedding/${slug}/submit`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "full", state, totals: { grandTotal: totalDue } }),
+        body: JSON.stringify({ kind: "full", state: full, totals: { grandTotal: totalDue } }),
       });
       if (res.ok) setSubmitted(true);
     } finally {
@@ -197,13 +205,30 @@ export function CouplePortal({
         )}
 
         {tab === "Catalogue" && (
-          <Section heading={heading} title="Catalogue" sub="Items included with your booking">
-            {catalogue.length === 0 ? <Empty>Nothing here yet.</Empty> : groupBy(catalogue, (c) => c.category).map(([catName, items]) => (
-              <div key={catName} style={{ marginBottom: 22 }}>
-                <div style={{ ...heading, fontSize: 17, marginBottom: 10 }}>{catName}</div>
-                <div style={grid}>{items.map((it) => <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} badge="Included" selected={!!catSel[it.id]?.sel} onToggle={() => toggleCat(it.id)} {...itemProps} />)}</div>
-              </div>
-            ))}
+          <Section heading={heading} title="Catalogue" sub="Included with your booking — tick what you'd like; add optional extras">
+            {catalogue.length === 0 ? <Empty>Nothing here yet.</Empty> : (
+              <>
+                {([{ inc: true, label: "Included with your booking", note: "Selected by default — deselect anything you don't need." },
+                   { inc: false, label: "Optional extras", note: "Add these to your day for an extra charge." }] as const).map((grp) => {
+                  const groupItems = catalogue.filter((c) => c.included === grp.inc);
+                  if (groupItems.length === 0) return null;
+                  return (
+                    <div key={String(grp.inc)} style={{ marginBottom: 28 }}>
+                      <div style={{ ...heading, fontSize: 20 }}>{grp.label}</div>
+                      <div style={{ fontSize: 12, color: "#8a8a8a", marginBottom: 12 }}>{grp.note}</div>
+                      {groupBy(groupItems, (c) => c.category).map(([catName, items]) => (
+                        <div key={catName} style={{ marginBottom: 18 }}>
+                          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: accent === "#FFC6AD" ? "var(--ink-2)" : primary, fontWeight: 700, marginBottom: 8 }}>{catName}</div>
+                          <div style={grid}>{items.map((it) => (
+                            <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} badge={grp.inc ? "Included" : undefined} selected={catIsSelected(it)} onToggle={() => toggleCat(it)} {...itemProps} />
+                          ))}</div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </>
+            )}
           </Section>
         )}
 
