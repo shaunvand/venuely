@@ -309,7 +309,13 @@ export async function GET(
   const themePrimary = theme.primary;
   const themeAccent = theme.accent;
   const themeLogo = theme.logoUrl || venue?.branding_logo_url || null;
-  const themeStyle = `<style id="vy-venue-theme">:root{--forest:${themePrimary} !important;--gold:${themeAccent} !important;--gold-light:${themeAccent} !important;--sage:${themeAccent}33 !important;}</style>`;
+  const themeStyle = `<style id="vy-venue-theme">`
+    + `:root{--forest:${themePrimary} !important;--gold:${themeAccent} !important;--gold-light:${themeAccent} !important;--sage:${themeAccent}33 !important;}`
+    // The hero gradient is hardcoded green in the base CSS — repaint it in the venue's primary.
+    + `header{background:linear-gradient(155deg,${themePrimary} 0%,${themePrimary} 55%,${themeAccent} 130%) !important;}`
+    // Drop the billing (Committed) + checklist (Tasks done) stat cards from the couple dashboard.
+    + `#dashStats>*:nth-child(3),#dashStats>*:nth-child(4){display:none !important;}`
+    + `</style>`;
   html = html.replace("</head>", `${themeStyle}</head>`);
   if (themeLogo) {
     html = html.replace(/(<img class="header-logo" src=")[^"]*(")/, `$1${themeLogo}$2`);

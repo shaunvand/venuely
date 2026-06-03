@@ -61,8 +61,6 @@
   <button class="nav-btn" onclick="showTab('suppliers',this)">Suppliers</button>
   <button class="nav-btn" onclick="showTab('catalogue',this)">Catalogue</button>
   <button class="nav-btn" onclick="showTab('rentals',this)">Rentals</button>
-  <button class="nav-btn" onclick="showTab('budget',this)">Budget</button>
-  <button class="nav-btn" onclick="showTab('checklist',this)">Checklist</button>
   <button class="nav-btn" onclick="showTab('timeline',this)">Day Timeline</button>
   <button class="nav-btn" onclick="showTab('floorplans',this)">Floor Plans</button>
   <button class="nav-btn" onclick="showTab('rooming',this)">Rooming List</button>
@@ -74,22 +72,19 @@
 
   <!-- Dashboard -->
   <div id="tab-dashboard" class="tab-panel active">
-    <div id="dashAlerts" style="margin-bottom:16px"></div>
+    <div id="dashAlerts" style="margin-bottom:16px;display:none"></div>
     <div class="dash-grid" id="dashStats"></div>
-    <!-- Key Deadlines -->
-    <div id="dashDeadlines"></div>
+    <!-- Key Deadlines (hidden — billing/checklist removed from couple view) -->
+    <div id="dashDeadlines" style="display:none"></div>
 
     <div class="dash-two">
       <div>
         <!-- Contact Coordinator -->
         <div id="dashContact"></div>
-        <div class="section-title" style="font-size:1.1rem;margin-bottom:14px">Upcoming Payments</div>
-        <div id="dashPayments"></div>
       </div>
-      <div>
-        <div class="section-title" style="font-size:1.1rem;margin-bottom:14px">Next on the Checklist</div>
-        <div id="dashTasks"></div>
-      </div>
+      <!-- Payments + checklist containers kept (so the app can target them) but hidden -->
+      <div id="dashPayments" style="display:none"></div>
+      <div id="dashTasks" style="display:none"></div>
     </div>
   </div>
 
