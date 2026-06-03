@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { TemplateTokens, PortalTheme } from "@/lib/portal/templates";
 import { GuestManager } from "@/components/GuestManager";
 import { ListManager, type ListField } from "@/components/ListManager";
+import { SeatingPlanner } from "@/components/SeatingPlanner";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -31,6 +32,26 @@ const BUDGET_FIELDS: ListField[] = [
   { key: "actual", label: "Actual R", width: 100 },
   { key: "paid", label: "Paid R", width: 90 },
 ];
+const CHECKLIST_FIELDS: ListField[] = [
+  { key: "title", label: "To-do", grow: 2, width: 200 },
+  { key: "due_date", label: "Due (YYYY-MM-DD)", width: 140 },
+  { key: "done", label: "Done", type: "checkbox" },
+];
+const FLOWER_FIELDS: ListField[] = [
+  { key: "title", label: "Flower / arrangement", grow: 2, width: 180 },
+  { key: "category", label: "For (bouquet, centrepiece…)", width: 170 },
+  { key: "notes", label: "Notes", width: 150 },
+];
+const DRESS_FIELDS: ListField[] = [
+  { key: "title", label: "Dress / outfit", grow: 2, width: 180 },
+  { key: "shop", label: "Shop / designer", width: 150 },
+  { key: "notes", label: "Features you love", width: 160 },
+];
+const DECOR_FIELDS: ListField[] = [
+  { key: "title", label: "Décor item", grow: 2, width: 180 },
+  { key: "area", label: "Where (ceremony, tables…)", width: 170 },
+  { key: "notes", label: "Notes", width: 150 },
+];
 
 type DaySel = { sel?: boolean; mg?: boolean; wed?: boolean; fb?: boolean };
 type WState = {
@@ -51,7 +72,7 @@ type GalleryItem = { url: string; category: string; label: string };
 type TableItem = { id: string; label: string; shape: string; seats: number; quantity: number };
 type Venue = { name: string; region: string | null; address: string | null; description: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
 
-const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Accommodation", "Suppliers", "Guests", "Seating", "Timeline", "Contacts", "Music", "Budget"] as const;
+const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget"] as const;
 type Tab = (typeof TABS)[number];
 
 const VENDOR_LABELS: Record<string, string> = { caterer: "Caterers", planner: "Planners", florist: "Florists", dj: "DJs", photographer: "Photographers", decor: "Décor", bar: "Bar services" };
@@ -339,35 +360,7 @@ export function CouplePortal({
           <GuestManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Seating" && (
-          <Section heading={heading} title="Seating" sub="The tables your venue offers — assign each guest a table number in the Guests tab">
-            {tables.length === 0 ? <Empty>Your venue hasn&apos;t set up seating yet.</Empty> : (() => {
-              const totalSeats = tables.reduce((s, t) => s + t.seats * t.quantity, 0);
-              const totalTables = tables.reduce((s, t) => s + t.quantity, 0);
-              return (
-                <>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 16 }}>
-                    <div style={{ background: `${accent}2e`, borderRadius: 14, padding: 16, textAlign: "center" }}>
-                      <div style={{ ...heading, fontSize: 26, color: primary }}>{totalTables}</div>
-                      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#57534e" }}>Tables available</div>
-                    </div>
-                    <div style={{ background: `${accent}2e`, borderRadius: 14, padding: 16, textAlign: "center" }}>
-                      <div style={{ ...heading, fontSize: 26, color: primary }}>{totalSeats}</div>
-                      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#57534e" }}>Seats in total</div>
-                    </div>
-                  </div>
-                  <div style={grid}>{tables.map((t) => (
-                    <div key={t.id} style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: tokens.cardRadius, padding: 16, textAlign: "center" }}>
-                      <div style={{ fontSize: 34, lineHeight: 1 }}>{t.shape === "round" ? "⭕" : t.shape === "long" ? "▬" : t.shape === "square" ? "⬜" : "🪑"}</div>
-                      <div style={{ ...heading, fontWeight: 700, marginTop: 8 }}>{t.label}</div>
-                      <div style={{ fontSize: 12.5, color: "#57534e", marginTop: 2 }}>{t.shape} · seats {t.seats}</div>
-                      <div style={{ fontSize: 12, color: primary, fontWeight: 700, marginTop: 4 }}>×{t.quantity} available</div>
-                    </div>
-                  ))}</div>
-                  <p style={{ fontSize: 12, color: "#8a8a8a", marginTop: 14 }}>Tip: open the <strong>Guests</strong> tab and set each guest&apos;s table number to build your seating plan. A visual drag-and-drop planner is coming soon.</p>
-                </>
-              );
-            })()}
-          </Section>
+          <SeatingPlanner slug={slug} tables={tables} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Timeline" && (
           <ListManager slug={slug} kind="timeline" title="Day timeline" sub="Your run sheet — when and where everything happens" fields={TIMELINE_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
@@ -377,6 +370,18 @@ export function CouplePortal({
         )}
         {tab === "Music" && (
           <ListManager slug={slug} kind="songs" title="Music & song requests" sub="Key moments + your playlist for the DJ" fields={SONG_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        )}
+        {tab === "Checklist" && (
+          <ListManager slug={slug} kind="checklist" title="Checklist" sub="Your to-dos and due dates" fields={CHECKLIST_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        )}
+        {tab === "Flowers" && (
+          <ListManager slug={slug} kind="flowers" title="Flowers" sub="Your flower wishlist to share with the florist" fields={FLOWER_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        )}
+        {tab === "Dress" && (
+          <ListManager slug={slug} kind="dress" title="The dress" sub="Track dresses, shops and the features you love" fields={DRESS_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        )}
+        {tab === "Décor" && (
+          <ListManager slug={slug} kind="decor" title="Décor" sub="Centrepieces, ceremony arch and styling notes" fields={DECOR_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Budget" && (
           <ListManager slug={slug} kind="budget" title="Your budget" sub="Track your own spend — separate from the venue invoice" fields={BUDGET_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
