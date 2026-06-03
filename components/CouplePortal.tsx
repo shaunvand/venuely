@@ -24,6 +24,13 @@ const SONG_FIELDS: ListField[] = [
   { key: "title", label: "Song title", grow: 2, width: 170 },
   { key: "artist", label: "Artist", width: 140 },
 ];
+const BUDGET_FIELDS: ListField[] = [
+  { key: "category", label: "Category", grow: 2, width: 150 },
+  { key: "vendor_name", label: "Vendor", width: 130 },
+  { key: "estimated", label: "Estimated R", width: 110 },
+  { key: "actual", label: "Actual R", width: 100 },
+  { key: "paid", label: "Paid R", width: 90 },
+];
 
 type DaySel = { sel?: boolean; mg?: boolean; wed?: boolean; fb?: boolean };
 type WState = {
@@ -43,7 +50,7 @@ type VendorItem = { id: string; type: string; name: string; description: string;
 type GalleryItem = { url: string; category: string; label: string };
 type Venue = { name: string; region: string | null; address: string | null; description: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
 
-const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Accommodation", "Suppliers", "Guests", "Timeline", "Contacts", "Music"] as const;
+const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Accommodation", "Suppliers", "Guests", "Timeline", "Contacts", "Music", "Budget"] as const;
 type Tab = (typeof TABS)[number];
 
 const VENDOR_LABELS: Record<string, string> = { caterer: "Caterers", planner: "Planners", florist: "Florists", dj: "DJs", photographer: "Photographers", decor: "Décor", bar: "Bar services" };
@@ -337,6 +344,9 @@ export function CouplePortal({
         )}
         {tab === "Music" && (
           <ListManager slug={slug} kind="songs" title="Music & song requests" sub="Key moments + your playlist for the DJ" fields={SONG_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        )}
+        {tab === "Budget" && (
+          <ListManager slug={slug} kind="budget" title="Your budget" sub="Track your own spend — separate from the venue invoice" fields={BUDGET_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
       </main>
 
