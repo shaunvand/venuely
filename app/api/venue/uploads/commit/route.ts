@@ -8,8 +8,25 @@ export const runtime = "nodejs";
 
 type Item = { category: string; data: Record<string, unknown> };
 
-// Tables that carry an item_code column → eligible for dedupe UPSERT on (venue_id, item_code).
+// Tables that carry an item_code column → eligible for dedupe on (venue_id, item_code).
 const ITEM_CODE_TABLES = new Set(["catalogue_items", "rental_items"]);
+
+// Columns that actually exist per table. The AI parser can emit fields that don't
+// belong on a given table (e.g. contact_email on a rental, item_code on a room);
+// we strip anything not listed so PostgREST doesn't reject the whole batch.
+const ALLOWED_COLS: Record<string, Set<string>> = {
+  catalogue_items: new Set(["venue_id", "category", "name", "description", "price", "price_unit", "image_url", "active", "sort_order", "commission_value", "commission_type", "item_code", "cost_treatment", "event_part", "import_batch_id"]),
+  rental_items: new Set(["venue_id", "category", "name", "description", "price", "stock_total", "image_url", "active", "sort_order", "commission_value", "commission_type", "item_code", "cost_treatment", "import_batch_id"]),
+  accommodation_rooms: new Set(["venue_id", "name", "room_type", "tier", "sleeps", "ideal_sleeps", "max_sleeps", "bridal_suite", "amenities", "price_per_night", "description", "image_url", "hero_image_url", "floor_plan_url", "active", "sort_order", "commission_value", "commission_type", "cost_treatment", "contact_name", "contact_phone", "contact_email", "website_url", "address", "import_batch_id"]),
+  vendor_partners: new Set(["venue_id", "vendor_type", "name", "description", "price_from", "image_url", "active", "sort_order", "commission_value", "commission_type", "cost_treatment", "contact_name", "contact_phone", "contact_email", "website_url", "import_batch_id"]),
+};
+function stripToColumns(table: string, row: Record<string, unknown>): Record<string, unknown> {
+  const allow = ALLOWED_COLS[table];
+  if (!allow) return row;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row)) if (allow.has(k)) out[k] = v;
+  return out;
+}
 
 type DestResult = { added: number; updated: number; failed: number; error?: string };
 
@@ -90,7 +107,7 @@ export async function POST(req: NextRequest) {
         const merged: Record<string, unknown> = {
           ...defaults, ...r, venue_id: venueId, sort_order: idx, import_batch_id: importBatchId,
         };
-        return ensureRequired(type, merged);
+        return stripToColumns(table, ensureRequired(type, merged));
       });
 
       // Rows with an item_code on a dedupe-capable table UPSERT on (venue_id,item_code)
@@ -111,11 +128,25 @@ export async function POST(req: NextRequest) {
 
       let catSaved = 0;
       if (upsertRows.length) {
-        // onConflict updates the matching row; we can't cheaply tell added vs updated,
-        // so count upserts as "updated" (conservative — they may overwrite existing rows).
-        const { error } = await admin.from(table).upsert(upsertRows, { onConflict: "venue_id,item_code" });
-        if (error) bump(table, { failed: upsertRows.length, error: error.message });
-        else { bump(table, { updated: upsertRows.length }); catSaved += upsertRows.length; }
+        // Dedupe in code (the partial unique index on (venue_id,item_code) can't be an
+        // ON CONFLICT target via PostgREST): look up existing codes → UPDATE those,
+        // INSERT the rest. Re-importing the same sheet updates instead of duplicating.
+        const codes = upsertRows.map((p) => String(p.item_code).trim());
+        const { data: existing } = await admin.from(table).select("id, item_code").eq("venue_id", venueId).in("item_code", codes);
+        const idByCode = new Map((existing ?? []).map((e) => [String((e as { item_code: string }).item_code), (e as { id: string }).id]));
+        const toUpdate = upsertRows.filter((p) => idByCode.has(String(p.item_code).trim()));
+        const toInsert = upsertRows.filter((p) => !idByCode.has(String(p.item_code).trim()));
+        for (const p of toUpdate) {
+          const id = idByCode.get(String(p.item_code).trim())!;
+          const { error } = await admin.from(table).update(p).eq("id", id);
+          if (error) bump(table, { failed: 1, error: error.message });
+          else { bump(table, { updated: 1 }); catSaved += 1; }
+        }
+        if (toInsert.length) {
+          const { error } = await admin.from(table).insert(toInsert);
+          if (error) bump(table, { failed: toInsert.length, error: error.message });
+          else { bump(table, { added: toInsert.length }); catSaved += toInsert.length; }
+        }
       }
       if (insertRows.length) {
         const { error } = await admin.from(table).insert(insertRows);
