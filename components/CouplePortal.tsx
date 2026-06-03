@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { TemplateTokens, PortalTheme } from "@/lib/portal/templates";
 import { GuestManager } from "@/components/GuestManager";
 import { ListManager, type ListField } from "@/components/ListManager";
-import { SeatingPlanner } from "@/components/SeatingPlanner";
+import { FloorPlanner } from "@/components/FloorPlanner";
 import { InspirationBoard } from "@/components/InspirationBoard";
 import { DocumentManager } from "@/components/DocumentManager";
 import { AddToCalendar } from "@/components/AddToCalendar";
@@ -370,7 +370,7 @@ export function CouplePortal({
           <GuestManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Seating" && (
-          <SeatingPlanner slug={slug} tables={tables} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+          <FloorPlanner slug={slug} tables={tables} initialPositions={((state as Record<string, unknown>).floorplan as { positions?: Record<number, { x: number; y: number }> })?.positions ?? {}} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Inspiration" && (
           <InspirationBoard slug={slug} initialPalette={(state as Record<string, unknown>).palette as string[] ?? []} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
