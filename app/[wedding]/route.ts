@@ -5,6 +5,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { applyMarkup } from "@/lib/billing/compute";
+import { resolveTheme as resolvePortalTheme } from "@/lib/portal/templates";
 
 // Salted hash. Folds in the per-wedding portal_salt when present so a rotated
 // salt invalidates old cookies. Must stay in lock-step with the helper in
@@ -159,7 +160,7 @@ export async function GET(
   // Fetch the wedding (no auth required to look up — auth/password gate below).
   const { data: wedding } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, wedding_state, portal_password_hash, portal_salt, venue:venues(id, name, slug, description, directions, website, included_items, contact_email, contact_phone, google_maps_url)")
+    .select("id, slug, couple_names, wedding_date, wedding_state, portal_password_hash, portal_salt, venue:venues(id, name, slug, description, directions, website, included_items, contact_email, contact_phone, google_maps_url, portal_template, portal_theme, branding_logo_url)")
     .eq("slug", rawSlug)
     .maybeSingle();
   if (!wedding) return new NextResponse("Wedding portal not found.", { status: 404 });
@@ -222,6 +223,7 @@ export async function GET(
       description: string | null; directions: string | null; website: string | null;
       included_items: unknown; contact_email: string | null; contact_phone: string | null;
       google_maps_url: string | null;
+      portal_template: string | null; portal_theme: unknown; branding_logo_url: string | null;
     } | null
   }).venue;
   const venueId = venue?.id;
@@ -299,6 +301,19 @@ export async function GET(
     /<script src="\/wedding-portal\/app\.js"/,
     `${initScript}<script src="/wedding-portal/app.js"`
   );
+
+  // Apply the venue's chosen portal theme (set in Your Venue → portal designer):
+  // remap the portal's brand CSS variables to the venue's primary/accent and swap
+  // the header logo, so the couple portal matches the design the venue configured.
+  const theme = resolvePortalTheme(venue?.portal_theme);
+  const themePrimary = theme.primary;
+  const themeAccent = theme.accent;
+  const themeLogo = theme.logoUrl || venue?.branding_logo_url || null;
+  const themeStyle = `<style id="vy-venue-theme">:root{--forest:${themePrimary} !important;--gold:${themeAccent} !important;--gold-light:${themeAccent} !important;--sage:${themeAccent}33 !important;}</style>`;
+  html = html.replace("</head>", `${themeStyle}</head>`);
+  if (themeLogo) {
+    html = html.replace(/(<img class="header-logo" src=")[^"]*(")/, `$1${themeLogo}$2`);
+  }
 
   return new NextResponse(html, {
     status: 200,
