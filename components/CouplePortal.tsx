@@ -10,6 +10,7 @@ import { InspirationBoard } from "@/components/InspirationBoard";
 import { DocumentManager } from "@/components/DocumentManager";
 import { AddToCalendar } from "@/components/AddToCalendar";
 import { GuestInvites } from "@/components/GuestInvites";
+import { AiPlanner } from "@/components/AiPlanner";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -425,6 +426,8 @@ export function CouplePortal({
           )}
         </div>
       </div>
+
+      <AiPlanner slug={slug} primary={primary} accent={accent} />
     </div>
   );
 }

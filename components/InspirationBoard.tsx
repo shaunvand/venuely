@@ -23,6 +23,8 @@ export function InspirationBoard({ slug, initialPalette, primary, accent, headin
   const [palette, setPalette] = useState<string[]>(initialPalette ?? []);
   const [linkUrl, setLinkUrl] = useState("");
   const [pinning, setPinning] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<{ id: string; style?: string; categories?: string[]; palette?: string[]; venueMatches?: string[]; suggestions?: string[] } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { fetch(`/api/wedding/${slug}/files/inspiration`).then((r) => r.json()).then((j) => { setPins(j.rows ?? []); setLoading(false); }).catch(() => setLoading(false)); }, [slug]);
@@ -60,6 +62,19 @@ export function InspirationBoard({ slug, initialPalette, primary, accent, headin
     await fetch(`/api/wedding/${slug}/state`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ patch: { palette: next } }) });
   }
   function toggleSwatch(hex: string) { savePalette(palette.includes(hex) ? palette.filter((c) => c !== hex) : [...palette, hex]); }
+
+  // Claude vision: analyse a pinned image → style/categories/palette + which of the
+  // venue's actual offerings fit the look.
+  async function analyze(pin: Pin) {
+    if (!pin.url) return;
+    setAnalyzing(pin.id); setAnalysis(null);
+    try {
+      const r = await fetch(`/api/wedding/${slug}/inspiration/analyze`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ imageUrl: pin.url }) });
+      const j = await r.json();
+      if (j.ok) setAnalysis({ id: pin.id, ...j.analysis });
+      else setAnalysis({ id: pin.id, suggestions: [j.error === "AI not configured" ? "AI isn't switched on yet." : "Couldn't analyse this image."] });
+    } finally { setAnalyzing(null); }
+  }
 
   const card: React.CSSProperties = { background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius };
   const chip = (active: boolean): React.CSSProperties => ({ border: `1px solid ${active ? primary : "rgba(0,0,0,0.15)"}`, background: active ? primary : "#fff", color: active ? "#fff" : "#44403c", borderRadius: 999, padding: "5px 13px", fontSize: 12.5, cursor: "pointer", fontWeight: 600 });
@@ -129,6 +144,40 @@ export function InspirationBoard({ slug, initialPalette, primary, accent, headin
         </div>
       </div>
 
+      {/* AI analysis result */}
+      {analysis && (
+        <div style={{ ...card, padding: 16, border: `1px solid ${primary}` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+            <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: primary, fontWeight: 700 }}>✨ AI ideas{analysis.style ? ` · ${analysis.style}` : ""}</div>
+            <button onClick={() => setAnalysis(null)} style={{ border: "none", background: "transparent", cursor: "pointer", color: "#8a8a8a" }}>✕</button>
+          </div>
+          {analysis.categories && analysis.categories.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11.5, color: "#8a8a8a", marginBottom: 4 }}>Style tags</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{analysis.categories.map((c) => <span key={c} style={{ fontSize: 12, background: `${accent}22`, borderRadius: 999, padding: "3px 10px" }}>{c}</span>)}</div>
+            </div>
+          )}
+          {analysis.palette && analysis.palette.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11.5, color: "#8a8a8a", marginBottom: 4 }}>Palette — tap to add to yours</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{analysis.palette.map((hex) => <button key={hex} onClick={() => { if (!palette.includes(hex)) savePalette([...palette, hex]); }} title={`Add ${hex}`} style={{ width: 28, height: 28, borderRadius: "50%", background: hex, border: palette.includes(hex) ? `3px solid ${primary}` : "1px solid rgba(0,0,0,0.15)", cursor: "pointer" }} />)}</div>
+            </div>
+          )}
+          {analysis.venueMatches && analysis.venueMatches.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11.5, color: "#8a8a8a", marginBottom: 4 }}>From {`your venue's`} options that suit this look</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{analysis.venueMatches.map((m) => <span key={m} style={{ fontSize: 12, background: "#fff", border: `1px solid ${primary}`, color: primary, borderRadius: 8, padding: "3px 10px", fontWeight: 600 }}>{m}</span>)}</div>
+            </div>
+          )}
+          {analysis.suggestions && analysis.suggestions.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11.5, color: "#8a8a8a", marginBottom: 4 }}>Styling ideas</div>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "#44403c" }}>{analysis.suggestions.map((s, i) => <li key={i} style={{ marginBottom: 2 }}>{s}</li>)}</ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* My board */}
       <div>
         <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: primary, fontWeight: 700, marginBottom: 10 }}>My board ({pins.length})</div>
@@ -141,6 +190,7 @@ export function InspirationBoard({ slug, initialPalette, primary, accent, headin
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {p.url && <img src={p.url} alt={p.note || "inspiration"} loading="lazy" style={{ width: "100%", display: "block" }} />}
                 <button onClick={() => unpin(p.id)} title="Remove" style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", borderRadius: 999, width: 26, height: 26, cursor: "pointer", fontSize: 13 }}>✕</button>
+                <button onClick={() => analyze(p)} disabled={analyzing === p.id} title="Get AI ideas" style={{ position: "absolute", top: 8, left: 8, background: analyzing === p.id ? "rgba(0,0,0,0.5)" : primary, color: "#fff", border: "none", borderRadius: 999, padding: "3px 9px", cursor: "pointer", fontSize: 11, fontWeight: 700 }}>{analyzing === p.id ? "…" : "✨ Ideas"}</button>
                 {p.source && <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, fontSize: 10, color: "#fff", background: "linear-gradient(transparent,rgba(0,0,0,0.55))", padding: "12px 8px 4px" }}>{p.source}</div>}
               </div>
             ))}
