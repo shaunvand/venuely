@@ -4,12 +4,16 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { TemplateTokens, PortalTheme } from "@/lib/portal/templates";
 
+type DaySel = { sel?: boolean; mg?: boolean; wed?: boolean; fb?: boolean };
 type WState = {
-  catalogueSelections?: Record<string, { sel?: boolean; mg?: boolean; wed?: boolean; fb?: boolean }>;
-  rentalSelections?: Record<string, { sel?: boolean; qty?: number }>;
+  catalogueSelections?: Record<string, DaySel>;
+  rentalSelections?: Record<string, DaySel & { qty?: number }>;
   roomAssignments?: Record<string, string[]>;
   [k: string]: unknown;
 };
+const DAY_TYPES: { key: "mg" | "wed" | "fb"; label: string }[] = [
+  { key: "mg", label: "M&G" }, { key: "wed", label: "Wedding" }, { key: "fb", label: "Farewell" },
+];
 
 type CatItem = { id: string; category: string; name: string; description: string; img: string | null; included: boolean };
 type RentItem = CatItem & { price: number };
@@ -86,12 +90,31 @@ export function CouplePortal({
   }
   function toggleCat(it: CatItem) {
     const cur = { ...(state.catalogueSelections ?? {}) };
-    cur[it.id] = { sel: !catIsSelected(it) };
+    cur[it.id] = catIsSelected(it) ? { sel: false } : { sel: true, wed: true };
+    persist({ ...state, catalogueSelections: cur });
+  }
+  function toggleCatDay(it: CatItem, day: "mg" | "wed" | "fb") {
+    const cur = { ...(state.catalogueSelections ?? {}) };
+    const e = { ...(cur[it.id] ?? {}), sel: true };
+    e[day] = !e[day];
+    cur[it.id] = e;
     persist({ ...state, catalogueSelections: cur });
   }
   function toggleRent(id: string) {
     const cur = { ...(state.rentalSelections ?? {}) };
-    if (cur[id]?.sel) delete cur[id]; else cur[id] = { sel: true, qty: 1 };
+    if (cur[id]?.sel) delete cur[id]; else cur[id] = { sel: true, qty: 1, wed: true };
+    persist({ ...state, rentalSelections: cur });
+  }
+  function toggleRentDay(id: string, day: "mg" | "wed" | "fb") {
+    const cur = { ...(state.rentalSelections ?? {}) };
+    const e = { qty: 1, ...(cur[id] ?? {}), sel: true };
+    e[day] = !e[day];
+    cur[id] = e;
+    persist({ ...state, rentalSelections: cur });
+  }
+  function setRentQty(id: string, n: number) {
+    const cur = { ...(state.rentalSelections ?? {}) };
+    cur[id] = { ...(cur[id] ?? {}), sel: true, qty: Math.max(1, n) };
     persist({ ...state, rentalSelections: cur });
   }
   function toggleRoom(id: string) {
@@ -220,7 +243,7 @@ export function CouplePortal({
                         <div key={catName} style={{ marginBottom: 18 }}>
                           <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: accent === "#FFC6AD" ? "var(--ink-2)" : primary, fontWeight: 700, marginBottom: 8 }}>{catName}</div>
                           <div style={grid}>{items.map((it) => (
-                            <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} badge={grp.inc ? "Included" : undefined} selected={catIsSelected(it)} onToggle={() => toggleCat(it)} {...itemProps} />
+                            <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} badge={grp.inc ? "Included" : undefined} selected={catIsSelected(it)} onToggle={() => toggleCat(it)} days={catSel[it.id]} onDay={(d) => toggleCatDay(it, d)} {...itemProps} />
                           ))}</div>
                         </div>
                       ))}
@@ -237,7 +260,7 @@ export function CouplePortal({
             {rentals.length === 0 ? <Empty>Nothing here yet.</Empty> : groupBy(rentals, (r) => r.category).map(([catName, items]) => (
               <div key={catName} style={{ marginBottom: 22 }}>
                 <div style={{ ...heading, fontSize: 17, marginBottom: 10 }}>{catName}</div>
-                <div style={grid}>{items.map((it) => <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} price={it.price} selected={!!rentSel[it.id]?.sel} onToggle={() => toggleRent(it.id)} {...itemProps} />)}</div>
+                <div style={grid}>{items.map((it) => <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} price={it.price} selected={!!rentSel[it.id]?.sel} onToggle={() => toggleRent(it.id)} days={rentSel[it.id]} onDay={(d) => toggleRentDay(it.id, d)} qty={rentSel[it.id]?.qty} onQty={(n) => setRentQty(it.id, n)} {...itemProps} />)}</div>
               </div>
             ))}
           </Section>
@@ -334,13 +357,15 @@ function PortalLogo({ logoUrl, venueName, heading, light }: { logoUrl: string | 
   return <span style={{ ...heading, color: light ? "#fff" : "var(--ink)", fontWeight: 700 }}>{venueName}</span>;
 }
 
-function PortalItemCard({ name, description, img, price, badge, selected, onToggle, primary, accent, heading, cardRadius }: {
+function PortalItemCard({ name, description, img, price, badge, selected, onToggle, days, onDay, qty, onQty, primary, accent, heading, cardRadius }: {
   name: string; description: string; img: string | null; price?: number; badge?: string;
   selected?: boolean; onToggle?: () => void;
+  days?: DaySel; onDay?: (d: "mg" | "wed" | "fb") => void;
+  qty?: number; onQty?: (n: number) => void;
   primary: string; accent: string; heading: React.CSSProperties; cardRadius: string;
 }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+    <div style={{ background: "#fff", border: selected ? `2px solid ${primary}` : "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius, overflow: "hidden", display: "flex", flexDirection: "column" }}>
       {img ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={img} alt="" style={{ width: "100%", aspectRatio: "4 / 3", objectFit: "cover" }} />
@@ -358,6 +383,27 @@ function PortalItemCard({ name, description, img, price, badge, selected, onTogg
           <button onClick={onToggle} style={{ marginTop: 8, padding: "7px 0", width: "100%", borderRadius: cardRadius, border: `1.5px solid ${primary}`, background: selected ? primary : "transparent", color: selected ? "#fff" : primary, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
             {selected ? "✓ Added" : "+ Add to my wedding"}
           </button>
+        )}
+        {selected && onDay && (
+          <div style={{ display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" }}>
+            {DAY_TYPES.map((d) => {
+              const on = !!days?.[d.key];
+              return (
+                <button key={d.key} onClick={() => onDay(d.key)} title={`${d.label} day`}
+                  style={{ flex: 1, minWidth: 56, fontSize: 10.5, padding: "4px 0", borderRadius: 999, cursor: "pointer", border: `1px solid ${on ? primary : "rgba(0,0,0,0.15)"}`, background: on ? `${primary}1f` : "#fff", color: on ? primary : "#57534e", fontWeight: on ? 700 : 500 }}>
+                  {on ? "✓ " : ""}{d.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {selected && onQty && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+            <span style={{ fontSize: 11, color: "#57534e" }}>Qty</span>
+            <button onClick={() => onQty((qty ?? 1) - 1)} style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(0,0,0,0.15)", background: "#fff", cursor: "pointer" }}>−</button>
+            <span style={{ minWidth: 22, textAlign: "center", fontWeight: 700 }}>{qty ?? 1}</span>
+            <button onClick={() => onQty((qty ?? 1) + 1)} style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(0,0,0,0.15)", background: "#fff", cursor: "pointer" }}>+</button>
+          </div>
         )}
       </div>
     </div>
