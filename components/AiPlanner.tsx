@@ -16,6 +16,9 @@ export function AiPlanner({ slug, primary, accent }: { slug: string; primary: st
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, busy]);
 
+  // Let the Overview "front door" (or anything) open the planner.
+  useEffect(() => { const h = () => setOpen(true); window.addEventListener("venuely:open-planner", h); return () => window.removeEventListener("venuely:open-planner", h); }, []);
+
   async function send(text: string) {
     const t = text.trim(); if (!t || busy) return;
     const next = [...messages, { role: "user" as const, content: t }];

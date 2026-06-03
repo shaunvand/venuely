@@ -80,6 +80,15 @@ type Venue = { name: string; region: string | null; address: string | null; desc
 const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Invites", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Documents"] as const;
 type Tab = (typeof TABS)[number];
 
+// Grouped navigation — keeps the portal simple: 5 top sections, sub-tabs below.
+const SECTIONS: { name: string; icon: string; tabs: Tab[] }[] = [
+  { name: "Plan", icon: "✨", tabs: ["Overview", "Our Venue", "Inspiration"] },
+  { name: "Choose", icon: "🍽️", tabs: ["Catalogue & Rentals", "Accommodation", "Suppliers"] },
+  { name: "Guests", icon: "💌", tabs: ["Guests", "Invites", "Seating"] },
+  { name: "Details", icon: "📝", tabs: ["Flowers", "Dress", "Décor", "Timeline", "Music", "Checklist", "Contacts"] },
+  { name: "Money & Docs", icon: "📄", tabs: ["Budget", "Documents"] },
+];
+
 const VENDOR_LABELS: Record<string, string> = { caterer: "Caterers", planner: "Planners", florist: "Florists", dj: "DJs", photographer: "Photographers", decor: "Décor", bar: "Bar services" };
 const rZA = (n: number) => `R${Math.round(n).toLocaleString("en-ZA")}`;
 
@@ -113,6 +122,7 @@ export function CouplePortal({
   tables: TableItem[];
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
+  const activeSection = SECTIONS.find((s) => s.tabs.includes(tab))?.name ?? "Plan";
   const [rentFilter, setRentFilter] = useState("All");
   const [rentFolder, setRentFolder] = useState<"all" | "included" | "extra">("all");
   const [supFilter, setSupFilter] = useState("All");
@@ -234,15 +244,20 @@ export function CouplePortal({
         </div>
       </header>
 
-      {/* NAV */}
+      {/* NAV — two levels: 5 sections on top, that section's tabs below */}
       <nav style={{ position: "sticky", top: 0, zIndex: 10, background: "#fffdfb", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "10px 16px", display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-          {TABS.map((t) => {
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "10px 16px 0", display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
+          {SECTIONS.map((s) => {
+            const active = s.name === activeSection;
+            return <button key={s.name} onClick={() => setTab(s.tabs[0])} style={{ fontSize: 14, padding: "8px 16px", cursor: "pointer", border: "none", borderRadius: 999, background: active ? primary : "transparent", color: active ? "#fff" : "#57534e", fontWeight: active ? 700 : 600 }}>{s.icon} {s.name}</button>;
+          })}
+        </div>
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px 10px", display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+          {(SECTIONS.find((s) => s.name === activeSection)?.tabs ?? []).map((t) => {
             const active = t === tab;
-            const base: React.CSSProperties = { fontSize: 13, padding: "6px 14px", cursor: "pointer", border: "none", background: "transparent", color: active ? primary : "#57534e", fontWeight: active ? 700 : 500 };
+            const base: React.CSSProperties = { fontSize: 12.5, padding: "5px 12px", cursor: "pointer", border: "none", background: "transparent", color: active ? primary : "#57534e", fontWeight: active ? 700 : 500 };
             const styled: React.CSSProperties =
-              tokens.tabStyle === "pill" ? { ...base, borderRadius: 999, background: active ? primary : "transparent", color: active ? "#fff" : "#57534e", border: active ? "none" : "1px solid rgba(0,0,0,0.12)" }
-              : tokens.tabStyle === "segmented" ? { ...base, border: "1px solid rgba(0,0,0,0.12)", borderRadius: tokens.buttonRadius, background: active ? primary : "#fff", color: active ? "#fff" : "#57534e" }
+              tokens.tabStyle === "pill" ? { ...base, borderRadius: 999, background: active ? `${accent}33` : "transparent", color: active ? primary : "#57534e", border: active ? `1px solid ${primary}` : "1px solid rgba(0,0,0,0.12)" }
               : { ...base, borderBottom: active ? `2px solid ${primary}` : "2px solid transparent", borderRadius: 0 };
             return <button key={t} onClick={() => setTab(t)} style={styled}>{t}</button>;
           })}
@@ -253,6 +268,17 @@ export function CouplePortal({
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 16px 60px" }}>
         {tab === "Overview" && (
           <div style={{ display: "grid", gap: 16 }}>
+            {/* AI front door */}
+            <div style={{ borderRadius: tokens.cardRadius, padding: 24, background: `linear-gradient(135deg, ${primary}, ${accent})`, color: "#fff" }}>
+              <div style={{ fontSize: 12, letterSpacing: 2, textTransform: "uppercase", opacity: 0.9 }}>Your AI wedding planner</div>
+              <div style={{ ...heading, fontSize: 24, margin: "6px 0 4px", color: "#fff" }}>Not sure where to start?</div>
+              <p style={{ opacity: 0.95, margin: "0 0 14px", fontSize: 14 }}>Tell me your vibe, guest count or budget and I&apos;ll guide you through everything {venue.name} offers — and fill in the rest.</p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button onClick={() => window.dispatchEvent(new Event("venuely:open-planner"))} style={{ background: "#fff", color: primary, border: "none", borderRadius: 999, padding: "10px 20px", fontWeight: 700, cursor: "pointer", fontSize: 14 }}>✨ Plan with AI</button>
+                <button onClick={() => setTab("Inspiration")} style={{ background: "rgba(255,255,255,0.2)", color: "#fff", border: "1px solid rgba(255,255,255,0.5)", borderRadius: 999, padding: "10px 20px", fontWeight: 600, cursor: "pointer", fontSize: 14 }}>Find your style</button>
+              </div>
+            </div>
+
             <div style={card({ padding: 22 })}>
               <div style={{ ...heading, fontSize: 22 }}>Welcome to your planning portal</div>
               <p style={{ color: "#57534e", marginTop: 6 }}>Browse everything {venue.name} offers — catalogue, rentals, accommodation and trusted suppliers — and plan your day in one place.</p>
