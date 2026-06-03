@@ -8,6 +8,7 @@ import { ListManager, type ListField } from "@/components/ListManager";
 import { SeatingPlanner } from "@/components/SeatingPlanner";
 import { InspirationBoard } from "@/components/InspirationBoard";
 import { DocumentManager } from "@/components/DocumentManager";
+import { AddToCalendar } from "@/components/AddToCalendar";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -87,7 +88,7 @@ function groupBy<T>(items: T[], key: (t: T) => string): [string, T[]][] {
 }
 
 export function CouplePortal({
-  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, totalDue, initialState, catalogue, rentals, rooms, vendors, gallery, tables,
+  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, weddingDate, weddingEndDate, totalDue, initialState, catalogue, rentals, rooms, vendors, gallery, tables,
 }: {
   slug: string;
   tokens: TemplateTokens;
@@ -98,6 +99,8 @@ export function CouplePortal({
   coupleNames: string;
   daysToGo: number | null;
   dateLabel: string;
+  weddingDate: string | null;
+  weddingEndDate: string | null;
   totalDue: number;
   initialState: WState;
   catalogue: CatItem[];
@@ -251,6 +254,11 @@ export function CouplePortal({
             <div style={card({ padding: 22 })}>
               <div style={{ ...heading, fontSize: 22 }}>Welcome to your planning portal</div>
               <p style={{ color: "#57534e", marginTop: 6 }}>Browse everything {venue.name} offers — catalogue, rentals, accommodation and trusted suppliers — and plan your day in one place.</p>
+              {weddingDate && (
+                <div style={{ marginTop: 14 }}>
+                  <AddToCalendar slug={slug} title={coupleNames || "Our wedding"} location={[venue.name, venue.address || venue.region].filter(Boolean).join(", ")} weddingDate={weddingDate} weddingEndDate={weddingEndDate} primary={primary} accent={accent} />
+                </div>
+              )}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14 }}>
               <Stat label="Days to go" value={daysToGo != null ? String(daysToGo) : "—"} heading={heading} accent={accent} primary={primary} />

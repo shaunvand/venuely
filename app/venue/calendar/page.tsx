@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { requireRole } from "@/lib/auth/require-role";
 import { BookingsCalendar } from "@/components/BookingsCalendar";
-import { getVenueCalendar } from "./actions";
+import { CalendarSubscribe } from "@/components/CalendarSubscribe";
+import { getVenueCalendar, getVenueCalToken } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,11 @@ export default async function VenueCalendar() {
   await requireRole(["venue_admin", "owner"]);
 
   const { weddings, bookings, holds } = await getVenueCalendar();
+  const icalToken = await getVenueCalToken();
+  const h = await headers();
+  const host = h.get("x-forwarded-host") || h.get("host") || "";
+  const proto = h.get("x-forwarded-proto") || "https";
+  const feedUrl = icalToken && host ? `${proto}://${host}/api/cal/${icalToken}.ics` : null;
 
   // Per-date occupancy summary, keyed by ISO date. Combines weddings (distinct
   // couples), room nights, and rental holds so the agenda can flag clashes.
@@ -88,6 +95,15 @@ export default async function VenueCalendar() {
             ))}
           </ul>
         </div>
+      )}
+
+      {feedUrl && (
+        <section className="vy-card">
+          <div className="vy-eyebrow">Sync</div>
+          <h2 className="vy-h2 mt-1 mb-1">Subscribe to your bookings</h2>
+          <p className="text-stone-600 text-sm mb-3">Add this private link to Google or Apple Calendar to see every booking on your own calendar — it stays in sync automatically.</p>
+          <CalendarSubscribe url={feedUrl} />
+        </section>
       )}
 
       <BookingsCalendar

@@ -77,6 +77,15 @@ function expandNights(checkIn: string, checkOut: string): string[] {
   return out;
 }
 
+// The venue's private calendar-subscription token. Pasting the .ics URL into
+// Google/Apple Calendar gives a live, auto-updating feed of every booking.
+export async function getVenueCalToken(): Promise<string | null> {
+  const venue = await getCurrentVenue();
+  const supabase = await createClient();
+  const { data } = await supabase.from("venues").select("ical_token").eq("id", venue.id).single();
+  return (data?.ical_token as string) ?? null;
+}
+
 export async function getVenueCalendar(): Promise<CalendarData> {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
