@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Action = { label: string; type: string; payload: Record<string, unknown> };
+type Msg = { role: "user" | "assistant"; content: string; actions?: Action[]; applied?: Record<number, boolean> };
 const STARTERS = ["Help me pick a menu for our day", "What should our timeline look like?", "Ideas to match our style", "How many tables will we need?"];
 
 // Right-side AI wedding planner. A chat recommendation tool grounded (server-side)
@@ -19,14 +20,24 @@ export function AiPlanner({ slug, primary, accent }: { slug: string; primary: st
   // Let the Overview "front door" (or anything) open the planner.
   useEffect(() => { const h = () => setOpen(true); window.addEventListener("venuely:open-planner", h); return () => window.removeEventListener("venuely:open-planner", h); }, []);
 
+  // Apply an action: hand it to CouplePortal (single source of truth), mark the
+  // button done, and close the drawer so the couple sees it set up in the tab.
+  function applyAction(mi: number, ai: number, a: Action) {
+    window.dispatchEvent(new CustomEvent("venuely:action", { detail: a }));
+    setMessages((ms) => ms.map((m, i) => i === mi ? { ...m, applied: { ...(m.applied || {}), [ai]: true } } : m));
+    setOpen(false);
+  }
+
   async function send(text: string) {
     const t = text.trim(); if (!t || busy) return;
     const next = [...messages, { role: "user" as const, content: t }];
     setMessages(next); setInput(""); setBusy(true);
     try {
-      const r = await fetch(`/api/wedding/${slug}/planner`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: next }) });
+      // Only send role/content upstream (drop client-only fields like actions/applied).
+      const payload = next.map((m) => ({ role: m.role, content: m.content }));
+      const r = await fetch(`/api/wedding/${slug}/planner`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: payload }) });
       const j = await r.json();
-      setMessages((m) => [...m, { role: "assistant", content: j.ok ? j.reply : (j.error === "AI not configured" ? "The AI planner isn't switched on yet — ask your venue to enable it." : "Sorry, I couldn't answer that just now. Please try again.") }]);
+      setMessages((m) => [...m, { role: "assistant", content: j.ok ? j.reply : (j.error === "AI not configured" ? "The AI planner isn't switched on yet — ask your venue to enable it." : "Sorry, I couldn't answer that just now. Please try again."), actions: j.ok ? (j.actions ?? []) : [], applied: {} }]);
     } catch {
       setMessages((m) => [...m, { role: "assistant", content: "Sorry, something went wrong. Please try again." }]);
     } finally { setBusy(false); }
@@ -62,7 +73,17 @@ export function AiPlanner({ slug, primary, accent }: { slug: string; primary: st
                 </div>
               )}
               {messages.map((m, i) => (
-                <div key={i} style={{ justifySelf: m.role === "user" ? "end" : "start", maxWidth: "85%", background: m.role === "user" ? primary : "#fff", color: m.role === "user" ? "#fff" : "#1c1917", border: m.role === "user" ? "none" : "1px solid rgba(0,0,0,0.08)", borderRadius: 14, padding: "10px 13px", fontSize: 13.5, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{m.content}</div>
+                <div key={i} style={{ justifySelf: m.role === "user" ? "end" : "start", maxWidth: "90%", display: "grid", gap: 6 }}>
+                  {m.content && <div style={{ justifySelf: m.role === "user" ? "end" : "start", maxWidth: "100%", background: m.role === "user" ? primary : "#fff", color: m.role === "user" ? "#fff" : "#1c1917", border: m.role === "user" ? "none" : "1px solid rgba(0,0,0,0.08)", borderRadius: 14, padding: "10px 13px", fontSize: 13.5, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{m.content}</div>}
+                  {m.actions && m.actions.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {m.actions.map((a, ai) => {
+                        const done = m.applied?.[ai];
+                        return <button key={ai} onClick={() => applyAction(i, ai, a)} disabled={done} style={{ border: `1px solid ${done ? "#1a7f4b" : primary}`, background: done ? "#1a7f4b" : "#fff", color: done ? "#fff" : primary, borderRadius: 999, padding: "7px 13px", fontSize: 12.5, fontWeight: 600, cursor: done ? "default" : "pointer" }}>{done ? `✓ ${a.label}` : a.label}</button>;
+                      })}
+                    </div>
+                  )}
+                </div>
               ))}
               {busy && <div style={{ justifySelf: "start", color: "#8a8a8a", fontSize: 13 }}>Thinking…</div>}
             </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { TemplateTokens, PortalTheme } from "@/lib/portal/templates";
 import { GuestManager } from "@/components/GuestManager";
@@ -196,6 +196,45 @@ export function CouplePortal({
     if (Array.isArray(cur[id]) && cur[id].length) delete cur[id]; else cur[id] = ["Reserved"];
     persist({ ...state, roomAssignments: cur });
   }
+
+  // AI planner actions land here (single source of truth): pre-select items, set the
+  // palette, add list rows — then jump to the relevant tab so the couple sees it.
+  const stateRef = useRef(state); stateRef.current = state;
+  useEffect(() => {
+    async function onAction(e: Event) {
+      const a = (e as CustomEvent).detail as { type: string; payload: Record<string, unknown> };
+      if (!a?.type) return;
+      const cur = stateRef.current;
+      const ids = (Array.isArray(a.payload?.ids) ? a.payload.ids : []).map(String);
+      if (a.type === "selectCatalogue") {
+        const c = { ...(cur.catalogueSelections ?? {}) }; ids.forEach((id) => { c[id] = { sel: true, wed: true }; });
+        persist({ ...cur, catalogueSelections: c }); setTab("Catalogue & Rentals");
+      } else if (a.type === "selectRentals") {
+        const r = { ...(cur.rentalSelections ?? {}) }; ids.forEach((id) => { r[id] = { sel: true, qty: 1, wed: true }; });
+        persist({ ...cur, rentalSelections: r }); setTab("Catalogue & Rentals");
+      } else if (a.type === "selectRooms") {
+        const rm = { ...(cur.roomAssignments ?? {}) }; ids.forEach((id) => { rm[id] = ["Reserved"]; });
+        persist({ ...cur, roomAssignments: rm }); setTab("Accommodation");
+      } else if (a.type === "setPalette") {
+        const colors = (Array.isArray(a.payload?.colors) ? a.payload.colors : []).map(String);
+        persist({ ...cur, palette: colors } as WState); setTab("Inspiration");
+      } else if (a.type === "addChecklist" || a.type === "addTimeline") {
+        const kind = a.type === "addChecklist" ? "checklist" : "timeline";
+        const items = (Array.isArray(a.payload?.items) ? a.payload.items : []) as unknown[];
+        for (const it of items) {
+          const bodyObj = kind === "checklist" ? { title: String(it) } : { title: String((it as { title?: string }).title ?? ""), start_time: String((it as { time?: string }).time ?? "") };
+          if (!bodyObj.title) continue;
+          await fetch(`/api/wedding/${slug}/list/${kind}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(bodyObj) });
+        }
+        setTab(kind === "checklist" ? "Checklist" : "Timeline");
+      } else if (a.type === "goto") {
+        const t = String(a.payload?.tab ?? "");
+        if ((TABS as readonly string[]).includes(t)) setTab(t as Tab);
+      }
+    }
+    window.addEventListener("venuely:action", onAction);
+    return () => window.removeEventListener("venuely:action", onAction);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   async function submitToVenue() {
     setBusy(true);
     try {
