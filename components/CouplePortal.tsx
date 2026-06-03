@@ -4,6 +4,26 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { TemplateTokens, PortalTheme } from "@/lib/portal/templates";
 import { GuestManager } from "@/components/GuestManager";
+import { ListManager, type ListField } from "@/components/ListManager";
+
+const TIMELINE_FIELDS: ListField[] = [
+  { key: "start_time", label: "Time", width: 90 },
+  { key: "title", label: "What's happening", grow: 2, width: 180 },
+  { key: "location", label: "Where", width: 130 },
+  { key: "responsible", label: "Who", width: 120 },
+];
+const CONTACT_FIELDS: ListField[] = [
+  { key: "role", label: "Role", type: "select", options: ["Photographer", "Videographer", "DJ", "MC", "Florist", "Coordinator", "Officiant", "Emergency", "Other"], width: 130 },
+  { key: "name", label: "Name", grow: 2, width: 150 },
+  { key: "company", label: "Company", width: 130 },
+  { key: "phone", label: "Phone", width: 120 },
+  { key: "email", label: "Email", width: 150 },
+];
+const SONG_FIELDS: ListField[] = [
+  { key: "moment", label: "Moment", type: "select", options: ["Bridal entrance", "First dance", "Father/daughter", "Cake cut", "Last dance", "Reception playlist", "Do NOT play"], width: 150 },
+  { key: "title", label: "Song title", grow: 2, width: 170 },
+  { key: "artist", label: "Artist", width: 140 },
+];
 
 type DaySel = { sel?: boolean; mg?: boolean; wed?: boolean; fb?: boolean };
 type WState = {
@@ -23,7 +43,7 @@ type VendorItem = { id: string; type: string; name: string; description: string;
 type GalleryItem = { url: string; category: string; label: string };
 type Venue = { name: string; region: string | null; address: string | null; description: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
 
-const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Accommodation", "Suppliers", "Guests"] as const;
+const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Accommodation", "Suppliers", "Guests", "Timeline", "Contacts", "Music"] as const;
 type Tab = (typeof TABS)[number];
 
 const VENDOR_LABELS: Record<string, string> = { caterer: "Caterers", planner: "Planners", florist: "Florists", dj: "DJs", photographer: "Photographers", decor: "Décor", bar: "Bar services" };
@@ -308,6 +328,15 @@ export function CouplePortal({
 
         {tab === "Guests" && (
           <GuestManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        )}
+        {tab === "Timeline" && (
+          <ListManager slug={slug} kind="timeline" title="Day timeline" sub="Your run sheet — when and where everything happens" fields={TIMELINE_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        )}
+        {tab === "Contacts" && (
+          <ListManager slug={slug} kind="contacts" title="Contacts" sub="Your vendors, coordinator and emergency contacts" fields={CONTACT_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        )}
+        {tab === "Music" && (
+          <ListManager slug={slug} kind="songs" title="Music & song requests" sub="Key moments + your playlist for the DJ" fields={SONG_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
       </main>
 

@@ -65,6 +65,23 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     .order("created_at", { ascending: false });
   const submissions = (submissionRows ?? []) as Array<{ id: string; kind: string; message: string | null; totals: unknown; status: string | null; created_at: string }>;
   const pendingSubmissions = submissions.filter((s) => (s.status ?? "pending") === "pending");
+
+  // Guest RSVP + dietary/accessibility roll-up for the caterer handover.
+  const { data: guestRows } = await supabase
+    .from("guests")
+    .select("rsvp_status, dietary, accessibility_needs, is_child")
+    .eq("wedding_id", wedding.id);
+  const gl = (guestRows ?? []) as Array<{ rsvp_status: string | null; dietary: string | null; accessibility_needs: string | null; is_child: boolean | null }>;
+  const dietaryList = gl.filter((g) => (g.dietary ?? "").trim()).map((g) => (g.dietary as string).trim());
+  const dietaryCounts = dietaryList.reduce<Record<string, number>>((m, d) => { const k = d.toLowerCase(); m[k] = (m[k] || 0) + 1; return m; }, {});
+  const guestStats = {
+    total: gl.length,
+    attending: gl.filter((g) => g.rsvp_status === "attending").length,
+    pending: gl.filter((g) => (g.rsvp_status ?? "pending") === "pending").length,
+    declined: gl.filter((g) => g.rsvp_status === "declined").length,
+    children: gl.filter((g) => g.is_child).length,
+    accessibility: gl.filter((g) => (g.accessibility_needs ?? "").trim()).map((g) => (g.accessibility_needs as string).trim()),
+  };
   const coupleMembers = (coupleMembersRes.data ?? []) as unknown as Array<{
     user_id: string;
     profiles: { id: string; full_name: string | null } | null;
@@ -340,6 +357,34 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Guest RSVP + dietary roll-up (caterer handover) */}
+      {guestStats.total > 0 && (
+        <div className="vy-card space-y-3">
+          <div className="flex items-baseline justify-between flex-wrap gap-2">
+            <div>
+              <div className="vy-eyebrow">Guests</div>
+              <h2 className="vy-h2 mt-1">{guestStats.attending} attending · {guestStats.pending} pending · {guestStats.declined} declined</h2>
+            </div>
+            <div className="text-xs" style={{ color: "var(--ink-2)" }}>{guestStats.total} on the list{guestStats.children ? ` · ${guestStats.children} children` : ""}</div>
+          </div>
+          {Object.keys(dietaryCounts).length > 0 && (
+            <div>
+              <div className="vy-label mb-1">Dietary requirements</div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(dietaryCounts).sort((a, b) => b[1] - a[1]).map(([d, n]) => (
+                  <span key={d} className="text-xs px-2.5 py-1 rounded-full" style={{ background: "var(--cream)", color: "var(--ink)", border: "1px solid var(--line)" }}>{d} <strong>×{n}</strong></span>
+                ))}
+              </div>
+            </div>
+          )}
+          {guestStats.accessibility.length > 0 && (
+            <div className="text-xs" style={{ color: "var(--ink-2)" }}>
+              <strong style={{ color: "var(--ink)" }}>Accessibility:</strong> {guestStats.accessibility.join(" · ")}
+            </div>
+          )}
         </div>
       )}
 
