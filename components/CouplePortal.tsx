@@ -22,13 +22,13 @@ type VendorItem = { id: string; type: string; name: string; description: string;
 type GalleryItem = { url: string; category: string; label: string };
 type Venue = { name: string; region: string | null; address: string | null; description: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
 
-const TABS = ["Overview", "Our Venue", "Catalogue", "Rentals", "Accommodation", "Suppliers"] as const;
+const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Accommodation", "Suppliers"] as const;
 type Tab = (typeof TABS)[number];
 
 const VENDOR_LABELS: Record<string, string> = { caterer: "Caterers", planner: "Planners", florist: "Florists", dj: "DJs", photographer: "Photographers", decor: "Décor", bar: "Bar services" };
 const rZA = (n: number) => `R${Math.round(n).toLocaleString("en-ZA")}`;
 
-function groupBy<T extends { category?: string; type?: string }>(items: T[], key: (t: T) => string): [string, T[]][] {
+function groupBy<T>(items: T[], key: (t: T) => string): [string, T[]][] {
   const m = new Map<string, T[]>();
   for (const it of items) { const k = key(it) || "Other"; (m.get(k) ?? m.set(k, []).get(k)!).push(it); }
   return [...m.entries()];
@@ -55,7 +55,6 @@ export function CouplePortal({
   gallery: GalleryItem[];
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
-  const [catFilter, setCatFilter] = useState("All");
   const [rentFilter, setRentFilter] = useState("All");
   const [rentFolder, setRentFolder] = useState<"all" | "included" | "extra">("all");
   const [supFilter, setSupFilter] = useState("All");
@@ -233,59 +232,40 @@ export function CouplePortal({
           </Section>
         )}
 
-        {tab === "Catalogue" && (
-          <Section heading={heading} title="Catalogue" sub="Included with your booking — tick what you'd like; add optional extras">
-            <FilterChips primary={primary} value={catFilter} onChange={setCatFilter}
-              options={["All", ...Array.from(new Set(catalogue.map((c) => c.eventPart || c.category)))]} />
-            {catalogue.length === 0 ? <Empty>Nothing here yet.</Empty> : (
-              <>
-                {([{ inc: true, label: "Included with your booking", note: "Selected by default — deselect anything you don't need." },
-                   { inc: false, label: "Optional extras", note: "Add these to your day for an extra charge." }] as const).map((grp) => {
-                  const groupItems = catalogue.filter((c) => c.included === grp.inc && (catFilter === "All" || (c.eventPart || c.category) === catFilter));
-                  if (groupItems.length === 0) return null;
-                  return (
-                    <div key={String(grp.inc)} style={{ marginBottom: 28 }}>
-                      <div style={{ ...heading, fontSize: 20 }}>{grp.label}</div>
-                      <div style={{ fontSize: 12, color: "#8a8a8a", marginBottom: 12 }}>{grp.note}</div>
-                      {groupBy(groupItems, (c) => c.eventPart || c.category).map(([catName, items]) => (
-                        <div key={catName} style={{ marginBottom: 18 }}>
-                          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: accent === "#FFC6AD" ? "var(--ink-2)" : primary, fontWeight: 700, marginBottom: 8 }}>{catName}</div>
-                          <div style={grid}>{items.map((it) => (
-                            <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} badge={grp.inc ? "Included" : undefined} selected={catIsSelected(it)} onToggle={() => toggleCat(it)} days={catSel[it.id]} onDay={(d) => toggleCatDay(it, d)} {...itemProps} />
-                          ))}</div>
-                        </div>
-                      ))}
-                    </div>
-                  );
+        {tab === "Catalogue & Rentals" && (() => {
+          // Catalogue + rentals are browsed together (catalogue is just the
+          // included/menu subset). Each keeps its own selection + pricing rules.
+          const keyOf = (it: CatItem | RentItem) => (("eventPart" in it && it.eventPart) ? it.eventPart : it.category) || "Other";
+          const merged: ({ item: CatItem; kind: "cat" } | { item: RentItem; kind: "rent" })[] = [
+            ...catalogue.map((c) => ({ item: c, kind: "cat" as const })),
+            ...rentals.map((r) => ({ item: r, kind: "rent" as const })),
+          ];
+          const cats = ["All", ...Array.from(new Set(merged.map((m) => keyOf(m.item))))];
+          const shown = merged.filter((m) =>
+            (rentFolder === "all" || (rentFolder === "included") === m.item.included) &&
+            (rentFilter === "All" || keyOf(m.item) === rentFilter));
+          return (
+            <Section heading={heading} title="Catalogue & Rentals" sub="Everything included with your booking, plus optional extras to add">
+              <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+                {([["all", "All"], ["included", "📁 Included with booking"], ["extra", "📁 To pay for"]] as const).map(([k, label]) => {
+                  const on = rentFolder === k;
+                  return <button key={k} onClick={() => setRentFolder(k)} style={{ fontSize: 12.5, padding: "7px 14px", borderRadius: tokens.cardRadius, cursor: "pointer", border: `1px solid ${on ? primary : "rgba(0,0,0,0.15)"}`, background: on ? `${primary}1f` : "#fff", color: on ? primary : "#57534e", fontWeight: on ? 700 : 500 }}>{label}</button>;
                 })}
-              </>
-            )}
-          </Section>
-        )}
-
-        {tab === "Rentals" && (
-          <Section heading={heading} title="Rentals" sub="Browse what's included and the optional extras to hire">
-            {/* Folders: Included with booking vs To pay for */}
-            <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-              {([["all", "All rentals"], ["included", "📁 Included with booking"], ["extra", "📁 To pay for"]] as const).map(([key, label]) => {
-                const on = rentFolder === key;
-                return <button key={key} onClick={() => setRentFolder(key)} style={{ fontSize: 12.5, padding: "7px 14px", borderRadius: tokens.cardRadius, cursor: "pointer", border: `1px solid ${on ? primary : "rgba(0,0,0,0.15)"}`, background: on ? `${primary}1f` : "#fff", color: on ? primary : "#57534e", fontWeight: on ? 700 : 500 }}>{label}</button>;
-              })}
-            </div>
-            <FilterChips primary={primary} value={rentFilter} onChange={setRentFilter}
-              options={["All", ...Array.from(new Set(rentals.map((r) => r.category)))]} />
-            {(() => {
-              const shown = rentals.filter((r) => (rentFolder === "all" || (rentFolder === "included") === r.included) && (rentFilter === "All" || r.category === rentFilter));
-              if (shown.length === 0) return <Empty>Nothing in this folder.</Empty>;
-              return groupBy(shown, (r) => r.category).map(([catName, items]) => (
+              </div>
+              <FilterChips primary={primary} value={rentFilter} onChange={setRentFilter} options={cats} />
+              {shown.length === 0 ? <Empty>Nothing in this folder.</Empty> : groupBy(shown, (m) => keyOf(m.item)).map(([catName, items]) => (
                 <div key={catName} style={{ marginBottom: 22 }}>
-                  <div style={{ ...heading, fontSize: 17, marginBottom: 10 }}>{catName}</div>
-                  <div style={grid}>{items.map((it) => <PortalItemCard key={it.id} name={it.name} description={it.description} img={it.img} price={it.included ? 0 : it.price} badge={it.included ? "Included" : undefined} selected={!!rentSel[it.id]?.sel} onToggle={() => toggleRent(it.id)} days={rentSel[it.id]} onDay={(d) => toggleRentDay(it.id, d)} qty={rentSel[it.id]?.qty} onQty={(n) => setRentQty(it.id, n)} {...itemProps} />)}</div>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: primary, fontWeight: 700, marginBottom: 8 }}>{catName}</div>
+                  <div style={grid}>{items.map((m) => m.kind === "cat" ? (
+                    <PortalItemCard key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} badge={m.item.included ? "Included" : undefined} selected={catIsSelected(m.item)} onToggle={() => toggleCat(m.item)} days={catSel[m.item.id]} onDay={(d) => toggleCatDay(m.item, d)} {...itemProps} />
+                  ) : (
+                    <PortalItemCard key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} selected={!!rentSel[m.item.id]?.sel} onToggle={() => toggleRent(m.item.id)} days={rentSel[m.item.id]} onDay={(d) => toggleRentDay(m.item.id, d)} qty={rentSel[m.item.id]?.qty} onQty={(n) => setRentQty(m.item.id, n)} {...itemProps} />
+                  ))}</div>
                 </div>
-              ));
-            })()}
-          </Section>
-        )}
+              ))}
+            </Section>
+          );
+        })()}
 
         {tab === "Accommodation" && (
           <Section heading={heading} title="Accommodation" sub="On-site stays for you and your guests">
