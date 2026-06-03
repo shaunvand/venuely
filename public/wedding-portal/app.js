@@ -1000,8 +1000,9 @@ function buildCatalogueHTML() {
     var rowsHtml = '';
     items.forEach(function(item) {
       var s = state.catalogueSelections[item.code] || {};
-      var imgHtml = CATALOGUE_ITEM_IMAGES[item.imgKey]
-        ? '<div class="cat-thumb-wrap"><img class="cat-thumb" src="' + CATALOGUE_ITEM_IMAGES[item.imgKey] + '" alt="' + item.name + '"></div>'
+      var catImg = item.img || CATALOGUE_ITEM_IMAGES[item.imgKey];
+      var imgHtml = catImg
+        ? '<div class="cat-thumb-wrap"><img class="cat-thumb" src="' + catImg + '" alt="' + item.name + '"></div>'
         : '';
       rowsHtml +=
         '<div class="catalogue-row ' + (s.sel ? 'rental-selected' : '') + '" id="cat-row-' + item.code + '">' +
@@ -1199,7 +1200,7 @@ function buildRentalHTML() {
               '<label for="rc-' + item.code + '" class="rental-code">' + item.code.replace('a','').replace('b','') + '</label>' +
             '</div>' +
             '<div class="rental-info">' +
-              (RENTAL_ITEM_IMAGES[item.code] ? '<div class="rental-thumb-wrap"><img class="rental-thumb" src="' + RENTAL_ITEM_IMAGES[item.code] + '" alt="' + item.name + '"></div>' : '') +
+              ((item.img || RENTAL_ITEM_IMAGES[item.code]) ? '<div class="rental-thumb-wrap"><img class="rental-thumb" src="' + (item.img || RENTAL_ITEM_IMAGES[item.code]) + '" alt="' + item.name + '"></div>' : '') +
               '<div class="rental-info-text">' +
                 '<div class="rental-name">' + item.name + '</div>' +
                 (item.desc ? '<div class="rental-desc">' + item.desc + '</div>' : '') +

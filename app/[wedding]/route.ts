@@ -110,9 +110,9 @@ function readTemplate(): string {
 }
 
 type Commish = { commission_value?: number | null; commission_type?: string | null };
-type Catalogue = { id: string; category: string; name: string; description: string | null; sort_order: number };
-type Rental    = { id: string; category: string; name: string; description: string | null; price: number; stock_total: number; sort_order: number } & Commish;
-type Room      = { id: string; name: string; room_type: string | null; sleeps: number; description: string | null; sort_order: number; price_per_night: number; floor_plan_url: string | null } & Commish;
+type Catalogue = { id: string; category: string; name: string; description: string | null; sort_order: number; image_url: string | null };
+type Rental    = { id: string; category: string; name: string; description: string | null; price: number; stock_total: number; sort_order: number; image_url: string | null } & Commish;
+type Room      = { id: string; name: string; room_type: string | null; sleeps: number; description: string | null; sort_order: number; price_per_night: number; floor_plan_url: string | null; hero_image_url: string | null; image_url: string | null } & Commish;
 
 // applyMarkup imported from @/lib/billing/compute — single source of truth
 
@@ -125,6 +125,7 @@ function shapeForApp(
   return {
     CATALOGUE_ITEMS: catalogue.map((c) => ({
       code: c.id, name: c.name, desc: c.description ?? "", cat: c.category, type: "included",
+      img: c.image_url ?? null,
     })),
     CATALOGUE_CATS: [...new Set(catalogue.map((c) => c.category))],
     RENTAL_ITEMS: rentals.map((r) => ({
@@ -132,6 +133,7 @@ function shapeForApp(
       rate: applyMarkup(Number(r.price), r.commission_value, r.commission_type),
       rateType: r.stock_total > 1 ? "perUnit" : "flat",
       maxQty: r.stock_total, repl: 0,
+      img: r.image_url ?? null,
     })),
     RENTAL_CATS: [...new Set(rentals.map((r) => r.category))],
     ACCOMMODATION: rooms.map((r) => ({
@@ -141,6 +143,7 @@ function shapeForApp(
       amenities: [],
       pricePerNight: applyMarkup(Number(r.price_per_night), r.commission_value, r.commission_type),
       floorPlan: r.floor_plan_url ?? null,
+      img: r.hero_image_url ?? r.image_url ?? null,
     })),
   };
 }
@@ -230,9 +233,9 @@ export async function GET(
 
   // Pull venue inventory in parallel.
   const [{ data: catRaw }, { data: rentRaw }, { data: roomRaw }, { data: vendorRaw }, { data: galleryRaw }, { data: areaRaw }, { data: floorplanRaw }] = await Promise.all([
-    supabase.from("catalogue_items").select("id, category, name, description, sort_order").eq("venue_id", venueId).eq("active", true).order("sort_order"),
-    supabase.from("rental_items").select("id, category, name, description, price, stock_total, sort_order, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
-    supabase.from("accommodation_rooms").select("id, name, room_type, sleeps, description, sort_order, price_per_night, floor_plan_url, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
+    supabase.from("catalogue_items").select("id, category, name, description, sort_order, image_url").eq("venue_id", venueId).eq("active", true).order("sort_order"),
+    supabase.from("rental_items").select("id, category, name, description, price, stock_total, sort_order, commission_value, commission_type, image_url").eq("venue_id", venueId).eq("active", true).order("sort_order"),
+    supabase.from("accommodation_rooms").select("id, name, room_type, sleeps, description, sort_order, price_per_night, floor_plan_url, hero_image_url, image_url, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
     supabase.from("vendor_partners").select("id, vendor_type, name, description, contact_email, contact_phone, website_url, price_from, image_url, commission_value, commission_type").eq("venue_id", venueId).eq("active", true).order("sort_order"),
     supabase.from("media_assets").select("url, label, kind, category, sort_order").eq("venue_id", venueId).eq("owner_type", "venue").in("kind", ["photo", "video", "hero"]).order("sort_order"),
     supabase.from("venue_areas").select("name, description, sort_order").eq("venue_id", venueId).eq("active", true).order("sort_order"),
