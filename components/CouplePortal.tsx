@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { TemplateTokens, PortalTheme } from "@/lib/portal/templates";
+import { GuestManager } from "@/components/GuestManager";
 
 type DaySel = { sel?: boolean; mg?: boolean; wed?: boolean; fb?: boolean };
 type WState = {
@@ -22,7 +23,7 @@ type VendorItem = { id: string; type: string; name: string; description: string;
 type GalleryItem = { url: string; category: string; label: string };
 type Venue = { name: string; region: string | null; address: string | null; description: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
 
-const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Accommodation", "Suppliers"] as const;
+const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Accommodation", "Suppliers", "Guests"] as const;
 type Tab = (typeof TABS)[number];
 
 const VENDOR_LABELS: Record<string, string> = { caterer: "Caterers", planner: "Planners", florist: "Florists", dj: "DJs", photographer: "Photographers", decor: "Décor", bar: "Bar services" };
@@ -303,6 +304,10 @@ export function CouplePortal({
               </div>
             ))}
           </Section>
+        )}
+
+        {tab === "Guests" && (
+          <GuestManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
       </main>
 
