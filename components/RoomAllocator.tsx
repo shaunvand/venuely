@@ -1,23 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Guest = { id: string; full_name: string; room_id: string | null; is_child?: boolean | null };
-type Room = { id: string; name: string; sleeps: number };
+type Room = { id: string; name: string; sleeps: number; price?: number | null; description?: string | null };
+const rZA = (n: number | null | undefined) => (n ? `R${Math.round(n).toLocaleString("en-ZA")}/night` : "");
 
 // Allocate guests to accommodation rooms by drag-and-drop (or a "put in…" select on
 // touch). Sets guests.room_id — the same record the venue sees. Capacity = sleeps.
-export function RoomAllocator({ slug, rooms, primary, accent, heading, cardRadius }: {
-  slug: string; rooms: Room[]; primary: string; accent: string; heading: React.CSSProperties; cardRadius: string;
+// onAllocated reports which rooms now have guests so the parent can bill them.
+export function RoomAllocator({ slug, rooms, onAllocated, primary, accent, heading, cardRadius }: {
+  slug: string; rooms: Room[]; onAllocated?: (roomIds: string[]) => void; primary: string; accent: string; heading: React.CSSProperties; cardRadius: string;
 }) {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
   const [drag, setDrag] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
+  const usedRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/wedding/${slug}/guests`).then((r) => r.json()).then((j) => { setGuests(j.guests ?? []); setLoading(false); }).catch(() => setLoading(false));
   }, [slug]);
+
+  // Tell the parent which rooms are in use (for billing) when that set changes.
+  useEffect(() => {
+    if (loading) return;
+    const ids = Array.from(new Set(guests.filter((g) => g.room_id).map((g) => g.room_id as string))).sort();
+    const key = ids.join(",");
+    if (usedRef.current === null) { usedRef.current = key; return; }
+    if (key !== usedRef.current) { usedRef.current = key; onAllocated?.(ids); }
+  }, [guests, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function assign(guestId: string, roomId: string | null) {
     setGuests((g) => g.map((x) => x.id === guestId ? { ...x, room_id: roomId } : x));
@@ -52,6 +64,7 @@ export function RoomAllocator({ slug, rooms, primary, accent, heading, cardRadiu
                 <span style={{ ...heading, fontWeight: 700 }}>🛏 {room.name}</span>
                 <span style={{ fontSize: 11, fontWeight: 700, color: full ? primary : "#57534e" }}>{inRoom.length}/{room.sleeps}</span>
               </div>
+              {(room.price || room.description) && <div style={{ fontSize: 11, color: "#8a8a8a", marginTop: 2 }}>Sleeps {room.sleeps}{room.price ? ` · ${rZA(room.price)}` : ""}</div>}
               <div style={{ marginTop: 8, display: "grid", gap: 4, minHeight: 28 }}>
                 {inRoom.length === 0 ? <span style={{ fontSize: 11.5, color: "#b0b0b0" }}>Drop guests here</span> : inRoom.map((g) => (
                   <span key={g.id} draggable onDragStart={() => setDrag(g.id)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, background: `${accent}22`, borderRadius: 8, padding: "3px 8px", cursor: "grab" }}>

@@ -380,14 +380,17 @@ export function CouplePortal({
         {tab === "Our Venue" && (
           <Section heading={heading} title="Our Venue" sub={venue.address || venue.region || ""}>
             {venue.description && <p style={{ color: "#57534e", maxWidth: 720, marginBottom: 16 }}>{venue.description}</p>}
-            {gallery.length === 0 ? <Empty>No photos yet.</Empty> : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 10 }}>
-                {gallery.map((g, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={i} src={g.url} alt={g.label} style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "cover", borderRadius: tokens.cardRadius }} />
-                ))}
+            {gallery.length === 0 ? <Empty>No photos yet.</Empty> : groupBy(gallery, (g) => g.category || "The venue").map(([label, items]) => (
+              <div key={label} style={{ marginBottom: 22 }}>
+                <div style={{ ...heading, fontSize: 16, marginBottom: 10 }}>{label}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 10 }}>
+                  {items.map((g, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={i} src={g.url} alt={g.label} style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "cover", borderRadius: tokens.cardRadius }} />
+                  ))}
+                </div>
               </div>
-            )}
+            ))}
           </Section>
         )}
 
@@ -429,15 +432,13 @@ export function CouplePortal({
         {tab === "Accommodation" && (
           <div style={{ display: "grid", gap: 26 }}>
             <GuestManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} rooms={rooms.map((r) => ({ id: r.id, name: r.name }))} />
-            <Section heading={heading} title="Accommodation" sub="On-site stays for you and your guests">
-              {rooms.length === 0 ? <Empty>No accommodation listed.</Empty> : (
-                <div style={grid}>{rooms.map((r) => <PortalItemCard key={r.id} name={r.name} description={`Sleeps ${r.sleeps}${r.description ? ` · ${r.description}` : ""}`} img={r.img} price={r.price} selected={!!(rooms_[r.id]?.length)} onToggle={() => toggleRoom(r.id)} {...itemProps} />)}</div>
-              )}
-            </Section>
-            {rooms.length > 0 && (
-              <div style={{ borderTop: "1px solid var(--line,#ece7e1)", paddingTop: 18 }}>
-                <RoomAllocator slug={slug} rooms={rooms.map((r) => ({ id: r.id, name: r.name, sleeps: r.sleeps }))} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
-              </div>
+            {rooms.length === 0 ? <Section heading={heading} title="Accommodation" sub="On-site stays for you and your guests"><Empty>No accommodation listed by your venue yet.</Empty></Section> : (
+              <RoomAllocator
+                slug={slug}
+                rooms={rooms.map((r) => ({ id: r.id, name: r.name, sleeps: r.sleeps, price: r.price, description: r.description }))}
+                onAllocated={(ids) => persist({ ...stateRef.current, roomAssignments: Object.fromEntries(ids.map((id) => [id, ["Allocated"]])) })}
+                primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius}
+              />
             )}
           </div>
         )}
