@@ -344,9 +344,9 @@ export function CouplePortal({
         </div>
       </aside>
 
-      {/* MAIN COLUMN */}
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 16px", borderBottom: "1px solid var(--line,#ece7e1)", background: "#fffdfb", position: "sticky", top: 0, zIndex: 10 }}>
+      {/* MAIN COLUMN — soft peach→cream fade across the top */}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: "linear-gradient(180deg, #FCE7DA 0%, var(--cream, #FBF7F2) 300px)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 16px", background: "transparent", position: "sticky", top: 0, zIndex: 10, backdropFilter: "blur(6px)" }}>
           {isMobile ? <button onClick={() => setNavOpen(true)} aria-label="Menu" style={{ border: "none", background: "transparent", fontSize: 22, cursor: "pointer", lineHeight: 1 }}>☰</button> : <span />}
           <span style={{ fontSize: 13, color: "#78716c", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, textAlign: isMobile ? "center" : "right" }}>{venue.name} · {dateLabel}</span>
           {!isMobile && <span style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>{coupleNames}</span>}
