@@ -16,6 +16,7 @@ import { RemindersManager } from "@/components/RemindersManager";
 import { CoupleOverview } from "@/components/CoupleOverview";
 import { LogoMark } from "@/components/Logo";
 import { RoomAllocator } from "@/components/RoomAllocator";
+import { ChecklistBoard } from "@/components/ChecklistBoard";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -486,7 +487,7 @@ export function CouplePortal({
           <ListManager slug={slug} kind="songs" title="Music & song requests" sub="Key moments + your playlist for the DJ" fields={SONG_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Checklist" && (
-          <ListManager slug={slug} kind="checklist" title="Checklist" sub="Your to-dos and due dates" fields={CHECKLIST_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+          <ChecklistBoard slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Flowers" && (
           <ListManager slug={slug} kind="flowers" title="Flowers" sub="Your flower wishlist to share with the florist" fields={FLOWER_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />

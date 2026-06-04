@@ -65,8 +65,8 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
   const invoiced = pay?.invoiced || totalDue || 0;
   const paid = pay?.paid || 0;
   const openChecklist = checklist.filter((c) => !c.done);
-  const dueThisWeek = openChecklist.filter((c) => { const d = daysUntil(c.due_date); return d != null && d <= 7; }).length;
-  const nextUp = [...openChecklist].filter((c) => c.due_date).sort((a, b) => String(a.due_date).localeCompare(String(b.due_date))).slice(0, 3);
+  const tasksDone = checklist.length - openChecklist.length;
+  const nextUp = [...openChecklist].sort((a, b) => (a.due_date && b.due_date ? String(a.due_date).localeCompare(String(b.due_date)) : 0)).slice(0, 3);
   const nextPaymentDue = pay?.depositDue && (pay.paid < (pay.invoiced || 0)) ? pay.depositDue : pay?.balanceDue || null;
 
   const docIcon = (m: string | null) => (m?.includes("pdf") ? "PDF" : m?.startsWith("image") ? "IMG" : "DOC");
@@ -103,7 +103,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
             { eb: "Guests", big: String(confirmed), sub: `Confirmed of ${invited} invited`, pct: invited ? confirmed / invited : 0, color: POPPY, link: "Guests", linkLabel: "View guest list" },
             { eb: "Accommodation", big: `${roomsBooked} / ${roomsTotal}`, sub: "Rooms booked", pct: roomsTotal ? roomsBooked / roomsTotal : 0, color: SAGE, link: "Accommodation", linkLabel: "View all rooms" },
             { eb: "Payments", big: rZA(paid), sub: `Paid of ${rZA(invoiced)}`, pct: invoiced ? paid / invoiced : 0, color: POPPY, link: "Payments", linkLabel: "View payments" },
-            { eb: "Tasks", big: String(dueThisWeek), sub: "Tasks due this week", pct: openChecklist.length ? Math.min(1, dueThisWeek / Math.max(1, openChecklist.length)) : 0, color: SAGE, link: "Checklist", linkLabel: "View checklist" },
+            { eb: "Checklist", big: `${tasksDone}/${checklist.length}`, sub: "Tasks complete", pct: checklist.length ? tasksDone / checklist.length : 0, color: SAGE, link: "Checklist", linkLabel: "View checklist" },
           ].map((s) => (
             <div key={s.eb} style={{ ...card, padding: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>

@@ -16,7 +16,7 @@ const KINDS: Record<string, { table: string; cols: string[]; order: string; name
   contacts: { table: "wedding_contacts", cols: ["role", "name", "company", "phone", "email", "is_emergency", "notes"], order: "created_at", name: "name", bool: ["is_emergency"] },
   songs: { table: "wedding_songs", cols: ["moment", "title", "artist", "notes", "sort_order"], order: "sort_order", name: "title" },
   budget: { table: "wedding_budget", cols: ["category", "description", "estimated", "actual", "paid", "vendor_name", "due_date", "notes"], order: "created_at", name: "category", numeric: ["estimated", "actual", "paid"] },
-  checklist: { table: "wedding_checklist", cols: ["title", "due_date", "done", "notes", "sort_order"], order: "sort_order", name: "title", bool: ["done"] },
+  checklist: { table: "wedding_checklist", cols: ["title", "due_date", "done", "notes", "sort_order", "phase"], order: "sort_order", name: "title", bool: ["done"] },
   flowers: { table: "wedding_flowers", cols: ["title", "category", "notes"], order: "created_at", name: "title" },
   dress: { table: "wedding_dress", cols: ["title", "shop", "notes"], order: "created_at", name: "title" },
   decor: { table: "wedding_decor", cols: ["title", "area", "notes"], order: "created_at", name: "title" },
