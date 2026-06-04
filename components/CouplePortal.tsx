@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { TemplateTokens, PortalTheme } from "@/lib/portal/templates";
 import { GuestManager } from "@/components/GuestManager";
+import { SuppliersManager } from "@/components/SuppliersManager";
 import { ListManager, type ListField } from "@/components/ListManager";
 import { InspirationBoard } from "@/components/InspirationBoard";
 import { DocumentManager } from "@/components/DocumentManager";
@@ -430,33 +431,13 @@ export function CouplePortal({
         )}
 
         {tab === "Suppliers" && (
-          <Section heading={heading} title="Suppliers" sub={`Trusted partners recommended by ${venue.name}`}>
-            <FilterChips primary={primary} value={supFilter} onChange={setSupFilter}
-              options={["All", ...Array.from(new Set(vendors.map((v) => VENDOR_LABELS[v.type] || v.type)))]} />
-            {vendors.length === 0 ? <Empty>No suppliers listed.</Empty> : groupBy(vendors.filter((v) => supFilter === "All" || (VENDOR_LABELS[v.type] || v.type) === supFilter), (v) => VENDOR_LABELS[v.type] || v.type).map(([label, items]) => (
-              <div key={label} style={{ marginBottom: 22 }}>
-                <div style={{ ...heading, fontSize: 17, marginBottom: 10 }}>{label}</div>
-                <div style={grid}>{items.map((v) => (
-                  <div key={v.id} style={card({ overflow: "hidden" })}>
-                    {v.img && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={v.img} alt="" style={{ width: "100%", height: 110, objectFit: "cover" }} />
-                    )}
-                    <div style={{ padding: 14 }}>
-                      <div style={{ ...heading, fontWeight: 700 }}>{v.name}</div>
-                      {v.description && <div style={{ fontSize: 12.5, color: "#57534e", margin: "4px 0" }}>{v.description}</div>}
-                      {v.price != null && <div style={{ color: primary, fontWeight: 700, fontSize: 13 }}>From {rZA(v.price)}</div>}
-                      <div style={{ fontSize: 12, color: "#57534e", marginTop: 6, display: "grid", gap: 2 }}>
-                        {v.phone && <span>📞 {v.phone}</span>}
-                        {v.email && <span>✉ {v.email}</span>}
-                        {v.website && <a href={v.website} target="_blank" rel="noopener noreferrer" style={{ color: primary }}>↗ Website</a>}
-                      </div>
-                    </div>
-                  </div>
-                ))}</div>
-              </div>
-            ))}
-          </Section>
+          <SuppliersManager
+            venueName={venue.name}
+            vendors={vendors.map((v) => ({ id: v.id, type: v.type, name: v.name, description: v.description, price: v.price, email: v.email, phone: v.phone }))}
+            suppliers={((state as Record<string, unknown>).suppliers as import("@/components/SuppliersManager").Supplier[]) ?? []}
+            onChange={(next) => persist({ ...state, suppliers: next })}
+            primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius}
+          />
         )}
 
         {tab === "Guests" && (

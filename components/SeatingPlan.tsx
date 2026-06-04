@@ -36,6 +36,7 @@ export function SeatingPlan({ slug, primary, accent, heading, cardRadius }: {
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
   const [addingGuest, setAddingGuest] = useState(false);
   const [newGuest, setNewGuest] = useState("");
   const [showTableModal, setShowTableModal] = useState(false);
@@ -86,9 +87,12 @@ export function SeatingPlan({ slug, primary, accent, heading, cardRadius }: {
     const occ = guests.find((g) => g.seat_table_id === table.id && g.seat_index === index);
     const [first, ...rest] = (occ?.full_name || "").split(" ");
     return (
-      <button key={index} onClick={() => clickSeat(table.id, index)} title={occ ? `${occ.full_name} — click to unassign` : "Click to place selected guest"}
-        style={{ width: 70, minHeight: 46, borderRadius: 8, cursor: "pointer", fontSize: 11, lineHeight: 1.15, padding: "4px 3px", textAlign: "center",
-          border: occ ? `1px solid ${primary}` : "1px dashed rgba(0,0,0,0.22)", background: occ ? "#fff" : (selected ? `${accent}14` : "transparent"), color: "#1c1917" }}>
+      <button key={index} onClick={() => clickSeat(table.id, index)} title={occ ? `${occ.full_name} — click or drag out to unassign` : "Click or drop a guest here"}
+        draggable={!!occ} onDragStart={() => occ && setDragId(occ.id)}
+        onDragOver={(e) => { if (dragId && !occ) e.preventDefault(); }}
+        onDrop={(e) => { e.preventDefault(); if (dragId && !occ) seatPatch(dragId, table.id, index); setDragId(null); }}
+        style={{ width: 70, minHeight: 46, borderRadius: 8, cursor: occ ? "grab" : "pointer", fontSize: 11, lineHeight: 1.15, padding: "4px 3px", textAlign: "center",
+          border: occ ? `1px solid ${primary}` : "1px dashed rgba(0,0,0,0.22)", background: occ ? "#fff" : (selected || dragId ? `${accent}14` : "transparent"), color: "#1c1917" }}>
         {occ ? <><div style={{ fontWeight: 700 }}>{first}</div>{rest.length > 0 && <div style={{ color: "#57534e" }}>{rest.join(" ")}</div>}</> : ""}
       </button>
     );
@@ -153,13 +157,15 @@ export function SeatingPlan({ slug, primary, accent, heading, cardRadius }: {
             <button onClick={addGuest} style={btnSolid}>Add</button>
           </div>
         )}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12, minHeight: 36, borderRadius: 10, padding: dragId ? 6 : 0, border: dragId ? `1px dashed ${primary}` : "none" }}
+          onDragOver={(e) => { if (dragId) e.preventDefault(); }}
+          onDrop={(e) => { e.preventDefault(); if (dragId) seatPatch(dragId, null, null); setDragId(null); }}>
           {guests.length === 0 ? <span style={{ color: "#8a8a8a", fontSize: 13 }}>No guests yet — add them here or in the Guest List.</span> : guests.map((g) => {
             const placed = !!g.seat_table_id;
             const isSel = selected === g.id;
             return (
-              <button key={g.id} onClick={() => setSelected(isSel ? null : g.id)}
-                style={{ fontSize: 12.5, borderRadius: 10, padding: "7px 12px", cursor: "pointer", textDecoration: placed ? "line-through" : "none",
+              <button key={g.id} draggable onDragStart={() => setDragId(g.id)} onClick={() => setSelected(isSel ? null : g.id)}
+                style={{ fontSize: 12.5, borderRadius: 10, padding: "7px 12px", cursor: "grab", textDecoration: placed ? "line-through" : "none",
                   border: isSel ? `2px solid ${primary}` : "1px solid rgba(0,0,0,0.12)", background: isSel ? `${primary}14` : "#fff", color: placed ? "#a8a29e" : "#1c1917", fontWeight: isSel ? 700 : 500 }}>
                 {g.full_name}
               </button>
