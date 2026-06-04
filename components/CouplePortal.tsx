@@ -13,6 +13,8 @@ import { GuestInvites } from "@/components/GuestInvites";
 import { AiPlanner } from "@/components/AiPlanner";
 import { PaymentsManager } from "@/components/PaymentsManager";
 import { RemindersManager } from "@/components/RemindersManager";
+import { CoupleOverview } from "@/components/CoupleOverview";
+import { LogoMark } from "@/components/Logo";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -269,45 +271,46 @@ export function CouplePortal({
   const itemProps = { primary, accent, heading, cardRadius: tokens.cardRadius };
 
   return (
-    <div style={{ minHeight: "100vh", background: tokens.surface, fontFamily: tokens.bodyFont, color: "var(--ink, #1c1917)" }}>
-      {/* HERO */}
-      <header style={{ ...heroImg, position: "relative", color: "#fff" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 24px 36px" }}>
-          <PortalLogo logoUrl={logoUrl} venueName={venue.name} heading={heading} light />
-          <div style={{ textAlign: "center", padding: "40px 0 8px" }}>
-            <div style={{ fontSize: 12, letterSpacing: 3, textTransform: "uppercase", opacity: 0.9 }}>{venue.name}</div>
-            <h1 style={{ ...heading, fontSize: 44, margin: "8px 0", color: "#fff", lineHeight: 1.05 }}>{coupleNames}</h1>
-            <div style={{ opacity: 0.95 }}>{dateLabel}</div>
-            {daysToGo != null && (
-              <div style={{ marginTop: 18, ...heading, fontSize: 30 }}>{daysToGo}<span style={{ fontSize: 12, letterSpacing: 2, marginLeft: 8, opacity: 0.9 }}>DAYS TO GO</span></div>
-            )}
-          </div>
+    <div style={{ display: "flex", minHeight: "100vh", background: "var(--cream, #FBF7F2)", fontFamily: tokens.bodyFont, color: "var(--ink, #1c1917)" }}>
+      {/* SIDEBAR — mirrors the venue dashboard */}
+      <aside style={{ width: 248, flexShrink: 0, background: "#fffdfb", borderRight: "1px solid var(--line, #ece7e1)", display: "flex", flexDirection: "column", padding: "20px 14px", position: "sticky", top: 0, height: "100vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 6px 18px" }}>
+          <LogoMark size={34} />
+          <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: 20, color: "var(--poppy,#FA523C)" }}>Venuely</span>
         </div>
-      </header>
+        <nav style={{ display: "grid", gap: 14, flex: 1 }}>
+          {SECTIONS.map((s) => (
+            <div key={s.name}>
+              <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#a8a29e", fontWeight: 700, padding: "0 8px 4px" }}>{s.name}</div>
+              <div style={{ display: "grid", gap: 2 }}>
+                {s.tabs.map((t) => {
+                  const active = t === tab;
+                  return <button key={t} onClick={() => setTab(t)} style={{ textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "7px 10px", fontSize: 13, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{t}</button>;
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+        <div style={{ marginTop: 14, background: "var(--bone,#FFF6F0)", borderRadius: 12, padding: 12 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700 }}>Need help?</div>
+          <div style={{ fontSize: 11.5, color: "#78716c", margin: "2px 0 8px" }}>Your venue coordinator is here to help.</div>
+          {venue.email && <a href={`mailto:${venue.email}`} style={{ display: "block", textAlign: "center", border: "1px solid var(--poppy,#FA523C)", color: "var(--poppy,#FA523C)", borderRadius: 999, padding: "6px", fontSize: 12.5, fontWeight: 600, textDecoration: "none" }}>Message Venue</a>}
+        </div>
+      </aside>
 
-      {/* NAV — two levels: 5 sections on top, that section's tabs below */}
-      <nav style={{ position: "sticky", top: 0, zIndex: 10, background: "#fffdfb", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "10px 16px 0", display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
-          {SECTIONS.map((s) => {
-            const active = s.name === activeSection;
-            return <button key={s.name} onClick={() => setTab(s.tabs[0])} style={{ fontSize: 14, padding: "8px 16px", cursor: "pointer", border: "none", borderRadius: 999, background: active ? primary : "transparent", color: active ? "#fff" : "#57534e", fontWeight: active ? 700 : 600 }}>{s.icon} {s.name}</button>;
-          })}
+      {/* MAIN COLUMN */}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12, padding: "12px 28px", borderBottom: "1px solid var(--line,#ece7e1)", background: "#fffdfb", position: "sticky", top: 0, zIndex: 10 }}>
+          <span style={{ fontSize: 13, color: "#78716c" }}>{venue.name} · {dateLabel}</span>
+          <span style={{ fontSize: 13.5, fontWeight: 700 }}>{coupleNames}</span>
         </div>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px 10px", display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-          {(SECTIONS.find((s) => s.name === activeSection)?.tabs ?? []).map((t) => {
-            const active = t === tab;
-            const base: React.CSSProperties = { fontSize: 12.5, padding: "5px 12px", cursor: "pointer", border: "none", background: "transparent", color: active ? primary : "#57534e", fontWeight: active ? 700 : 500 };
-            const styled: React.CSSProperties =
-              tokens.tabStyle === "pill" ? { ...base, borderRadius: 999, background: active ? `${accent}33` : "transparent", color: active ? primary : "#57534e", border: active ? `1px solid ${primary}` : "1px solid rgba(0,0,0,0.12)" }
-              : { ...base, borderBottom: active ? `2px solid ${primary}` : "2px solid transparent", borderRadius: 0 };
-            return <button key={t} onClick={() => setTab(t)} style={styled}>{t}</button>;
-          })}
-        </div>
-      </nav>
 
-      {/* BODY */}
-      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 16px 60px" }}>
+        {/* BODY */}
+        <main style={{ flex: 1, padding: "24px 28px 90px", width: "100%" }}>
         {tab === "Overview" && (
+          <CoupleOverview slug={slug} venue={venue} coupleNames={coupleNames} daysToGo={daysToGo} dateLabel={dateLabel} totalDue={totalDue} rooms={rooms} rentals={rentals} state={state} onNavigate={(t) => setTab(t as Tab)} />
+        )}
+        {false && (
           <div style={{ display: "grid", gap: 16 }}>
             {/* AI front door */}
             <div style={{ borderRadius: tokens.cardRadius, padding: 24, background: `linear-gradient(135deg, ${primary}, ${accent})`, color: "#fff" }}>
@@ -498,6 +501,8 @@ export function CouplePortal({
             </button>
           )}
         </div>
+      </div>
+
       </div>
 
       <AiPlanner slug={slug} primary={primary} accent={accent} />
