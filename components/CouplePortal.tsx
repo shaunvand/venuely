@@ -19,6 +19,7 @@ import { RoomAllocator } from "@/components/RoomAllocator";
 import { ChecklistBoard } from "@/components/ChecklistBoard";
 import { TimelineBoard } from "@/components/TimelineBoard";
 import { SeatingPlan } from "@/components/SeatingPlan";
+import { BudgetBoard } from "@/components/BudgetBoard";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -493,7 +494,7 @@ export function CouplePortal({
           <ListManager slug={slug} kind="decor" title="Décor" sub="Centrepieces, ceremony arch and styling notes" fields={DECOR_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Budget" && (
-          <ListManager slug={slug} kind="budget" title="Your budget" sub="Track your own spend — separate from the venue invoice" fields={BUDGET_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+          <BudgetBoard slug={slug} totalDue={totalDue} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Payments" && (
           <div style={{ display: "grid", gap: 28 }}>
