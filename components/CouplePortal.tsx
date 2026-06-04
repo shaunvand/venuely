@@ -93,6 +93,23 @@ const SECTIONS: { name: string; icon: string; tabs: Tab[] }[] = [
   { name: "Money & Docs", icon: "📄", tabs: ["Budget", "Payments", "Documents"] },
 ];
 
+// Couple sidebar — flat, curated order + display labels (tab keys unchanged).
+const COUPLE_NAV: { key: Tab; label: string }[] = [
+  { key: "Overview", label: "Overview" },
+  { key: "Our Venue", label: "Our Venue" },
+  { key: "Guests", label: "Guest List" },
+  { key: "Accommodation", label: "Accommodation" },
+  { key: "Inspiration", label: "Inspiration" },
+  { key: "Invites", label: "Invites" },
+  { key: "Suppliers", label: "Suppliers" },
+  { key: "Catalogue & Rentals", label: "Venue stock / Rentals" },
+  { key: "Budget", label: "Budget" },
+  { key: "Payments", label: "Payments" },
+  { key: "Seating", label: "Seating plan" },
+  { key: "Timeline", label: "Wedding day Timeline" },
+  { key: "Checklist", label: "Checklist" },
+];
+
 const VENDOR_LABELS: Record<string, string> = { caterer: "Caterers", planner: "Planners", florist: "Florists", dj: "DJs", photographer: "Photographers", decor: "Décor", bar: "Bar services" };
 const rZA = (n: number) => `R${Math.round(n).toLocaleString("en-ZA")}`;
 
@@ -278,18 +295,11 @@ export function CouplePortal({
           <LogoMark size={34} />
           <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: 20, color: "var(--poppy,#FA523C)" }}>Venuely</span>
         </div>
-        <nav style={{ display: "grid", gap: 14, flex: 1 }}>
-          {SECTIONS.map((s) => (
-            <div key={s.name}>
-              <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#a8a29e", fontWeight: 700, padding: "0 8px 4px" }}>{s.name}</div>
-              <div style={{ display: "grid", gap: 2 }}>
-                {s.tabs.map((t) => {
-                  const active = t === tab;
-                  return <button key={t} onClick={() => setTab(t)} style={{ textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "7px 10px", fontSize: 13, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{t}</button>;
-                })}
-              </div>
-            </div>
-          ))}
+        <nav style={{ display: "grid", gap: 2, flex: 1 }}>
+          {COUPLE_NAV.map(({ key, label }) => {
+            const active = key === tab;
+            return <button key={key} onClick={() => setTab(key)} style={{ textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{label}</button>;
+          })}
         </nav>
         <div style={{ marginTop: 14, background: "var(--bone,#FFF6F0)", borderRadius: 12, padding: 12 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700 }}>Need help?</div>
