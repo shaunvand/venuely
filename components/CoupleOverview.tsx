@@ -37,9 +37,9 @@ type RoomItem = { id: string; name: string };
 type RentItem = { id: string };
 type WState = { rentalSelections?: Record<string, { sel?: boolean }>; roomAssignments?: Record<string, string[]>; sharedNote?: string };
 
-export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, totalDue, rooms, rentals, state, onNavigate }: {
+export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, totalDue, rooms, rentals, state, cover, onNavigate }: {
   slug: string; venue: Venue; coupleNames: string; daysToGo: number | null; dateLabel: string; totalDue: number;
-  rooms: RoomItem[]; rentals: RentItem[]; state: WState; onNavigate: (tab: string) => void;
+  rooms: RoomItem[]; rentals: RentItem[]; state: WState; cover: string | null; onNavigate: (tab: string) => void;
 }) {
   const [guests, setGuests] = useState<Array<{ rsvp_status: string | null }>>([]);
   const [pay, setPay] = useState<{ invoiced: number; paid: number; balance: number; depositDue: string | null; balanceDue: string | null; payments: Array<{ id: string; amount: number; direction: string; kind: string | null; paid_at: string | null }> } | null>(null);
@@ -75,15 +75,20 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 320px", gap: 20, alignItems: "start" }}>
       {/* ── MAIN COLUMN ─────────────────────────────────────────── */}
       <div style={{ display: "grid", gap: 18 }}>
+        {/* Cover banner — the venue represents itself here */}
+        <div style={{ position: "relative", borderRadius: 18, overflow: "hidden", minHeight: 220, display: "flex", alignItems: "flex-end", background: cover ? `center/cover no-repeat url('${cover}')` : `linear-gradient(135deg, ${POPPY}, ${SAGE})` }}>
+          {cover && <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent 30%, rgba(0,0,0,0.6))" }} />}
+          <div style={{ position: "relative", padding: "26px 28px", color: "#fff" }}>
+            <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", opacity: 0.9 }}>Wedding portal</div>
+            <h1 style={{ ...serif, fontStyle: "italic", fontSize: 40, margin: "6px 0 4px", color: "#fff", lineHeight: 1.05 }}>{coupleNames}</h1>
+            <div style={{ fontSize: 14, opacity: 0.95 }}>{venue.name} · {dateLabel}{daysToGo != null ? ` · ${daysToGo} days to go` : ""}</div>
+          </div>
+        </div>
+
         {/* Welcome */}
         <div>
-          <h1 style={{ ...serif, fontSize: 40, margin: 0, color: INK, lineHeight: 1.05 }}>Welcome back, {coupleNames}</h1>
-          <p style={{ color: INK2, marginTop: 6 }}>Here&apos;s everything you need for your big day.</p>
-          <div style={{ display: "inline-flex", gap: 18, marginTop: 12, padding: "10px 16px", background: "var(--bone, #FFF6F0)", borderRadius: 12, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: 13, color: INK }}>🏛 {venue.name}</span>
-            <span style={{ fontSize: 13, color: INK }}>📅 {dateLabel}</span>
-            {daysToGo != null && <span style={{ fontSize: 12.5, color: POPPY, fontWeight: 700 }}>{daysToGo} days to go</span>}
-          </div>
+          <h2 style={{ ...serif, fontSize: 26, margin: 0, color: INK }}>Welcome back{coupleNames ? `, ${coupleNames.split("&")[0].trim()}` : ""}</h2>
+          <p style={{ color: INK2, marginTop: 4 }}>Here&apos;s everything you need for your big day.</p>
         </div>
 
         {/* AI planner banner */}

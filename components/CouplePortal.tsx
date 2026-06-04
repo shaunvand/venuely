@@ -308,7 +308,7 @@ export function CouplePortal({
         {/* BODY */}
         <main style={{ flex: 1, padding: "24px 28px 90px", width: "100%" }}>
         {tab === "Overview" && (
-          <CoupleOverview slug={slug} venue={venue} coupleNames={coupleNames} daysToGo={daysToGo} dateLabel={dateLabel} totalDue={totalDue} rooms={rooms} rentals={rentals} state={state} onNavigate={(t) => setTab(t as Tab)} />
+          <CoupleOverview slug={slug} venue={venue} coupleNames={coupleNames} daysToGo={daysToGo} dateLabel={dateLabel} totalDue={totalDue} rooms={rooms} rentals={rentals} state={state} cover={cover} onNavigate={(t) => setTab(t as Tab)} />
         )}
         {false && (
           <div style={{ display: "grid", gap: 16 }}>
