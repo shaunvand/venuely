@@ -190,6 +190,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
           <div style={{ ...serif, fontStyle: "italic", fontSize: 14, opacity: 0.95 }}>Your wedding day</div>
           <div style={{ ...serif, fontSize: 64, lineHeight: 1, margin: "6px 0" }}>{daysToGo ?? "—"}</div>
           <div style={{ fontSize: 12, letterSpacing: 2, textTransform: "uppercase", opacity: 0.9 }}>days to go</div>
+          <div style={{ ...serif, fontStyle: "italic", fontSize: 15, marginTop: 16, opacity: 0.95 }}>We can&apos;t wait to celebrate with you!</div>
         </div>
 
         {/* Next task / payment */}
