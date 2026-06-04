@@ -144,15 +144,7 @@ export function PaymentsManager({ slug, primary, accent, heading, cardRadius }: 
               })}
             </div>
 
-            <div style={{ display: "grid", gap: 10 }}>
-              <div><span style={{ fontSize: 12.5, fontWeight: 600 }}>Payment instructions (your banking details, shown in reminders)</span><textarea value={settings.paymentInstructions ?? ""} onChange={(e) => setSettings({ ...settings, paymentInstructions: e.target.value })} onBlur={(e) => saveSettings({ ...settings, paymentInstructions: e.target.value })} rows={2} placeholder="e.g. EFT to Standard Bank · Acc 123… · Ref: your name" style={{ ...field, width: "100%", resize: "vertical", marginTop: 4 }} /></div>
-              <div><span style={{ fontSize: 12.5, fontWeight: 600 }}>Reminder message <span style={{ color: "#a0a0a0", fontWeight: 400 }}>(use {"{name}"}, {"{couple}"}, {"{amount}"})</span></span><textarea value={settings.paymentTemplate ?? ""} onChange={(e) => setSettings({ ...settings, paymentTemplate: e.target.value })} onBlur={(e) => saveSettings({ ...settings, paymentTemplate: e.target.value })} rows={2} placeholder="Hi {name}, a friendly reminder for your contribution towards {couple}'s wedding. Outstanding: {amount}." style={{ ...field, width: "100%", resize: "vertical", marginTop: 4 }} /></div>
-              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}><input type="checkbox" checked={!!settings.autoPaymentReminders} onChange={(e) => saveSettings({ ...settings, autoPaymentReminders: e.target.checked })} /> Auto-remind unpaid guests</label>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>every <input type="number" value={settings.intervalDays ?? 30} onChange={(e) => setSettings({ ...settings, intervalDays: Number(e.target.value) })} onBlur={(e) => saveSettings({ ...settings, intervalDays: Number(e.target.value) })} style={{ ...field, width: 60, padding: "4px 8px" }} /> days</label>
-                {saved && <span style={{ fontSize: 12, color: "#1a7f4b" }}>Saved ✓</span>}
-              </div>
-            </div>
+            <p style={{ fontSize: 12, color: "#a0a0a0", margin: 0 }}>Set your banking details, edit the reminder email, choose a frequency and turn on auto-reminders in the <b>Reminders</b> tab.</p>
           </>
         )}
       </div>

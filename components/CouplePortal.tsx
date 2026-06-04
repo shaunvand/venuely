@@ -12,6 +12,7 @@ import { AddToCalendar } from "@/components/AddToCalendar";
 import { GuestInvites } from "@/components/GuestInvites";
 import { AiPlanner } from "@/components/AiPlanner";
 import { PaymentsManager } from "@/components/PaymentsManager";
+import { RemindersManager } from "@/components/RemindersManager";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -78,14 +79,14 @@ type GalleryItem = { url: string; category: string; label: string };
 type TableItem = { id: string; label: string; shape: string; seats: number; quantity: number };
 type Venue = { name: string; region: string | null; address: string | null; description: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
 
-const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Invites", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Payments", "Documents"] as const;
+const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Invites", "Reminders", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Payments", "Documents"] as const;
 type Tab = (typeof TABS)[number];
 
 // Grouped navigation — keeps the portal simple: 5 top sections, sub-tabs below.
 const SECTIONS: { name: string; icon: string; tabs: Tab[] }[] = [
   { name: "Plan", icon: "✨", tabs: ["Overview", "Our Venue", "Inspiration"] },
   { name: "Choose", icon: "🍽️", tabs: ["Catalogue & Rentals", "Accommodation", "Suppliers"] },
-  { name: "Guests", icon: "💌", tabs: ["Guests", "Invites", "Seating"] },
+  { name: "Guests", icon: "💌", tabs: ["Guests", "Invites", "Reminders", "Seating"] },
   { name: "Details", icon: "📝", tabs: ["Flowers", "Dress", "Décor", "Timeline", "Music", "Checklist", "Contacts"] },
   { name: "Money & Docs", icon: "📄", tabs: ["Budget", "Payments", "Documents"] },
 ];
@@ -439,6 +440,9 @@ export function CouplePortal({
         )}
         {tab === "Invites" && (
           <GuestInvites slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        )}
+        {tab === "Reminders" && (
+          <RemindersManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Seating" && (
           <FloorPlanner slug={slug} tables={tables} initialPositions={((state as Record<string, unknown>).floorplan as { positions?: Record<number, { x: number; y: number }> })?.positions ?? {}} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />

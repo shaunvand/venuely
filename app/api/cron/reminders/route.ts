@@ -25,9 +25,10 @@ async function runGuestReminders(supabase: SupabaseClient): Promise<{ rsvp: numb
     .or("reminder_settings->>autoRsvpReminders.eq.true,reminder_settings->>autoPaymentReminders.eq.true");
 
   for (const w of weddings ?? []) {
-    const s = (w.reminder_settings ?? {}) as { autoRsvpReminders?: boolean; autoPaymentReminders?: boolean; intervalDays?: number; paymentTemplate?: string; paymentInstructions?: string };
-    const intervalMs = Math.max(1, Number(s.intervalDays) || 30) * 86400000;
-    const due = (stamp: string | null) => !stamp || (nowMs - new Date(stamp).getTime()) >= intervalMs;
+    const s = (w.reminder_settings ?? {}) as { autoRsvpReminders?: boolean; autoPaymentReminders?: boolean; intervalDays?: number; rsvpIntervalDays?: number; paymentIntervalDays?: number; rsvpSubject?: string; rsvpTemplate?: string; paymentSubject?: string; paymentTemplate?: string; paymentInstructions?: string };
+    const rsvpMs = Math.max(1, Number(s.rsvpIntervalDays || s.intervalDays) || 30) * 86400000;
+    const payMs = Math.max(1, Number(s.paymentIntervalDays || s.intervalDays) || 30) * 86400000;
+    const dueBy = (stamp: string | null, ms: number) => !stamp || (nowMs - new Date(stamp).getTime()) >= ms;
     const couple = w.couple_names || "the couple";
 
     const { data: guests } = await supabase.from("guests")
@@ -37,19 +38,21 @@ async function runGuestReminders(supabase: SupabaseClient): Promise<{ rsvp: numb
     for (const g of guests ?? []) {
       const first = g.full_name?.split(" ")[0] || "there";
       // RSVP reminder: invited, no response yet, due for a nudge.
-      if (s.autoRsvpReminders && g.invited_at && !g.responded_at && due(g.rsvp_reminder_at)) {
+      if (s.autoRsvpReminders && g.invited_at && !g.responded_at && dueBy(g.rsvp_reminder_at, rsvpMs)) {
         const link = `${SITE}/rsvp/${g.rsvp_token}`;
-        const html = `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;background:#FFF6F0;border-radius:16px;padding:32px"><h1 style="font-family:Georgia,serif;font-size:22px;margin:0 0 12px">A gentle RSVP reminder</h1><p style="color:#57534e">Hi ${escH(first)}, we'd still love to know if you can join ${escH(couple)}. It only takes a moment.</p><p style="margin:20px 0"><a href="${link}" style="background:#FA523C;color:#fff;text-decoration:none;border-radius:999px;padding:12px 26px;font-weight:600;display:inline-block">RSVP now</a></p></div>`;
-        const r = await sendEmail(g.email, `Friendly reminder — please RSVP for ${couple}`, html);
+        const text = (s.rsvpTemplate || `Hi {name}, we'd still love to know if you can join {couple}. It only takes a moment: {link}`)
+          .replace(/\{name\}/g, first).replace(/\{couple\}/g, couple).replace(/\{link\}/g, link);
+        const html = `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;background:#FFF6F0;border-radius:16px;padding:32px"><h1 style="font-family:Georgia,serif;font-size:22px;margin:0 0 12px">A gentle RSVP reminder</h1><p style="color:#57534e;white-space:pre-wrap">${escH(text)}</p><p style="margin:20px 0"><a href="${link}" style="background:#FA523C;color:#fff;text-decoration:none;border-radius:999px;padding:12px 26px;font-weight:600;display:inline-block">RSVP now</a></p></div>`;
+        const r = await sendEmail(g.email, s.rsvpSubject || `Friendly reminder — please RSVP for ${couple}`, html);
         if (r.sent) { await supabase.from("guests").update({ rsvp_reminder_at: nowIso }).eq("id", g.id); rsvp++; }
       }
       // Payment reminder: attending, owes a balance, due for a nudge.
       const outstanding = Number(g.amount_due || 0) - Number(g.amount_paid || 0);
-      if (s.autoPaymentReminders && g.rsvp_status === "attending" && outstanding > 0 && due(g.payment_reminder_at)) {
+      if (s.autoPaymentReminders && g.rsvp_status === "attending" && outstanding > 0 && dueBy(g.payment_reminder_at, payMs)) {
         const text = (s.paymentTemplate || `Hi {name}, a friendly reminder for your contribution towards {couple}'s wedding. Outstanding: {amount}.`)
           .replace(/\{name\}/g, first).replace(/\{couple\}/g, couple).replace(/\{amount\}/g, randsH(outstanding));
         const html = `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;background:#FFF6F0;border-radius:16px;padding:32px"><h1 style="font-family:Georgia,serif;font-size:22px;margin:0 0 12px">A gentle reminder</h1><p style="color:#57534e;white-space:pre-wrap">${escH(text)}</p>${s.paymentInstructions ? `<div style="margin-top:16px;padding:14px;background:#fff;border-radius:10px;white-space:pre-wrap;font-size:14px">${escH(s.paymentInstructions)}</div>` : ""}</div>`;
-        const r = await sendEmail(g.email, `Payment reminder — ${couple}'s wedding`, html);
+        const r = await sendEmail(g.email, s.paymentSubject || `Payment reminder — ${couple}'s wedding`, html);
         if (r.sent) { await supabase.from("guests").update({ payment_reminder_at: nowIso }).eq("id", g.id); payment++; }
       }
     }

@@ -10,7 +10,9 @@ function admin() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
-const KEYS = new Set(["intervalDays", "rsvpTemplate", "paymentTemplate", "paymentInstructions", "guestContributions", "defaultGuestAmount", "autoRsvpReminders", "autoPaymentReminders"]);
+const KEYS = new Set(["intervalDays", "rsvpIntervalDays", "paymentIntervalDays", "rsvpSubject", "paymentSubject", "rsvpTemplate", "paymentTemplate", "paymentInstructions", "guestContributions", "defaultGuestAmount", "autoRsvpReminders", "autoPaymentReminders"]);
+const NUM = new Set(["intervalDays", "rsvpIntervalDays", "paymentIntervalDays", "defaultGuestAmount"]);
+const BOOL = new Set(["guestContributions", "autoRsvpReminders", "autoPaymentReminders"]);
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
   const { slug } = await ctx.params;
@@ -28,8 +30,8 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ slug: strin
   const clean: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(body)) {
     if (!KEYS.has(k)) continue;
-    if (k === "guestContributions" || k === "autoRsvpReminders" || k === "autoPaymentReminders") clean[k] = !!v;
-    else if (k === "intervalDays" || k === "defaultGuestAmount") clean[k] = v === "" || v == null ? 0 : Number(v);
+    if (BOOL.has(k)) clean[k] = !!v;
+    else if (NUM.has(k)) clean[k] = v === "" || v == null ? 0 : Number(v);
     else clean[k] = v === "" ? null : v;
   }
   const { error } = await admin().from("weddings").update({ reminder_settings: clean }).eq("id", access.wedding.id);
