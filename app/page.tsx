@@ -682,7 +682,7 @@ function Pricing() {
             </span>
             <span>
               <span className="block mb-1">Example: couple spends R120,000 → we invoice you R600. <span style={{ color: "var(--poppy)", fontWeight: 600 }}>You keep R119,400.</span></span>
-              <span className="block text-[12px]">40 weddings/year × R120k avg = R24k a year — paid only when revenue lands, never a fixed bill at the end of the month.</span>
+              <span className="block text-[12px]">Paid only when revenue lands, never a fixed bill at the end of the month.</span>
             </span>
           </div>
 
