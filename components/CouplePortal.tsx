@@ -148,6 +148,13 @@ export function CouplePortal({
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
   const activeSection = SECTIONS.find((s) => s.tabs.includes(tab))?.name ?? "Plan";
+  const [navOpen, setNavOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 860);
+    check(); window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
   const [rentFilter, setRentFilter] = useState("All");
   const [rentFolder, setRentFolder] = useState<"all" | "included" | "extra">("all");
   const [supFilter, setSupFilter] = useState("All");
@@ -293,8 +300,11 @@ export function CouplePortal({
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--cream, #FBF7F2)", fontFamily: tokens.bodyFont, color: "var(--ink, #1c1917)" }}>
-      {/* SIDEBAR — mirrors the venue dashboard */}
-      <aside style={{ width: 248, flexShrink: 0, background: "#fffdfb", borderRight: "1px solid var(--line, #ece7e1)", display: "flex", flexDirection: "column", padding: "20px 14px", position: "sticky", top: 0, height: "100vh", overflowY: "auto" }}>
+      {isMobile && navOpen && <div onClick={() => setNavOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 55 }} />}
+      {/* SIDEBAR — mirrors the venue dashboard (drawer on mobile) */}
+      <aside style={isMobile
+        ? { width: 256, background: "#fffdfb", borderRight: "1px solid var(--line, #ece7e1)", display: "flex", flexDirection: "column", padding: "20px 14px", position: "fixed", top: 0, left: 0, height: "100vh", overflowY: "auto", zIndex: 60, transform: navOpen ? "translateX(0)" : "translateX(-100%)", transition: "transform 0.2s ease", boxShadow: navOpen ? "4px 0 24px rgba(0,0,0,0.18)" : "none" }
+        : { width: 248, flexShrink: 0, background: "#fffdfb", borderRight: "1px solid var(--line, #ece7e1)", display: "flex", flexDirection: "column", padding: "20px 14px", position: "sticky", top: 0, height: "100vh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 6px 18px" }}>
           <LogoMark size={34} />
           <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: 20, color: "var(--poppy,#FA523C)" }}>Venuely</span>
@@ -302,7 +312,7 @@ export function CouplePortal({
         <nav style={{ display: "grid", gap: 2, flex: 1 }}>
           {COUPLE_NAV.map(({ key, label }) => {
             const active = key === tab;
-            return <button key={key} onClick={() => setTab(key)} style={{ textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{label}</button>;
+            return <button key={key} onClick={() => { setTab(key); setNavOpen(false); }} style={{ textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{label}</button>;
           })}
         </nav>
         <div style={{ marginTop: 14, background: "var(--bone,#FFF6F0)", borderRadius: 12, padding: 12 }}>
@@ -314,13 +324,14 @@ export function CouplePortal({
 
       {/* MAIN COLUMN */}
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12, padding: "12px 28px", borderBottom: "1px solid var(--line,#ece7e1)", background: "#fffdfb", position: "sticky", top: 0, zIndex: 10 }}>
-          <span style={{ fontSize: 13, color: "#78716c" }}>{venue.name} · {dateLabel}</span>
-          <span style={{ fontSize: 13.5, fontWeight: 700 }}>{coupleNames}</span>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 16px", borderBottom: "1px solid var(--line,#ece7e1)", background: "#fffdfb", position: "sticky", top: 0, zIndex: 10 }}>
+          {isMobile ? <button onClick={() => setNavOpen(true)} aria-label="Menu" style={{ border: "none", background: "transparent", fontSize: 22, cursor: "pointer", lineHeight: 1 }}>☰</button> : <span />}
+          <span style={{ fontSize: 13, color: "#78716c", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, textAlign: isMobile ? "center" : "right" }}>{venue.name} · {dateLabel}</span>
+          {!isMobile && <span style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>{coupleNames}</span>}
         </div>
 
         {/* BODY */}
-        <main style={{ flex: 1, padding: "24px 28px 90px", width: "100%" }}>
+        <main style={{ flex: 1, padding: isMobile ? "16px 14px 80px" : "24px 28px 90px", width: "100%" }}>
         {tab === "Overview" && (
           <CoupleOverview slug={slug} venue={venue} coupleNames={coupleNames} daysToGo={daysToGo} dateLabel={dateLabel} totalDue={totalDue} rooms={rooms} rentals={rentals} state={state} cover={cover} onNavigate={(t) => setTab(t as Tab)} />
         )}

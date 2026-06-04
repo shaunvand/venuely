@@ -46,6 +46,12 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
   const [timeline, setTimeline] = useState<Array<{ id: string; start_time: string | null; title: string; location: string | null }>>([]);
   const [checklist, setChecklist] = useState<Array<{ id: string; title: string; due_date: string | null; done: boolean | null }>>([]);
   const [docs, setDocs] = useState<Array<{ id: string; label: string | null; mime_type: string | null; url: string | null }>>([]);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const check = () => setNarrow(window.innerWidth < 980);
+    check(); window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     fetch(`/api/wedding/${slug}/guests`).then((r) => r.json()).then((j) => setGuests(j.guests ?? [])).catch(() => {});
@@ -72,7 +78,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
   const docIcon = (m: string | null) => (m?.includes("pdf") ? "PDF" : m?.startsWith("image") ? "IMG" : "DOC");
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 320px", gap: 20, alignItems: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,1fr) 320px", gap: 20, alignItems: "start" }}>
       {/* ── MAIN COLUMN ─────────────────────────────────────────── */}
       <div style={{ display: "grid", gap: 18 }}>
         {/* Cover banner — the venue represents itself here */}
@@ -184,7 +190,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
       </div>
 
       {/* ── RIGHT RAIL ──────────────────────────────────────────── */}
-      <div style={{ display: "grid", gap: 16, position: "sticky", top: 16 }}>
+      <div style={{ display: "grid", gap: 16, position: narrow ? "static" : "sticky", top: 16 }}>
         {/* Countdown hero */}
         <div style={{ borderRadius: 18, padding: 22, background: SAGE, color: "#fff", textAlign: "center" }}>
           <div style={{ ...serif, fontStyle: "italic", fontSize: 14, opacity: 0.95 }}>Your wedding day</div>
