@@ -99,21 +99,42 @@ const SECTIONS: { name: string; icon: string; tabs: Tab[] }[] = [
 ];
 
 // Couple sidebar — flat, curated order + display labels (tab keys unchanged).
-const COUPLE_NAV: { key: Tab; label: string }[] = [
-  { key: "Overview", label: "Overview" },
-  { key: "Our Venue", label: "Our Venue" },
-  { key: "Guests", label: "Guest List" },
-  { key: "Accommodation", label: "Accommodation" },
-  { key: "Inspiration", label: "Inspiration" },
-  { key: "Invites", label: "Invites" },
-  { key: "Suppliers", label: "Suppliers" },
-  { key: "Catalogue & Rentals", label: "Venue stock / Rentals" },
-  { key: "Budget", label: "Budget" },
-  { key: "Payments", label: "Payments" },
-  { key: "Seating", label: "Seating plan" },
-  { key: "Timeline", label: "Wedding day Timeline" },
-  { key: "Checklist", label: "Checklist" },
+const COUPLE_NAV: { key: Tab; label: string; icon: string }[] = [
+  { key: "Overview", label: "Overview", icon: "home" },
+  { key: "Our Venue", label: "Our Venue", icon: "venue" },
+  { key: "Guests", label: "Guest List", icon: "users" },
+  { key: "Accommodation", label: "Accommodation", icon: "bed" },
+  { key: "Inspiration", label: "Inspiration", icon: "sparkle" },
+  { key: "Invites", label: "Invites", icon: "mail" },
+  { key: "Suppliers", label: "Suppliers", icon: "store" },
+  { key: "Catalogue & Rentals", label: "Venue stock / Rentals", icon: "box" },
+  { key: "Budget", label: "Budget", icon: "wallet" },
+  { key: "Payments", label: "Payments", icon: "card" },
+  { key: "Seating", label: "Seating plan", icon: "seat" },
+  { key: "Timeline", label: "Wedding day Timeline", icon: "clock" },
+  { key: "Checklist", label: "Checklist", icon: "check" },
 ];
+
+// Thin line icons (Venuely style) for the couple sidebar. Plain function (not a
+// component) so it can be called inline without remount/lint issues.
+function navIcon(name: string) {
+  const P: Record<string, React.ReactNode> = {
+    home: <><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /></>,
+    venue: <><path d="M4 21V5l8-3 8 3v16" /><path d="M9 21v-5h6v5" /><path d="M8 9h.01M12 9h.01M16 9h.01" /></>,
+    users: <><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3 3-5 6-5s6 2 6 5" /><path d="M16 5.2a3 3 0 0 1 0 5.6" /><path d="M21 20c0-2.2-1.6-3.7-4-4.2" /></>,
+    bed: <><path d="M3 18v-7a2 2 0 0 1 2-2h9a4 4 0 0 1 4 4v5" /><path d="M3 14h18" /><path d="M3 18v2M21 13v7" /></>,
+    sparkle: <><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" /></>,
+    mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></>,
+    store: <><path d="M4 9l1-4h14l1 4" /><path d="M4 9a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0" /><path d="M5 11v8h14v-8" /></>,
+    box: <><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" /><path d="M10 12h4" /></>,
+    wallet: <><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M3 10h18" /><circle cx="17" cy="14" r="1.1" /></>,
+    card: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /><path d="M7 15l2 2 4-4" /></>,
+    seat: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 9v12" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    check: <><path d="M9 6h11M9 12h11M9 18h11" /><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2" /></>,
+  };
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{P[name] ?? null}</svg>;
+}
 
 const VENDOR_LABELS: Record<string, string> = { caterer: "Caterers", planner: "Planners", florist: "Florists", dj: "DJs", photographer: "Photographers", decor: "Décor", bar: "Bar services" };
 const rZA = (n: number) => `R${Math.round(n).toLocaleString("en-ZA")}`;
@@ -311,9 +332,9 @@ export function CouplePortal({
           <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: 20, color: "var(--poppy,#FA523C)" }}>Venuely</span>
         </div>
         <nav style={{ display: "grid", gap: 2, flex: 1 }}>
-          {COUPLE_NAV.map(({ key, label }) => {
+          {COUPLE_NAV.map(({ key, label, icon }) => {
             const active = key === tab;
-            return <button key={key} onClick={() => { setTab(key); setNavOpen(false); }} style={{ textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{label}</button>;
+            return <button key={key} onClick={() => { setTab(key); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{navIcon(icon)}<span>{label}</span></button>;
           })}
         </nav>
         <div style={{ marginTop: 14, background: "var(--bone,#FFF6F0)", borderRadius: 12, padding: 12 }}>
