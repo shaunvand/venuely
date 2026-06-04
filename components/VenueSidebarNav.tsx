@@ -6,9 +6,12 @@ import { useState } from "react";
 
 type IconName =
   | "overview" | "venue" | "enquiries" | "weddings" | "calendar" | "import"
-  | "marketplace" | "vendors" | "money" | "setup";
+  | "marketplace" | "vendors" | "money" | "setup"
+  | "catalogue" | "box" | "bed" | "areas" | "seat"
+  | "catering" | "planner" | "flowers" | "music" | "camera" | "decor" | "bar"
+  | "card" | "payout" | "check" | "settings" | "team";
 
-type Item = { href: string; label: string; children?: Item[] };
+type Item = { href: string; label: string; icon?: IconName; children?: Item[] };
 type Group = { label: string; icon: IconName; items: Item[] };
 
 const TOP_LINKS: (Item & { icon: IconName })[] = [
@@ -25,35 +28,36 @@ const GROUPS: Group[] = [
     label: "Marketplace",
     icon: "marketplace",
     items: [
-      { href: "/venue/catalogue", label: "Catalogue" },
+      { href: "/venue/catalogue", label: "Catalogue", icon: "catalogue" },
       {
         href: "/venue/rentals",
         label: "Rentals",
+        icon: "box",
         children: [
           { href: "/venue/rentals?view=included", label: "Included" },
           { href: "/venue/rentals?view=extras", label: "Extras" },
         ],
       },
-      { href: "/venue/accommodation", label: "Accommodation" },
-      { href: "/venue/areas", label: "Areas" },
-      { href: "/venue/seating", label: "Seating & tables" },
+      { href: "/venue/accommodation", label: "Accommodation", icon: "bed" },
+      { href: "/venue/areas", label: "Areas", icon: "areas" },
+      { href: "/venue/seating", label: "Seating & tables", icon: "seat" },
     ],
   },
   {
     label: "Partner vendors",
     icon: "vendors",
     items: [
-      { href: "/venue/marketplace/caterers", label: "Caterers" },
-      { href: "/venue/marketplace/planners", label: "Planners" },
-      { href: "/venue/marketplace/florists", label: "Florists" },
-      { href: "/venue/marketplace/djs", label: "DJs" },
-      { href: "/venue/marketplace/photographers", label: "Photographers" },
-      { href: "/venue/marketplace/decor", label: "Decor" },
-      { href: "/venue/marketplace/bar", label: "Bar services" },
+      { href: "/venue/marketplace/caterers", label: "Caterers", icon: "catering" },
+      { href: "/venue/marketplace/planners", label: "Planners", icon: "planner" },
+      { href: "/venue/marketplace/florists", label: "Florists", icon: "flowers" },
+      { href: "/venue/marketplace/djs", label: "DJs", icon: "music" },
+      { href: "/venue/marketplace/photographers", label: "Photographers", icon: "camera" },
+      { href: "/venue/marketplace/decor", label: "Decor", icon: "decor" },
+      { href: "/venue/marketplace/bar", label: "Bar services", icon: "bar" },
     ],
   },
-  { label: "Money", icon: "money", items: [{ href: "/venue/payments", label: "Payments" }, { href: "/venue/billing", label: "Payouts & fees" }] },
-  { label: "Setup", icon: "setup", items: [{ href: "/venue/setup", label: "Checklist" }, { href: "/venue/settings", label: "Settings" }, { href: "/venue/team", label: "Team" }] },
+  { label: "Money", icon: "money", items: [{ href: "/venue/payments", label: "Payments", icon: "card" }, { href: "/venue/billing", label: "Payouts & fees", icon: "payout" }] },
+  { label: "Setup", icon: "setup", items: [{ href: "/venue/setup", label: "Checklist", icon: "check" }, { href: "/venue/settings", label: "Settings", icon: "settings" }, { href: "/venue/team", label: "Team", icon: "team" }] },
 ];
 
 // Minimal stroke icon set (currentColor) keyed by name.
@@ -70,6 +74,23 @@ function Icon({ name, className = "w-5 h-5" }: { name: IconName; className?: str
     vendors: <><circle cx="9" cy="8" r="3" {...common} /><path d="M3.5 20c0-3 2.5-5.5 5.5-5.5S14.5 17 14.5 20" {...common} /><path d="M16 5.5a3 3 0 010 5.8M20.5 20c0-2.4-1.4-4.5-3.5-5.3" {...common} /></>,
     money: <><rect x="3" y="5" width="18" height="14" rx="2" {...common} /><path d="M3 10h18" {...common} /></>,
     setup: <><circle cx="12" cy="12" r="3" {...common} /><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" {...common} /></>,
+    catalogue: <path d="M4 6h16M4 12h16M4 18h10" {...common} />,
+    box: <><rect x="3" y="4" width="18" height="4" rx="1" {...common} /><path d="M5 8v11a1 1 0 001 1h12a1 1 0 001-1V8M10 12h4" {...common} /></>,
+    bed: <path d="M3 18v-7a2 2 0 012-2h9a4 4 0 014 4v5M3 14h18M3 18v2M21 13v7" {...common} />,
+    areas: <><path d="M12 21s-6-5-6-10a6 6 0 1112 0c0 5-6 10-6 10z" {...common} /><circle cx="12" cy="11" r="2" {...common} /></>,
+    seat: <><rect x="3" y="3" width="18" height="18" rx="2" {...common} /><path d="M3 9h18M9 9v12" {...common} /></>,
+    catering: <><circle cx="12" cy="12" r="8" {...common} /><circle cx="12" cy="12" r="3" {...common} /></>,
+    planner: <><rect x="5" y="4" width="14" height="17" rx="2" {...common} /><path d="M9 4h6v3H9zM8 12h8M8 16h5" {...common} /></>,
+    flowers: <><circle cx="12" cy="9" r="3" {...common} /><path d="M12 12v8M9 17c-2 0-3-1.5-3-3M15 17c2 0 3-1.5 3-3" {...common} /></>,
+    music: <><path d="M9 18V5l10-2v13" {...common} /><circle cx="6" cy="18" r="3" {...common} /><circle cx="16" cy="16" r="3" {...common} /></>,
+    camera: <><rect x="3" y="7" width="18" height="13" rx="2" {...common} /><circle cx="12" cy="13.5" r="3.5" {...common} /><path d="M8 7l1.5-3h5L16 7" {...common} /></>,
+    decor: <path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" {...common} />,
+    bar: <path d="M6 3h12l-5 7v8M8 21h8" {...common} />,
+    card: <><rect x="3" y="5" width="18" height="14" rx="2" {...common} /><path d="M3 9h18M7 15l2 2 4-4" {...common} /></>,
+    payout: <><path d="M12 3v12M8 11l4 4 4-4" {...common} /><path d="M4 21h16" {...common} /></>,
+    check: <><path d="M9 6h11M9 12h11M9 18h11" {...common} /><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2" {...common} /></>,
+    settings: <><circle cx="12" cy="12" r="3" {...common} /><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" {...common} /></>,
+    team: <><circle cx="9" cy="8" r="3" {...common} /><path d="M3 20c0-3 3-5 6-5s6 2 6 5" {...common} /><path d="M16 5.5a3 3 0 010 5.5M21 20c0-2-1.5-3.5-4-4" {...common} /></>,
   };
   return <svg viewBox="0 0 24 24" className={className} aria-hidden>{paths[name]}</svg>;
 }
@@ -156,10 +177,11 @@ function NavGroup({
               <div key={i.href}>
                 <Link
                   href={i.href}
-                  className={`vy-side-link ${active && !i.children ? "active" : ""} ${
+                  className={`vy-side-link flex items-center gap-2.5 ${active && !i.children ? "active" : ""} ${
                     active && i.children ? "font-semibold" : ""
                   }`}
                 >
+                  {i.icon && <Icon name={i.icon} className="w-[18px] h-[18px] flex-shrink-0" />}
                   {i.label}
                 </Link>
                 {i.children && active && (
