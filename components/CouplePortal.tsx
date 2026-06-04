@@ -415,6 +415,7 @@ export function CouplePortal({
 
         {tab === "Accommodation" && (
           <div style={{ display: "grid", gap: 26 }}>
+            <GuestManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} rooms={rooms.map((r) => ({ id: r.id, name: r.name }))} />
             <Section heading={heading} title="Accommodation" sub="On-site stays for you and your guests">
               {rooms.length === 0 ? <Empty>No accommodation listed.</Empty> : (
                 <div style={grid}>{rooms.map((r) => <PortalItemCard key={r.id} name={r.name} description={`Sleeps ${r.sleeps}${r.description ? ` · ${r.description}` : ""}`} img={r.img} price={r.price} selected={!!(rooms_[r.id]?.length)} onToggle={() => toggleRoom(r.id)} {...itemProps} />)}</div>
