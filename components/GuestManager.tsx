@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type Guest = {
   id: string;
@@ -9,6 +9,7 @@ export type Guest = {
   phone: string | null;
   rsvp_status: string | null;
   table_number: number | null;
+  room_id: string | null;
   dietary: string | null;
   accessibility_needs: string | null;
   plus_one: boolean | null;
@@ -17,23 +18,38 @@ export type Guest = {
   notes: string | null;
 };
 
+type Room = { id: string; name: string };
+
 const RSVP = [
   { v: "pending", label: "Pending", color: "#8a8a8a" },
   { v: "attending", label: "Attending", color: "#1f5d3e" },
   { v: "declined", label: "Declined", color: "#b42318" },
 ];
 
-export function GuestManager({ slug, primary, accent, heading, cardRadius }: {
-  slug: string; primary: string; accent: string; heading: React.CSSProperties; cardRadius: string;
+export function GuestManager({ slug, primary, accent, heading, cardRadius, rooms = [] }: {
+  slug: string; primary: string; accent: string; heading: React.CSSProperties; cardRadius: string; rooms?: Room[];
 }) {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
   const [draft, setDraft] = useState({ full_name: "", dietary: "", table_number: "", accessibility_needs: "", is_child: false });
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    fetch(`/api/wedding/${slug}/guests`).then((r) => r.json()).then((j) => { setGuests(j.guests ?? []); setLoading(false); }).catch(() => setLoading(false));
-  }, [slug]);
+  function load() { return fetch(`/api/wedding/${slug}/guests`).then((r) => r.json()).then((j) => setGuests(j.guests ?? [])); }
+  useEffect(() => { load().finally(() => setLoading(false)); }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function importFile(f: File | null) {
+    if (!f) return;
+    setImporting(true); setImportMsg("");
+    const fd = new FormData(); fd.append("file", f);
+    const r = await fetch(`/api/wedding/${slug}/guests/import`, { method: "POST", body: fd });
+    const j = await r.json();
+    setImporting(false);
+    if (j.ok) { setImportMsg(`✓ Imported ${j.imported} guests`); await load(); } else setImportMsg(j.error || "Import failed");
+    if (fileRef.current) fileRef.current.value = "";
+  }
 
   async function addGuest() {
     if (!draft.full_name.trim()) return;
@@ -80,7 +96,14 @@ export function GuestManager({ slug, primary, accent, heading, cardRadius }: {
 
       {/* Add */}
       <div style={card({ padding: 14 })}>
-        <div style={{ ...heading, fontSize: 16, marginBottom: 8 }}>Add a guest</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ ...heading, fontSize: 16 }}>Add guests</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => importFile(e.target.files?.[0] || null)} style={{ display: "none" }} />
+            <button onClick={() => fileRef.current?.click()} disabled={importing} style={{ border: `1px solid ${primary}`, background: "#fff", color: primary, borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>{importing ? "Importing…" : "⬆ Bulk add (Excel/CSV)"}</button>
+            {importMsg && <span style={{ fontSize: 12, color: importMsg.startsWith("✓") ? "#1a7f4b" : "#b42318" }}>{importMsg}</span>}
+          </div>
+        </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <input style={{ ...input, flex: "2 1 180px" }} placeholder="Full name" value={draft.full_name} onChange={(e) => setDraft({ ...draft, full_name: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") addGuest(); }} />
           <input style={{ ...input, flex: "1 1 120px" }} placeholder="Dietary (e.g. vegan, halal)" value={draft.dietary} onChange={(e) => setDraft({ ...draft, dietary: e.target.value })} />
@@ -105,6 +128,12 @@ export function GuestManager({ slug, primary, accent, heading, cardRadius }: {
               </select>
               <input style={{ ...input, flex: "1 1 110px" }} placeholder="Dietary" value={g.dietary ?? ""} onChange={(e) => patch(g.id, { dietary: e.target.value })} />
               <input style={{ ...input, width: 70 }} placeholder="Table" value={g.table_number ?? ""} onChange={(e) => patch(g.id, { table_number: e.target.value === "" ? null : Number(e.target.value) })} />
+              {rooms.length > 0 && (
+                <select value={g.room_id ?? ""} onChange={(e) => patch(g.id, { room_id: e.target.value || null })} title="Accommodation" style={{ ...input, maxWidth: 130 }}>
+                  <option value="">No room</option>
+                  {rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              )}
               <input style={{ ...input, flex: "1 1 120px" }} placeholder="Accessibility" value={g.accessibility_needs ?? ""} onChange={(e) => patch(g.id, { accessibility_needs: e.target.value })} />
               {g.is_child && <span style={{ fontSize: 10, background: `${accent}40`, color: "#5a4", padding: "2px 8px", borderRadius: 999 }}>Child</span>}
               <button onClick={() => remove(g.id)} title="Remove" style={{ marginLeft: "auto", border: "none", background: "transparent", color: "#b42318", cursor: "pointer", fontSize: 13 }}>✕</button>

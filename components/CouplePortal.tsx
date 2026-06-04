@@ -15,6 +15,7 @@ import { PaymentsManager } from "@/components/PaymentsManager";
 import { RemindersManager } from "@/components/RemindersManager";
 import { CoupleOverview } from "@/components/CoupleOverview";
 import { LogoMark } from "@/components/Logo";
+import { RoomAllocator } from "@/components/RoomAllocator";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -411,11 +412,18 @@ export function CouplePortal({
         })()}
 
         {tab === "Accommodation" && (
-          <Section heading={heading} title="Accommodation" sub="On-site stays for you and your guests">
-            {rooms.length === 0 ? <Empty>No accommodation listed.</Empty> : (
-              <div style={grid}>{rooms.map((r) => <PortalItemCard key={r.id} name={r.name} description={`Sleeps ${r.sleeps}${r.description ? ` · ${r.description}` : ""}`} img={r.img} price={r.price} selected={!!(rooms_[r.id]?.length)} onToggle={() => toggleRoom(r.id)} {...itemProps} />)}</div>
+          <div style={{ display: "grid", gap: 26 }}>
+            <Section heading={heading} title="Accommodation" sub="On-site stays for you and your guests">
+              {rooms.length === 0 ? <Empty>No accommodation listed.</Empty> : (
+                <div style={grid}>{rooms.map((r) => <PortalItemCard key={r.id} name={r.name} description={`Sleeps ${r.sleeps}${r.description ? ` · ${r.description}` : ""}`} img={r.img} price={r.price} selected={!!(rooms_[r.id]?.length)} onToggle={() => toggleRoom(r.id)} {...itemProps} />)}</div>
+              )}
+            </Section>
+            {rooms.length > 0 && (
+              <div style={{ borderTop: "1px solid var(--line,#ece7e1)", paddingTop: 18 }}>
+                <RoomAllocator slug={slug} rooms={rooms.map((r) => ({ id: r.id, name: r.name, sleeps: r.sleeps }))} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+              </div>
             )}
-          </Section>
+          </div>
         )}
 
         {tab === "Suppliers" && (
@@ -449,7 +457,7 @@ export function CouplePortal({
         )}
 
         {tab === "Guests" && (
-          <GuestManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+          <GuestManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} rooms={rooms.map((r) => ({ id: r.id, name: r.name }))} />
         )}
         {tab === "Invites" && (
           <div style={{ display: "grid", gap: 28 }}>
