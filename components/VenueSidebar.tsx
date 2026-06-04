@@ -54,12 +54,6 @@ export function VenueSidebar() {
         )}
       </div>
 
-      {!collapsed && (
-        <div className="mb-5 text-sm italic text-[color:var(--ink-2)]" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
-          Everything wedding, handled.
-        </div>
-      )}
-
       {collapsed && (
         <button
           type="button"
