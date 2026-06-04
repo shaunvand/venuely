@@ -1,6 +1,7 @@
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createAdminClient } from "@/lib/supabase/server";
 import { addTable, updateTable, deleteTable } from "./actions";
+import { SaveButton } from "@/components/SaveButton";
 
 const SHAPES = ["round", "square", "long", "other"];
 
@@ -59,7 +60,7 @@ export default async function VenueSeating() {
                 <div className="space-y-1"><label className="vy-label">Seats each</label><input name="seats" type="number" min="1" defaultValue={t.seats} className="vy-input" /></div>
                 <div className="space-y-1"><label className="vy-label">How many</label><input name="quantity" type="number" min="1" defaultValue={t.quantity} className="vy-input" /></div>
                 <div className="flex gap-2">
-                  <button className="vy-btn vy-btn-secondary text-xs flex-1">Save</button>
+                  <SaveButton label="Save" className="vy-btn vy-btn-secondary text-xs flex-1" />
                   <button formAction={deleteTable.bind(null, t.id)} className="vy-btn vy-btn-danger text-xs">✕</button>
                 </div>
               </form>

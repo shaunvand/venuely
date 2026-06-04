@@ -9,6 +9,7 @@ import {
   sendPortalInvite, rotatePortalAccess, revokeCoupleAccess, approveSubmission,
 } from "../actions";
 import { statusColor } from "@/lib/wedding/status";
+import { SaveButton } from "@/components/SaveButton";
 import { addPayment, deletePayment, addCharge, deleteCharge } from "./ledger-actions";
 import { sendDepositReminder, sendBalanceReminder } from "../reminder-actions";
 import { depositReminder, balanceReminder } from "@/lib/notifications";
@@ -329,7 +330,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
             <option value="booked">booked</option><option value="completed">completed</option><option value="cancelled">cancelled</option>
           </select></div>
         <div className="md:col-span-2 space-y-1"><label className="vy-label">Notes</label><input name="notes" defaultValue={wedding.notes ?? ""} className="vy-input" /></div>
-        <div className="md:col-span-6"><button className="vy-btn vy-btn-primary">Save changes</button></div>
+        <div className="md:col-span-6"><SaveButton /></div>
       </form>
 
       {/* Couple submissions awaiting review → approve sends the EFT invoice */}
