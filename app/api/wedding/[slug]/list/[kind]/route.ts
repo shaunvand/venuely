@@ -12,7 +12,7 @@ function admin() {
 }
 
 const KINDS: Record<string, { table: string; cols: string[]; order: string; name: string; numeric?: string[]; bool?: string[] }> = {
-  timeline: { table: "wedding_timeline", cols: ["start_time", "title", "location", "responsible", "notes", "sort_order"], order: "sort_order", name: "title" },
+  timeline: { table: "wedding_timeline", cols: ["start_time", "title", "location", "responsible", "notes", "sort_order", "event_date"], order: "sort_order", name: "title" },
   contacts: { table: "wedding_contacts", cols: ["role", "name", "company", "phone", "email", "is_emergency", "notes"], order: "created_at", name: "name", bool: ["is_emergency"] },
   songs: { table: "wedding_songs", cols: ["moment", "title", "artist", "notes", "sort_order"], order: "sort_order", name: "title" },
   budget: { table: "wedding_budget", cols: ["category", "description", "estimated", "actual", "paid", "vendor_name", "due_date", "notes"], order: "created_at", name: "category", numeric: ["estimated", "actual", "paid"] },

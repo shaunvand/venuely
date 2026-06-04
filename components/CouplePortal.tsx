@@ -17,6 +17,7 @@ import { CoupleOverview } from "@/components/CoupleOverview";
 import { LogoMark } from "@/components/Logo";
 import { RoomAllocator } from "@/components/RoomAllocator";
 import { ChecklistBoard } from "@/components/ChecklistBoard";
+import { TimelineBoard } from "@/components/TimelineBoard";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -478,7 +479,7 @@ export function CouplePortal({
           <DocumentManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Timeline" && (
-          <ListManager slug={slug} kind="timeline" title="Day timeline" sub="Your run sheet — when and where everything happens" fields={TIMELINE_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+          <TimelineBoard slug={slug} weddingDate={weddingDate} weddingEndDate={weddingEndDate} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Contacts" && (
           <ListManager slug={slug} kind="contacts" title="Contacts" sub="Your vendors, coordinator and emergency contacts" fields={CONTACT_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
