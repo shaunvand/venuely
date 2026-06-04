@@ -319,11 +319,13 @@ body {
   border-right: 1px solid var(--line);
 }
 .vy-side-link {
-  display: block;
-  padding: 0.45rem 0.6rem;
-  border-radius: 7px;
-  font-size: 0.88rem;
-  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  font-size: 0.84rem;
+  color: #44403c;
   transition: background 0.12s;
 }
 .vy-side-link:hover { background: var(--bone); }

@@ -62,7 +62,7 @@ const GROUPS: Group[] = [
 
 // Minimal stroke icon set (currentColor) keyed by name.
 function Icon({ name, className = "w-5 h-5" }: { name: IconName; className?: string }) {
-  const common = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const common = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   const paths: Record<IconName, React.ReactNode> = {
     overview: <path d="M3 11l9-8 9 8M5 10v10h14V10" {...common} />,
     venue: <path d="M4 21V9l8-5 8 5v12M9 21v-6h6v6" {...common} />,
@@ -163,9 +163,9 @@ function NavGroup({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between vy-eyebrow px-0 py-1.5 hover:text-stone-900 transition-colors"
+        className="w-full flex items-center justify-between px-1 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500 hover:text-stone-900 transition-colors"
       >
-        <span className="flex items-center gap-2"><Icon name={group.icon} className="w-4 h-4" />{group.label}</span>
+        <span className="flex items-center gap-2.5"><Icon name={group.icon} className="w-[18px] h-[18px]" />{group.label}</span>
         <span className={`text-[10px] transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
       </button>
       {open && (
