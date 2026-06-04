@@ -113,8 +113,8 @@ export async function connectPayouts(formData: FormData) {
   if (!("ok" in resolved)) redirect("/venue/billing?err=not_configured");
   if (!resolved.ok) redirect("/venue/billing?err=resolve_failed");
 
-  // platform_fee_rate is a fraction (0.0100). Paystack wants a percent (1.0).
-  const percentageCharge = Math.round(Number(venue.platform_fee_rate ?? 0.01) * 100 * 100) / 100;
+  // platform_fee_rate is a fraction (0.0050). Paystack wants a percent (0.5).
+  const percentageCharge = Math.round(Number(venue.platform_fee_rate ?? 0.005) * 100 * 100) / 100;
 
   const created = await createSubaccount({
     businessName: venue.name,

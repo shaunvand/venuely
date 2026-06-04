@@ -144,12 +144,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A customer email is required to take a payment." }, { status: 400 });
   }
 
-  // platform_fee_rate is stored as a fraction (e.g. 0.0100 for 1%). Venuely's fee
+  // platform_fee_rate is stored as a fraction (e.g. 0.0050 for 0.5%). Venuely's fee
   // = rate × (grand_total − venue commission); the venue keeps 100% of its
   // commission. Paystack's subaccount percentage_charge would tax the GROSS, so
   // instead we pass a per-transaction FIXED `transaction_charge` that overrides
   // it, computed off the commission-excluding base.
-  const feeRate = Number(venue.platform_fee_rate ?? 0.01);
+  const feeRate = Number(venue.platform_fee_rate ?? 0.005);
 
   // The couple pays the full amountMajor (gross) via Paystack, but we charge the
   // platform fee only on its commission-excluding share. Scale the proforma's

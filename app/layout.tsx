@@ -22,7 +22,7 @@ const cormorant = Cormorant_Garamond({
 export const metadata: Metadata = {
   title: "Venuely — Weddings Made Easy",
   description:
-    "Run your wedding venue like a hotel. Branded couple portals, catalogue + rentals + accommodation tracking, ZAR billing. 1% of wedding spend — no monthly fee.",
+    "Run your wedding venue like a hotel. Branded couple portals, catalogue + rentals + accommodation tracking, ZAR billing. 0.5% of wedding spend — no monthly fee.",
   openGraph: {
     title: "Venuely — Weddings Made Easy",
     description:

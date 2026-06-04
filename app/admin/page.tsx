@@ -106,7 +106,7 @@ export default async function OwnerDashboard() {
           >
             <div className="font-medium">Billing →</div>
             <div className="text-sm text-gray-600 mt-1">
-              1% platform fee on wedding spend per venue. Live tally of collected vs outstanding.
+              0.5% platform fee on wedding spend per venue. Live tally of collected vs outstanding.
             </div>
           </Link>
         </div>

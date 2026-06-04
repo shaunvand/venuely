@@ -59,7 +59,7 @@ async function buildWeddingCharges(
     .select("platform_fee_rate")
     .eq("id", venueId)
     .single();
-  const feeRate = Number((venue as { platform_fee_rate?: number } | null)?.platform_fee_rate ?? 0.01);
+  const feeRate = Number((venue as { platform_fee_rate?: number } | null)?.platform_fee_rate ?? 0.005);
 
   const state = (wedding.wedding_state ?? {}) as WeddingState;
   const rules = await loadRules(supabase, venueId);
@@ -616,7 +616,7 @@ export async function approveSubmission(submissionId: string, weddingId: string,
         <div style="padding:24px">
           <p style="margin:0 0 16px;color:#57534e">Commission on the confirmed booking for <strong>${couple}</strong> (invoiced ${rZA(grandTotal)}). This is deducted as your Venuely platform fee.</p>
           <div style="display:flex;justify-content:space-between;background:#FFF6F0;border-radius:8px;padding:14px 16px;margin-bottom:16px">
-            <span style="font-weight:600">Commission due (1%)</span><span style="font-weight:700">${rZA(commission)}</span>
+            <span style="font-weight:600">Commission due (0.5%)</span><span style="font-weight:700">${rZA(commission)}</span>
           </div>
           <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#FA523C;font-weight:700;margin-bottom:6px">Pay Venuely by EFT</div>
           ${bankRows({ account_name: p.account_name, bank: p.bank_name, account_number: p.account_number, branch: p.branch_code, swift: p.swift, iban: p.iban, reference: cref })}

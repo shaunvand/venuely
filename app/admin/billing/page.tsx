@@ -51,7 +51,7 @@ export default async function OwnerBilling() {
         <div className="vy-eyebrow">Revenue</div>
         <h1 className="vy-h1 mt-1">Platform fees</h1>
         <p className="text-stone-600 text-sm mt-1">
-          1% of wedding spend, billed per booking. No flat subscription.
+          0.5% of wedding spend, billed per booking. No flat subscription.
         </p>
       </header>
 
@@ -59,7 +59,7 @@ export default async function OwnerBilling() {
         <div>
           <div className="vy-eyebrow">Pricing model</div>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className="font-serif text-4xl">1%</span>
+            <span className="font-serif text-4xl">0.5%</span>
             <span className="text-stone-500">of wedding spend</span>
           </div>
           <div className="text-xs text-stone-500 mt-1">Per-venue rate adjustable below · no monthly fee</div>
@@ -84,7 +84,7 @@ export default async function OwnerBilling() {
             <tbody>
               {venues.map((v) => {
                 const stats = weddingsByVenue[v.id as string] || { total: 0, booked: 0, pending: 0 };
-                const rate = Number(v.platform_fee_rate ?? 0.01);
+                const rate = Number(v.platform_fee_rate ?? 0.005);
                 return (
                   <tr key={v.id}>
                     <td><div className="font-medium">{v.name}</div></td>

@@ -275,15 +275,8 @@ function Hero() {
             className="px-7 py-3.5 rounded-lg font-medium text-white transition-all hover:scale-[1.03] active:scale-[0.98]"
             style={{ background: "var(--poppy)" }}
           >
-            Get Started Free
+            Get Started for Free
           </Link>
-          <a
-            href="#for-couples"
-            className="px-7 py-3.5 rounded-lg font-medium transition-all hover:scale-[1.03]"
-            style={{ border: "1.5px solid var(--poppy)", color: "var(--poppy)" }}
-          >
-            Book a Demo
-          </a>
         </div>
         <div className="mt-8">
           <TrustChips />
@@ -648,7 +641,7 @@ function Pricing() {
             your <span style={{ color: "var(--poppy)" }}>wedding</span> pays.
           </h2>
           <p className="mt-5 text-base max-w-lg mx-auto" style={{ color: "var(--ink-2)" }}>
-            No subscription. No setup fee. We take 1% of what couples spend
+            No subscription. No setup fee. We take 0.5% of what couples spend
             through the platform — that&apos;s it.
           </p>
         </div>
@@ -658,7 +651,7 @@ function Pricing() {
         <div className="mt-12 bg-white rounded-3xl p-10 sm:p-12 relative z-10" style={{ border: "1px solid var(--line)" }}>
           <div className="text-center">
             <div className="text-xs uppercase tracking-[0.32em]" style={{ color: "var(--sage)" }}>Per booking</div>
-            <div className="font-serif mt-2" style={{ color: "var(--poppy)", fontSize: "4.5rem", lineHeight: 1 }}>1%</div>
+            <div className="font-serif mt-2" style={{ color: "var(--poppy)", fontSize: "4.5rem", lineHeight: 1 }}>0.5%</div>
             <div className="text-lg" style={{ color: "var(--ink)" }}>of wedding spend</div>
             <div className="text-sm mt-2" style={{ color: "var(--ink-2)" }}>No monthly fee · No contract · Cancel anytime</div>
           </div>
@@ -869,7 +862,7 @@ function FinalCTA() {
           wedding.
         </h2>
         <p className="mt-5 text-sm" style={{ color: "var(--ink-2)" }}>
-          Free until a couple books. Then we take 1% — never more.
+          Free until a couple books. Then we take 0.5% — never more.
         </p>
         <p className="mt-6 text-base leading-relaxed max-w-lg mx-auto" style={{ color: "var(--ink-2)" }}>
           Drop in your existing PDFs, brochures and rooming lists — Smart Import builds your

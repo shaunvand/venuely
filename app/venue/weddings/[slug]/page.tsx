@@ -236,7 +236,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
 
   const totals = computeTotals(rules, charges, payments);
 
-  const platformFeeRate = Number((venue as { platform_fee_rate?: number }).platform_fee_rate ?? 0.01);
+  const platformFeeRate = Number((venue as { platform_fee_rate?: number }).platform_fee_rate ?? 0.005);
   // Venuely fee = rate × (grand_total − venue commission); the venue keeps 100%
   // of its commission. projectedFee is therefore charged on platform_fee_base.
   const projectedFee = platformFee(totals, platformFeeRate);
@@ -341,7 +341,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
           </div>
           <h2 className="vy-h2">Couple submitted their selections</h2>
           <p className="text-sm" style={{ color: "var(--ink-2)" }}>
-            Review the proforma above, then approve to email the couple their EFT invoice and record your 1% Venuely commission.
+            Review the proforma above, then approve to email the couple their EFT invoice and record your 0.5% Venuely commission.
           </p>
           <div className="space-y-2">
             {pendingSubmissions.map((s) => (

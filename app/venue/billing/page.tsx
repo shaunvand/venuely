@@ -16,7 +16,7 @@ export default async function VenueBillingPage() {
   const supabase = await createClient();
 
   // platform_fee_rate is a fraction; show it as a percent.
-  const feePercent = Math.round(Number(venue.platform_fee_rate ?? 0.01) * 100 * 100) / 100;
+  const feePercent = Math.round(Number(venue.platform_fee_rate ?? 0.005) * 100 * 100) / 100;
 
   const { data: row } = await supabase
     .from("venues")

@@ -45,7 +45,7 @@ export default function SignupPage() {
         <div>
           <h1 className="font-serif text-3xl">List your venue on Venuely</h1>
           <p className="text-stone-600 text-sm mt-2">
-            For wedding-venue owners and managers. No monthly fee — we take 1% of wedding spend when couples book through your portal. Couples get invited by you afterwards.
+            For wedding-venue owners and managers. No monthly fee — we take 0.5% of wedding spend when couples book through your portal. Couples get invited by you afterwards.
           </p>
         </div>
 
