@@ -172,7 +172,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
           </div>
 
           <div style={{ ...card, padding: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}><span style={eyebrow}>📄 Documents</span><button onClick={() => onNavigate("Documents")} style={{ background: "none", border: "none", color: POPPY, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>View all →</button></div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}><span style={eyebrow}>📄 Documents</span><button onClick={() => onNavigate("Payments")} style={{ background: "none", border: "none", color: POPPY, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>View all →</button></div>
             {docs.length === 0 ? <div style={{ color: INK2, fontSize: 13 }}>No documents yet.</div> : docs.slice(0, 5).map((d) => (
               <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${LINE}` }}>
                 <span style={{ fontSize: 13, color: INK, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.label || "Document"}</span>

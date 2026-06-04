@@ -452,10 +452,12 @@ export function CouplePortal({
           <GuestManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Invites" && (
-          <GuestInvites slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
-        )}
-        {tab === "Reminders" && (
-          <RemindersManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+          <div style={{ display: "grid", gap: 28 }}>
+            <GuestInvites slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+            <div style={{ borderTop: "1px solid var(--line,#ece7e1)", paddingTop: 20 }}>
+              <RemindersManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+            </div>
+          </div>
         )}
         {tab === "Seating" && (
           <FloorPlanner slug={slug} tables={tables} initialPositions={((state as Record<string, unknown>).floorplan as { positions?: Record<number, { x: number; y: number }> })?.positions ?? {}} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
@@ -491,7 +493,12 @@ export function CouplePortal({
           <ListManager slug={slug} kind="budget" title="Your budget" sub="Track your own spend — separate from the venue invoice" fields={BUDGET_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Payments" && (
-          <PaymentsManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+          <div style={{ display: "grid", gap: 28 }}>
+            <PaymentsManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+            <div style={{ borderTop: "1px solid var(--line,#ece7e1)", paddingTop: 20 }}>
+              <DocumentManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+            </div>
+          </div>
         )}
       </main>
 
