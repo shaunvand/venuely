@@ -11,8 +11,8 @@ function admin() {
   });
 }
 
-const COLS = "id, full_name, email, phone, rsvp_status, table_number, room_id, dietary, accessibility_needs, plus_one, is_child, side, notes, rsvp_token, invited_at, responded_at, party_size, rsvp_message, amount_due, amount_paid, payment_note";
-const ALLOWED = new Set(["full_name", "email", "phone", "rsvp_status", "table_number", "room_id", "dietary", "accessibility_needs", "plus_one", "is_child", "side", "notes", "amount_due", "amount_paid", "payment_note"]);
+const COLS = "id, full_name, email, phone, rsvp_status, table_number, room_id, seat_table_id, seat_index, dietary, accessibility_needs, plus_one, is_child, side, notes, rsvp_token, invited_at, responded_at, party_size, rsvp_message, amount_due, amount_paid, payment_note";
+const ALLOWED = new Set(["full_name", "email", "phone", "rsvp_status", "table_number", "room_id", "seat_table_id", "seat_index", "dietary", "accessibility_needs", "plus_one", "is_child", "side", "notes", "amount_due", "amount_paid", "payment_note"]);
 const NUMERIC = new Set(["amount_due", "amount_paid"]);
 
 function clean(body: Record<string, unknown>): Record<string, unknown> {

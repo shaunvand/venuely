@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import type { TemplateTokens, PortalTheme } from "@/lib/portal/templates";
 import { GuestManager } from "@/components/GuestManager";
 import { ListManager, type ListField } from "@/components/ListManager";
-import { FloorPlanner } from "@/components/FloorPlanner";
 import { InspirationBoard } from "@/components/InspirationBoard";
 import { DocumentManager } from "@/components/DocumentManager";
 import { AddToCalendar } from "@/components/AddToCalendar";
@@ -18,6 +17,7 @@ import { LogoMark } from "@/components/Logo";
 import { RoomAllocator } from "@/components/RoomAllocator";
 import { ChecklistBoard } from "@/components/ChecklistBoard";
 import { TimelineBoard } from "@/components/TimelineBoard";
+import { SeatingPlan } from "@/components/SeatingPlan";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -470,7 +470,7 @@ export function CouplePortal({
           </div>
         )}
         {tab === "Seating" && (
-          <FloorPlanner slug={slug} tables={tables} initialPositions={((state as Record<string, unknown>).floorplan as { positions?: Record<number, { x: number; y: number }> })?.positions ?? {}} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+          <SeatingPlan slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
         {tab === "Inspiration" && (
           <InspirationBoard slug={slug} initialPalette={(state as Record<string, unknown>).palette as string[] ?? []} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
