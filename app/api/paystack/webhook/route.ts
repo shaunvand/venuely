@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
   // Amounts: Paystack sends minor units (ZAR cents). Store major units to match
   // payment_ledger / compute.ts which work in Rands.
   const grossMajor = Number.isFinite(data.amount) ? Number(data.amount) / 100 : null;
-  // Venuely fee = 1% of the couple's BASE payment (excludes the venue's commission).
+  // Venuely fee = 0.5% of the couple's BASE payment (excludes the venue's commission).
   // The checkout route computes this and passes it in metadata.platform_fee_amount
   // (major units). Prefer that; only fall back to rate×gross if the metadata is
   // absent (older links) — never silently tax the commission.

@@ -4,7 +4,7 @@
 // "not configured" result instead of throwing, so the build and every page that
 // imports this module stay healthy without keys.
 //
-// Model: 1% of money transacted, no monthly fee. Rail = Paystack Subaccounts —
+// Model: 0.5% of money transacted, no monthly fee. Rail = Paystack Subaccounts —
 // the couple pays the full amount, Paystack settles T+1 with the platform fee
 // taken off the top (`bearer: "account"` => the fee comes from the platform's
 // share, i.e. the subaccount's `percentage_charge` is what the platform keeps).
@@ -120,7 +120,7 @@ export async function createSubaccount(input: {
   businessName: string;
   bankCode: string;
   accountNumber: string;
-  percentageCharge: number; // platform's % kept off the top (e.g. 1 for 1%)
+  percentageCharge: number; // platform's % kept off the top (e.g. 0.5 for 0.5%)
 }): Promise<PaystackResult<Subaccount>> {
   return call<Subaccount>(`/subaccount`, {
     method: "POST",

@@ -555,7 +555,7 @@ async function sendResend(to: string, subject: string, html: string): Promise<vo
   } catch { /* non-fatal */ }
 }
 
-// Approve a couple's submission: compute + persist the invoice (and 1% platform
+// Approve a couple's submission: compute + persist the invoice (and 0.5% platform
 // fee), email the couple their EFT invoice (paid to the VENUE), and email the
 // venue their commission invoice (paid to VENUELY).
 export async function approveSubmission(submissionId: string, weddingId: string, slug: string) {
@@ -570,7 +570,7 @@ export async function approveSubmission(submissionId: string, weddingId: string,
   if (!wed) throw new Error("Wedding not found");
   const venue = (wed as unknown as { venue: VenueBank | null }).venue;
 
-  // Compute + persist invoice_total + 1% platform_fee_owed.
+  // Compute + persist invoice_total + 0.5% platform_fee_owed.
   await markInvoiced(weddingId, slug);
   const { data: fresh } = await supabase.from("weddings").select("invoice_total, platform_fee_owed").eq("id", weddingId).single();
   const grandTotal = Number(fresh?.invoice_total ?? 0);
@@ -604,7 +604,7 @@ export async function approveSubmission(submissionId: string, weddingId: string,
     await sendResend(coupleEmail, `Your invoice from ${venue?.name ?? "your venue"}`, html);
   }
 
-  // 2) Commission invoice — venue pays Venuely 1% by EFT.
+  // 2) Commission invoice — venue pays Venuely 0.5% by EFT.
   const venueEmail = venue?.contact_email;
   if (venueEmail && commission > 0) {
     const { data: ps } = await admin.from("platform_settings").select("*").eq("id", 1).single();
