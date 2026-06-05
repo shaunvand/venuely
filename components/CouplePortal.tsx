@@ -330,9 +330,17 @@ export function CouplePortal({
       <aside style={isMobile
         ? { width: 256, background: "#fffdfb", borderRight: "1px solid var(--line, #ece7e1)", display: "flex", flexDirection: "column", padding: "20px 14px", position: "fixed", top: 0, left: 0, height: "100vh", overflowY: "auto", zIndex: 60, transform: navOpen ? "translateX(0)" : "translateX(-100%)", transition: "transform 0.2s ease", boxShadow: navOpen ? "4px 0 24px rgba(0,0,0,0.18)" : "none" }
         : { width: 248, flexShrink: 0, background: "#fffdfb", borderRight: "1px solid var(--line, #ece7e1)", display: "flex", flexDirection: "column", padding: "20px 14px", position: "sticky", top: 0, height: "100vh", overflowY: "auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 6px 18px" }}>
-          <LogoMark size={34} />
-          <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: 20, color: "var(--poppy,#FA523C)" }}>Venuely</span>
+        <div style={{ padding: "0 6px 18px" }}>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={venue.name} style={{ maxHeight: 44, maxWidth: 188, objectFit: "contain" }} />
+          ) : (
+            <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: 19, color: primary, lineHeight: 1.15 }}>{venue.name}</div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 7 }}>
+            <LogoMark size={12} />
+            <span style={{ fontSize: 10, letterSpacing: 0.3, color: "#a8a29e" }}>Powered by Venuely</span>
+          </div>
         </div>
         <nav style={{ display: "grid", gap: 2, flex: 1 }}>
           {COUPLE_NAV.map(({ key, label, icon }) => {
