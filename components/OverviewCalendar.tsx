@@ -22,7 +22,21 @@ export type CalBooking = {
   couple_names: string;
   wedding_date: string;            // yyyy-mm-dd (start)
   wedding_end_date?: string | null; // yyyy-mm-dd (inclusive end) — null = single day
+  status?: string | null;
 };
+
+// Solid pill colours per wedding status (white text). A double-booked day overrides
+// to a strong red regardless of status.
+function pillColor(status: string | null | undefined): string {
+  switch ((status ?? "").toLowerCase()) {
+    case "booked": return "var(--poppy)";        // confirmed
+    case "provisional": case "quoted": return "#C99A2E"; // gold — pencilled in
+    case "inquiry": case "new": case "interest": return "#8a9a86"; // sage — lead
+    case "completed": return "#9aa39b";          // muted — done
+    case "cancelled": case "lost": return "#c4bdb4"; // grey — dead
+    default: return "var(--poppy)";
+  }
+}
 
 export type CalRoom = { id: string; name: string; sleeps: number };
 
@@ -227,7 +241,10 @@ export function OverviewCalendar({ bookings, rooms, roomOccupancy, weddingHref =
 
         {/* legend */}
         <div className="flex flex-wrap items-center gap-4 text-xs mb-3" style={{ color: "var(--ink-2)" }}>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: "var(--poppy)" }} /> Wedding</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: "#8a9a86" }} /> Inquiry</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: "#C99A2E" }} /> Provisional</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: "var(--poppy)" }} /> Booked</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: "#9aa39b" }} /> Completed</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: "#b91c1c" }} /> Double-booked</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: "var(--peach)" }} /> Selected</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full" style={{ outline: "2px solid var(--sage)", background: "transparent" }} /> Today</span>
@@ -277,8 +294,8 @@ export function OverviewCalendar({ bookings, rooms, roomOccupancy, weddingHref =
                       href={`/venue/weddings/${w.slug}`}
                       onClick={(e) => e.stopPropagation()}
                       className="block truncate rounded px-1 py-0.5 text-[10px] leading-tight font-medium hover:opacity-90"
-                      style={{ background: clash ? "#b91c1c" : "var(--poppy)", color: "#fff" }}
-                      title={w.couple_names + (w.wedding_end_date ? ` (until ${fmtShort(String(w.wedding_end_date).slice(0, 10))})` : "")}
+                      style={{ background: clash ? "#b91c1c" : pillColor(w.status), color: "#fff" }}
+                      title={`${w.couple_names}${w.status ? ` · ${w.status}` : ""}${w.wedding_end_date ? ` (until ${fmtShort(String(w.wedding_end_date).slice(0, 10))})` : ""}`}
                     >
                       {w.couple_names}
                     </Link>

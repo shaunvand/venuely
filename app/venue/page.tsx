@@ -112,7 +112,7 @@ export default async function VenueOverview() {
   ] = await Promise.all([
     supabase.from("weddings").select("id, slug, couple_names, wedding_date").eq("venue_id", venue.id).gte("wedding_date", todayIso).order("wedding_date").limit(5),
     supabase.from("weddings").select("id, slug, couple_names, wedding_date").eq("venue_id", venue.id).order("created_at", { ascending: false }).limit(5),
-    supabase.from("weddings").select("slug, couple_names, wedding_date, wedding_end_date").eq("venue_id", venue.id),
+    supabase.from("weddings").select("slug, couple_names, wedding_date, wedding_end_date, status").eq("venue_id", venue.id),
     // Couple-edited portal state — the single source of truth. We aggregate these
     // blobs for the engagement counts instead of the dead relational tables.
     supabase.from("weddings").select("wedding_state, wedding_state_updated_at").eq("venue_id", venue.id),
@@ -381,7 +381,7 @@ export default async function VenueOverview() {
       {/* Enlarged calendar across the top — bookings, multi-day spans, and a live
           availability check driven by selecting dates. */}
       <OverviewCalendar
-        bookings={(allWeddings ?? []) as { slug: string; couple_names: string; wedding_date: string; wedding_end_date: string | null }[]}
+        bookings={(allWeddings ?? []) as { slug: string; couple_names: string; wedding_date: string; wedding_end_date: string | null; status: string | null }[]}
         rooms={activeRooms}
         roomOccupancy={roomOccupancy}
       />
