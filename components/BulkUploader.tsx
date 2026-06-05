@@ -92,7 +92,7 @@ const SELECT_FIELD_OPTIONS: Record<string, string[]> = {
 };
 
 const BUBBLE = "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition";
-const BUBBLE_PRIMARY = `${BUBBLE} bg-stone-900 text-white hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed`;
+const BUBBLE_PRIMARY = `${BUBBLE} bg-[var(--poppy)] text-white hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed`;
 const BUBBLE_SECONDARY = `${BUBBLE} bg-white border border-stone-300 text-stone-800 hover:bg-stone-100`;
 const BUBBLE_GHOST = `${BUBBLE} text-stone-700 hover:bg-stone-100`;
 
@@ -405,7 +405,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
             className="hidden" />
         </label>
         <button disabled={!files.length || busy} onClick={parse} className={BUBBLE_PRIMARY}>
-          {busy ? "Reading your files…" : `Read ${files.length || "no"} file${files.length === 1 ? "" : "s"}`}
+          {busy ? "Uploading…" : "Upload files"}
         </button>
         {!files.length && !items.length && (
           <span className="text-xs text-stone-500">Drop in the same docs you send couples — quotes, brochures, stock lists, rooming spreadsheets.</span>
@@ -415,7 +415,19 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
       {files.length > 0 && (
         <div className="text-xs text-stone-600 flex gap-2 flex-wrap">
           {files.map((f, i) => (
-            <span key={i} className="px-2 py-1 rounded-full bg-stone-100 border border-stone-200">{f.name} <span className="text-stone-400">· {(f.size/1024).toFixed(0)}kB</span></span>
+            <span key={i} className="group relative pl-3 pr-7 py-1 rounded-full bg-stone-100 border border-stone-200">
+              {f.name} <span className="text-stone-400">· {(f.size/1024).toFixed(0)}kB</span>
+              <button
+                type="button"
+                onClick={() => { setFiles((prev) => prev.filter((_, idx) => idx !== i)); if (fileRef.current) fileRef.current.value = ""; }}
+                title="Remove this file"
+                aria-label={`Remove ${f.name}`}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[11px] leading-none text-white shadow"
+                style={{ background: "var(--poppy)" }}
+              >
+                ✕
+              </button>
+            </span>
           ))}
         </div>
       )}
