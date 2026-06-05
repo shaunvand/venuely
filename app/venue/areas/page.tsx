@@ -45,12 +45,12 @@ export default async function VenueAreas() {
         </p>
       </header>
 
-      <form action={addArea.bind(null, venue.id)} className="vy-card grid gap-3 md:grid-cols-6">
-        <div className="md:col-span-2 space-y-1">
+      <form action={addArea.bind(null, venue.id)} className="vy-card grid gap-2.5 md:grid-cols-6 items-end" style={{ padding: "1rem 1.25rem" }}>
+        <div className="md:col-span-2 space-y-0.5">
           <label className="vy-label">Area name</label>
           <input name="name" required placeholder="Oak Tree" className="vy-input" />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <label className="vy-label">Kind</label>
           <select name="area_kind" className="vy-select" defaultValue="extra">
             <option value="main">Main (included)</option>
@@ -58,30 +58,31 @@ export default async function VenueAreas() {
             <option value="overflow">Overflow</option>
           </select>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <label className="vy-label">Hire fee (R)</label>
           <input name="price_hire" type="number" step="0.01" min="0" placeholder="0" className="vy-input" />
-          <p className="text-[11px] text-stone-400">Applies to all day types — leave the three below blank.</p>
         </div>
-        <div className="md:col-span-2" />
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <label className="vy-label">Wedding (R)</label>
           <input name="price_wedding" type="number" step="0.01" min="0" placeholder="0" className="vy-input" />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <label className="vy-label">M&G (R)</label>
           <input name="price_mg" type="number" step="0.01" min="0" placeholder="0" className="vy-input" />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <label className="vy-label">Farewell (R)</label>
           <input name="price_farewell" type="number" step="0.01" min="0" placeholder="0" className="vy-input" />
         </div>
-        <div className="md:col-span-3 space-y-1">
+        <div className="md:col-span-3 space-y-0.5">
           <label className="vy-label">Description</label>
           <input name="description" placeholder="Open meadow ceremony spot, mountain backdrop" className="vy-input" />
         </div>
-        <div className="md:col-span-6 flex justify-end">
-          <button className="vy-btn vy-btn-primary">+ Add area</button>
+        <div className="md:col-span-2 flex items-end">
+          <p className="text-[11px] text-stone-400 leading-tight">Hire fee applies to all day types — leave the per-day fields blank to use it.</p>
+        </div>
+        <div className="md:col-span-1 flex justify-end">
+          <button className="vy-btn vy-btn-primary whitespace-nowrap">+ Add area</button>
         </div>
       </form>
 
