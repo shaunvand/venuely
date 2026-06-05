@@ -396,6 +396,14 @@ export function InventoryManager({
                         {String(i.description)}
                       </div>
                     ) : null}
+                    {type === "accommodation" && (i.sleeps || i.room_type || i.tier || i.bridal_suite === true || i.bridal_suite === "true") ? (
+                      <div className="text-[11px] flex items-center gap-1.5 flex-wrap" style={{ color: "var(--ink-2)" }}>
+                        {i.sleeps ? <span>🛏 Sleeps {String(i.sleeps)}{i.max_sleeps && i.max_sleeps !== i.sleeps ? `–${String(i.max_sleeps)}` : ""}</span> : null}
+                        {(i.room_type || i.tier) ? <span>· {String(i.room_type || i.tier)}</span> : null}
+                        {(i.bridal_suite === true || i.bridal_suite === "true") ? <span style={{ color: "var(--poppy-deep)" }}>· Bridal suite</span> : null}
+                        {(i.amenities && Array.isArray(i.amenities) && i.amenities.length) ? <span>· {(i.amenities as string[]).slice(0, 3).join(", ")}</span> : null}
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* Right: editable price / stock / commission + actions */}
