@@ -540,9 +540,10 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                 return (
                   <div
                     key={it._id}
-                    className="relative rounded-xl bg-white overflow-hidden transition"
+                    className="relative rounded-xl bg-white overflow-hidden transition hover:shadow-md"
                     style={{
                       border: "1px solid var(--line)",
+                      boxShadow: "0 2px 8px rgba(28,25,23,0.08)",
                       opacity: it._include ? 1 : 0.55,
                     }}
                   >
