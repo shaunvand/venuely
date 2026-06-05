@@ -10,7 +10,7 @@ export default async function VenueAreas() {
     supabase.from("venue_areas").select("id, name, slug, description, area_kind, active, sort_order").eq("venue_id", venue.id).order("sort_order"),
     supabase.from("area_pricing").select("area_id, day_type, price"),
     supabase.from("media_assets").select("id, url, owner_id, sort_order").eq("venue_id", venue.id).eq("owner_type", "area").order("sort_order"),
-    supabase.from("media_assets").select("url").eq("venue_id", venue.id).eq("owner_type", "venue").eq("kind", "photo").order("sort_order"),
+    supabase.from("media_assets").select("url, label, category").eq("venue_id", venue.id).eq("owner_type", "venue").eq("kind", "photo").order("sort_order"),
   ]);
 
   const priceMap: Record<string, Record<string, number>> = {};
@@ -33,7 +33,7 @@ export default async function VenueAreas() {
     prices: priceMap[a.id] ?? {},
     images: imageMap[a.id] ?? [],
   }));
-  const galleryImgs = (gallery ?? []).map((g) => ({ url: g.url as string }));
+  const galleryImgs = (gallery ?? []).map((g) => ({ url: g.url as string, label: (g as { label?: string | null }).label ?? null, category: (g as { category?: string | null }).category ?? null }));
 
   return (
     <div className="space-y-8">

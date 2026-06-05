@@ -9,7 +9,7 @@ type Item = Record<string, unknown> & { id: string; active?: boolean };
 type ImportPreviewRow = Record<string, unknown> & { _include?: boolean };
 
 const BUBBLE = "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition";
-const BUBBLE_PRIMARY = `${BUBBLE} bg-stone-900 text-white hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed`;
+const BUBBLE_PRIMARY = `${BUBBLE} bg-[var(--poppy)] text-white hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed`;
 const BUBBLE_SECONDARY = `${BUBBLE} bg-white border border-stone-300 text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:cursor-not-allowed`;
 const BUBBLE_DANGER = `${BUBBLE} bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed`;
 const BUBBLE_GHOST = `${BUBBLE} text-stone-700 hover:bg-stone-100 disabled:opacity-50 disabled:cursor-not-allowed`;
@@ -603,9 +603,10 @@ export function InventoryManager({
           <div className="space-y-3">
             <p className="text-xs text-stone-600">
               Upload any Excel/CSV file. Our AI maps your columns to the right fields. Review and edit below, then confirm.
+              {" "}Got a <strong>PDF</strong> price list? Use <a href="/venue/uploads" className="underline" style={{ color: "var(--poppy)" }}>Smart Import</a> in the sidebar — it reads PDFs too.
             </p>
             <div className="flex gap-2 items-center flex-wrap">
-              <label className={BUBBLE_SECONDARY + " cursor-pointer"}>
+              <label className={BUBBLE_PRIMARY + " cursor-pointer"}>
                 Choose file
                 <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) onImportFile(f); }}

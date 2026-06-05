@@ -8,6 +8,7 @@ import {
 } from "@/app/venue/areas/actions";
 
 export type AreaImage = { id: string; url: string };
+export type GalleryPhoto = { url: string; label?: string | null; category?: string | null };
 export type AreaRow = {
   id: string;
   name: string;
@@ -26,7 +27,7 @@ const DAY_TYPES = [
 
 const KIND_LABEL: Record<string, string> = { main: "Main (included)", extra: "Extra (paid)", overflow: "Overflow" };
 
-export function AreaManager({ venueId, areas, gallery }: { venueId: string; areas: AreaRow[]; gallery: { url: string }[] }) {
+export function AreaManager({ venueId, areas, gallery }: { venueId: string; areas: AreaRow[]; gallery: GalleryPhoto[] }) {
   if (areas.length === 0) {
     return <div className="vy-empty">No areas yet. Add Oak Tree, Hall/Lapa, Pool, etc. above.</div>;
   }
@@ -39,10 +40,11 @@ export function AreaManager({ venueId, areas, gallery }: { venueId: string; area
   );
 }
 
-function AreaCard({ venueId, area, gallery }: { venueId: string; area: AreaRow; gallery: { url: string }[] }) {
+function AreaCard({ venueId, area, gallery }: { venueId: string; area: AreaRow; gallery: GalleryPhoto[] }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
@@ -55,21 +57,28 @@ function AreaCard({ venueId, area, gallery }: { venueId: string; area: AreaRow; 
 
   async function uploadFiles(files: FileList | null) {
     if (!files || !files.length) return;
+    setErr(null);
     setBusy(`Uploading ${files.length} image${files.length === 1 ? "" : "s"}…`);
     try {
       const urls: string[] = [];
+      const failed: string[] = [];
       for (const f of Array.from(files)) {
-        if (!f.type.startsWith("image/")) continue;
+        if (!f.type.startsWith("image/")) { failed.push(`${f.name}: not an image`); continue; }
+        if (f.size > 20 * 1024 * 1024) { failed.push(`${f.name}: over 20MB`); continue; }
         const fd = new FormData();
         fd.append("file", f);
         fd.append("venue_id", venueId);
         const res = await fetch("/api/venue/inventory/image", { method: "POST", body: fd });
-        const j = await res.json();
-        if (res.ok && j.ok) urls.push(j.url);
+        const j = await res.json().catch(() => ({}));
+        if (res.ok && j.ok && j.url) urls.push(j.url);
+        else failed.push(`${f.name}: ${j.error || `upload failed (${res.status})`}`);
       }
       if (urls.length) await addAreaImages(area.id, urls);
       if (fileRef.current) fileRef.current.value = "";
+      if (failed.length) setErr(failed.join(" · "));
       router.refresh();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Upload failed");
     } finally {
       setBusy(null);
     }
@@ -92,9 +101,20 @@ function AreaCard({ venueId, area, gallery }: { venueId: string; area: AreaRow; 
     startTransition(async () => { await deleteAreaImage(id); router.refresh(); });
   }
 
-  // Gallery photos not already attached to this area (for the smart-import picker).
+  // Gallery photos not already attached, ranked by how well their label/category/
+  // filename matches this area's name + description (so e.g. "Dam" photos surface
+  // first). Matches are flagged "Suggested".
   const attached = new Set(area.images.map((i) => i.url));
-  const pickable = gallery.filter((g) => !attached.has(g.url));
+  const tokens = `${area.name} ${area.description ?? ""}`.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2);
+  const pickable = gallery
+    .filter((g) => !attached.has(g.url))
+    .map((g) => {
+      const hay = `${g.label ?? ""} ${g.category ?? ""} ${g.url}`.toLowerCase();
+      const score = tokens.reduce((n, t) => n + (hay.includes(t) ? 1 : 0), 0);
+      return { ...g, score };
+    })
+    .sort((a, b) => b.score - a.score);
+  const suggestedCount = pickable.filter((p) => p.score > 0).length;
 
   return (
     <div className="vy-card space-y-4">
@@ -150,15 +170,14 @@ function AreaCard({ venueId, area, gallery }: { venueId: string; area: AreaRow; 
 
         {/* Image actions */}
         <div className="flex items-center gap-2 mt-2 flex-wrap">
-          <label className="vy-btn vy-btn-secondary text-xs cursor-pointer">
-            ⬆ Upload images
-            <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => uploadFiles(e.target.files)} />
-          </label>
+          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => uploadFiles(e.target.files)} />
+          <button type="button" onClick={() => fileRef.current?.click()} className="vy-btn vy-btn-secondary text-xs">⬆ Upload images</button>
           <button type="button" onClick={() => setPickerOpen(true)} disabled={!pickable.length} className="vy-btn vy-btn-ghost text-xs disabled:opacity-40" title={pickable.length ? "Pick from your venue gallery" : "No gallery photos to import"}>
-            ✨ Smart Import
+            ✨ Smart Import{suggestedCount > 0 ? ` (${suggestedCount} match)` : ""}
           </button>
           {busy && <span className="text-xs" style={{ color: "var(--ink-2)" }}>{busy}</span>}
         </div>
+        {err && <p className="text-xs mt-1" style={{ color: "#b42318" }}>{err}</p>}
       </div>
 
       {/* Edit details (toggle) */}
@@ -223,7 +242,7 @@ function AreaCard({ venueId, area, gallery }: { venueId: string; area: AreaRow; 
               <button onClick={() => setPickerOpen(false)} className="text-stone-500 hover:text-stone-900 rounded-full h-8 w-8 flex items-center justify-center hover:bg-stone-100">✕</button>
             </div>
             <div className="p-5">
-              <p className="text-xs mb-3" style={{ color: "var(--ink-2)" }}>Pick venue gallery photos to attach to this area.</p>
+              <p className="text-xs mb-3" style={{ color: "var(--ink-2)" }}>{suggestedCount > 0 ? `${suggestedCount} photo${suggestedCount === 1 ? "" : "s"} match "${area.name}" — shown first.` : `Pick venue gallery photos to attach to ${area.name}.`}</p>
               {pickable.length === 0 ? (
                 <div className="vy-empty text-sm">No gallery photos available.</div>
               ) : (
@@ -240,6 +259,7 @@ function AreaCard({ venueId, area, gallery }: { venueId: string; area: AreaRow; 
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={g.url} alt="" className="h-24 w-full object-cover" />
+                        {g.score > 0 && !sel && <span className="absolute bottom-1 left-1 text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: "var(--poppy)", color: "#fff" }}>Suggested</span>}
                         {sel && <span className="absolute top-1 right-1 w-5 h-5 rounded-full text-[11px] flex items-center justify-center" style={{ background: "var(--poppy)", color: "#fff" }}>✓</span>}
                       </button>
                     );
