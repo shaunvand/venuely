@@ -33,7 +33,7 @@ export default function SignupPage() {
       setMsg(error.message);
       setLoading(false);
     } else if (data.user) {
-      router.push(`/signup/check-email?email=${encodeURIComponent(email)}`);
+      router.push(`/signup/check-email?email=${encodeURIComponent(email)}&name=${encodeURIComponent(fullName)}`);
     }
   }
 

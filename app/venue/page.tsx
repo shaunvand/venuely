@@ -90,6 +90,8 @@ function parseEngagement(blob: unknown): CoupleEngagement {
 export default async function VenueOverview() {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const firstName = String((user?.user_metadata as { full_name?: string } | undefined)?.full_name ?? "").trim().split(" ")[0];
   const { doneCount, totalCount, pct, counts, hasImported } = await computeSetupSteps(supabase, venue);
   const todayIso = new Date().toISOString().slice(0, 10);
   const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
@@ -322,7 +324,7 @@ export default async function VenueOverview() {
 
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="vy-eyebrow">Welcome to Venuely</div>
+          <div className="vy-eyebrow">{firstName ? `Welcome to Venuely, ${firstName}` : "Welcome to Venuely"}</div>
           <h1 className="vy-h1 mt-1">{venue.name}</h1>
           {(venue.address || venue.region) && (
             <p className="text-stone-600 text-sm mt-1">

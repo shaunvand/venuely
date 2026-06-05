@@ -9,14 +9,18 @@ import { createClient } from "@/lib/supabase/client";
 export default function CheckEmailPage() {
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState<string>("");
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [resendMsg, setResendMsg] = useState<string | null>(null);
 
   // searchParams isn't available as a prop in a client page — read it from the URL.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const e = new URLSearchParams(window.location.search).get("email");
+    const params = new URLSearchParams(window.location.search);
+    const e = params.get("email");
     if (e) setEmail(e);
+    const n = params.get("name");
+    if (n) setFirstName(n.trim().split(" ")[0]);
   }, []);
 
   // Auto-advance to the dashboard the moment the email gets confirmed.
@@ -120,9 +124,9 @@ export default function CheckEmailPage() {
           >
             ✉
           </div>
-          <h1 className="font-serif text-3xl sm:text-4xl leading-tight">Check your inbox</h1>
+          <h1 className="font-serif text-3xl sm:text-4xl leading-tight">{firstName ? `Welcome to Venuely, ${firstName}` : "Check your inbox"}</h1>
           <p className="mt-4 text-sm leading-relaxed" style={{ color: "var(--ink-2)" }}>
-            We&apos;ve sent a confirmation link
+            {firstName ? "Just one more step — we've sent a confirmation link" : "We've sent a confirmation link"}
             {email ? (
               <>
                 {" "}to <span style={{ color: "var(--poppy)", fontWeight: 600 }}>{email}</span>
