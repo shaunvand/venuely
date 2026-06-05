@@ -26,8 +26,8 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
   const wId = access.wedding.id;
   const vId = access.wedding.venue_id;
 
-  const [wedRes, venRes, catRes, rentRes, roomRes, vendRes, galRes, tableRes] = await Promise.all([
-    db.from("weddings").select("id, slug, couple_names, wedding_date, wedding_end_date, wedding_state").eq("id", wId).single(),
+  const [wedRes, venRes, catRes, rentRes, roomRes, vendRes, galRes, tableRes, areaRes, areaPriceRes, areaImgRes] = await Promise.all([
+    db.from("weddings").select("id, slug, couple_names, wedding_date, wedding_end_date, wedding_state, area_selections").eq("id", wId).single(),
     db.from("venues").select("name, region, address, portal_template, portal_theme, branding_logo_url, contact_email, contact_phone, google_maps_url, description").eq("id", vId).single(),
     db.from("catalogue_items").select("id, category, name, description, image_url, cost_treatment, event_part, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
     db.from("rental_items").select("id, category, name, description, price, image_url, cost_treatment, commission_value, commission_type, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
@@ -35,6 +35,9 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
     db.from("vendor_partners").select("id, vendor_type, name, description, price_from, image_url, contact_email, contact_phone, website_url, commission_value, commission_type, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
     db.from("media_assets").select("url, category, kind, label, sort_order").eq("venue_id", vId).eq("owner_type", "venue").in("kind", ["photo", "video", "hero"]).order("sort_order"),
     db.from("venue_tables").select("id, label, shape, seats, quantity").eq("venue_id", vId).eq("active", true).order("sort_order"),
+    db.from("venue_areas").select("id, name, description, area_kind, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
+    db.from("area_pricing").select("area_id, day_type, price"),
+    db.from("media_assets").select("owner_id, url, sort_order").eq("venue_id", vId).eq("owner_type", "area").order("sort_order"),
   ]);
 
   const wedding = wedRes.data;
@@ -46,6 +49,14 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
   const isImg = (u: unknown) => /\.(jpe?g|png|webp|gif|avif|heic)(\?|$)/i.test(String(u));
   const gallery = (galRes.data ?? []).filter((g) => isImg(g.url)).map((g) => ({ url: String(g.url), category: (g.category as string) ?? "Other", label: (g.label as string) ?? "" }));
   const cover = theme.coverUrl || gallery[0]?.url || null;
+
+  // Venue spaces (areas) → couple portal "Our Venue" tab.
+  const areaPriceMap: Record<string, Record<string, number>> = {};
+  (areaPriceRes.data ?? []).forEach((p) => { (areaPriceMap[p.area_id as string] ??= {})[p.day_type as string] = Number(p.price) || 0; });
+  const areaImgMap: Record<string, string> = {};
+  (areaImgRes.data ?? []).forEach((m) => { const k = String(m.owner_id); if (!areaImgMap[k] && isImg(m.url)) areaImgMap[k] = String(m.url); });
+  const areas = (areaRes.data ?? []).map((a) => ({ id: a.id as string, name: a.name as string, description: (a.description as string) ?? null, kind: (a.area_kind as string) ?? "extra", img: areaImgMap[a.id as string] ?? null, prices: areaPriceMap[a.id as string] ?? {} }));
+  const initialAreaSelections = (wedding.area_selections ?? []) as Array<{ area_id: string; day_type: string }>;
 
   const num = (n: unknown) => Number(n ?? 0);
   const catalogue = (catRes.data ?? []).map((c) => ({ id: c.id, category: c.category, name: c.name, description: c.description ?? "", img: (c.image_url as string) ?? null, included: (c.cost_treatment as string) === "included", eventPart: (c.event_part as string) ?? null }));
@@ -89,6 +100,8 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
       vendors={vendors}
       gallery={gallery}
       tables={(tableRes.data ?? []).map((t) => ({ id: t.id as string, label: t.label as string, shape: t.shape as string, seats: Number(t.seats), quantity: Number(t.quantity) }))}
+      areas={areas}
+      initialAreaSelections={initialAreaSelections}
     />
   );
 }

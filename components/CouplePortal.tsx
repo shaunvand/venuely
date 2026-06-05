@@ -20,6 +20,7 @@ import { ChecklistBoard } from "@/components/ChecklistBoard";
 import { TimelineBoard } from "@/components/TimelineBoard";
 import { SeatingPlan } from "@/components/SeatingPlan";
 import { BudgetBoard } from "@/components/BudgetBoard";
+import { SpacesSection, type AreaItem } from "@/components/SpacesSection";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -146,7 +147,7 @@ function groupBy<T>(items: T[], key: (t: T) => string): [string, T[]][] {
 }
 
 export function CouplePortal({
-  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, weddingDate, weddingEndDate, totalDue, initialState, catalogue, rentals, rooms, vendors, gallery, tables,
+  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, weddingDate, weddingEndDate, totalDue, initialState, catalogue, rentals, rooms, vendors, gallery, tables, areas = [], initialAreaSelections = [],
 }: {
   slug: string;
   tokens: TemplateTokens;
@@ -167,6 +168,8 @@ export function CouplePortal({
   vendors: VendorItem[];
   gallery: GalleryItem[];
   tables: TableItem[];
+  areas?: AreaItem[];
+  initialAreaSelections?: Array<{ area_id: string; day_type: string }>;
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
   const activeSection = SECTIONS.find((s) => s.tabs.includes(tab))?.name ?? "Plan";
@@ -412,6 +415,7 @@ export function CouplePortal({
                 </div>
               </div>
             ))}
+            <SpacesSection slug={slug} areas={areas} initialSelections={initialAreaSelections} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
           </Section>
         )}
 
