@@ -78,12 +78,10 @@ export default async function VenueAreas() {
           <label className="vy-label">Description</label>
           <input name="description" placeholder="Open meadow ceremony spot, mountain backdrop" className="vy-input" />
         </div>
-        <div className="md:col-span-2 flex items-end">
-          <p className="text-[11px] text-stone-400 leading-tight">Hire fee applies to all day types — leave the per-day fields blank to use it.</p>
-        </div>
-        <div className="md:col-span-1 flex justify-end">
+        <div className="md:col-span-2 flex justify-end items-end">
           <button className="vy-btn vy-btn-primary whitespace-nowrap">+ Add area</button>
         </div>
+        <p className="md:col-span-6 text-[11px] text-stone-400 leading-tight">Hire fee applies to all day types — leave the per-day fields blank to use it.</p>
       </form>
 
       <AreaManager venueId={venue.id} areas={areaRows} gallery={galleryImgs} />
