@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 type Guest = { id: string; full_name: string; room_id: string | null; is_child?: boolean | null };
-type Room = { id: string; name: string; sleeps: number; price?: number | null; description?: string | null };
+type Room = { id: string; name: string; sleeps: number; price?: number | null; description?: string | null; img?: string | null; type?: string | null };
 const rZA = (n: number | null | undefined) => (n ? `R${Math.round(n).toLocaleString("en-ZA")}/night` : "");
 
 // Allocate guests to accommodation rooms by drag-and-drop (or a "put in…" select on
@@ -59,19 +59,28 @@ export function RoomAllocator({ slug, rooms, onAllocated, primary, accent, headi
               onDragOver={(e) => { if (drag) { e.preventDefault(); setOver(room.id); } }}
               onDragLeave={() => setOver((o) => (o === room.id ? null : o))}
               onDrop={(e) => { e.preventDefault(); setOver(null); if (drag && !full) assign(drag, room.id); setDrag(null); }}
-              style={card({ padding: 12, borderColor: isOver ? accent : full ? primary : "rgba(0,0,0,0.08)" })}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ ...heading, fontWeight: 700 }}>🛏 {room.name}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: full ? primary : "#57534e" }}>{inRoom.length}/{room.sleeps}</span>
-              </div>
-              {(room.price || room.description) && <div style={{ fontSize: 11, color: "#8a8a8a", marginTop: 2 }}>Sleeps {room.sleeps}{room.price ? ` · ${rZA(room.price)}` : ""}</div>}
-              <div style={{ marginTop: 8, display: "grid", gap: 4, minHeight: 28 }}>
-                {inRoom.length === 0 ? <span style={{ fontSize: 11.5, color: "#b0b0b0" }}>Drop guests here</span> : inRoom.map((g) => (
-                  <span key={g.id} draggable onDragStart={() => setDrag(g.id)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, background: `${accent}22`, borderRadius: 8, padding: "3px 8px", cursor: "grab" }}>
-                    {g.full_name}{g.is_child ? " 🧒" : ""}
-                    <button onClick={() => assign(g.id, null)} title="Remove" style={{ border: "none", background: "transparent", color: "#b42318", cursor: "pointer" }}>✕</button>
-                  </span>
-                ))}
+              style={{ background: "#fff", border: `1px solid ${isOver ? accent : full ? primary : "rgba(0,0,0,0.08)"}`, borderLeft: `3px solid ${primary}`, borderRadius: cardRadius, overflow: "hidden", boxShadow: "0 2px 8px rgba(28,25,23,0.08)" }}>
+              {room.img && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={room.img} alt="" style={{ width: "100%", height: 120, objectFit: "cover" }} />
+              )}
+              <div style={{ padding: 14 }}>
+                {room.type && <span style={{ display: "inline-block", fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#57534e", background: `${accent}33`, borderRadius: 999, padding: "3px 9px" }}>{room.type}</span>}
+                <div style={{ ...heading, fontSize: 16, fontWeight: 700, marginTop: 6 }}>{room.name}</div>
+                <div style={{ fontSize: 12.5, color: "#57534e", marginTop: 3 }}>🛏 Sleeps {room.sleeps}{room.price ? <> · <span style={{ color: primary, fontWeight: 700 }}>{rZA(room.price)}</span></> : null}</div>
+                {room.description && <div style={{ fontSize: 12.5, color: "#57534e", fontStyle: "italic", margin: "8px 0" }}>{room.description}</div>}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 8 }}>
+                  <span style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: 1, color: "#a8a29e", fontWeight: 700 }}>Who&apos;s staying</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: full ? primary : "#57534e" }}>{inRoom.length}/{room.sleeps}</span>
+                </div>
+                <div style={{ marginTop: 8, display: "grid", gap: 4, minHeight: 24 }}>
+                  {inRoom.length === 0 ? <span style={{ fontSize: 11.5, color: "#b0b0b0" }}>Drag guests here</span> : inRoom.map((g) => (
+                    <span key={g.id} draggable onDragStart={() => setDrag(g.id)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, background: `${accent}22`, borderRadius: 8, padding: "3px 8px", cursor: "grab" }}>
+                      {g.full_name}{g.is_child ? " 🧒" : ""}
+                      <button onClick={() => assign(g.id, null)} title="Remove" style={{ border: "none", background: "transparent", color: "#b42318", cursor: "pointer" }}>✕</button>
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
           );

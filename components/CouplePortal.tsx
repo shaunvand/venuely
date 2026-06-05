@@ -468,7 +468,7 @@ export function CouplePortal({
             {rooms.length === 0 ? <Section heading={heading} title="Accommodation" sub="On-site stays for you and your guests"><Empty>No accommodation listed by your venue yet.</Empty></Section> : (
               <RoomAllocator
                 slug={slug}
-                rooms={rooms.map((r) => ({ id: r.id, name: r.name, sleeps: r.sleeps, price: r.price, description: r.description }))}
+                rooms={rooms.map((r) => ({ id: r.id, name: r.name, sleeps: r.sleeps, price: r.price, description: r.description, img: r.img, type: r.type }))}
                 onAllocated={(ids) => persist({ ...stateRef.current, roomAssignments: Object.fromEntries(ids.map((id) => [id, ["Allocated"]])) })}
                 primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius}
               />
