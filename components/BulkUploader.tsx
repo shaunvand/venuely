@@ -161,7 +161,14 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
       const res = await fetch("/api/venue/uploads/parse", { method: "POST", body: fd });
       const j = await res.json();
       if (!res.ok || !j.ok) { setStatus({ tone: "error", text: `Reading failed: ${j.error ?? "unknown error"}` }); return; }
-      setItems(j.items as Item[]);
+      // Option A: when the file gave us embedded photos, default each item to YOUR
+      // photo (by order) instead of an online stock image — correctable per item.
+      const imgs = (j.images ?? []) as Array<{ url: string }>;
+      const parsed = j.items as Item[];
+      const withFileImages = imgs.length
+        ? parsed.map((it, idx) => idx < imgs.length ? { ...it, data: { ...it.data, image_url: imgs[idx].url }, image_source: "embedded" as const } : it)
+        : parsed;
+      setItems(withFileImages);
       setFileReports(j.files ?? []);
       setExtractedImages(j.images ?? []);
       const counts = Object.entries(j.counts as Record<string, number>).map(([k, v]) => `${v} ${CATEGORY_LABELS[k] ?? k}`).join(", ");
@@ -590,7 +597,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                         <div className="flex items-center justify-center gap-2 w-full">
                           <select
                             value=""
-                            onChange={(e) => { if (e.target.value) updateField(it._id, "image_url", e.target.value); }}
+                            onChange={(e) => { if (e.target.value) updateItem(it._id, { data: { ...it.data, image_url: e.target.value }, image_source: "embedded" }); }}
                             className="border rounded-full px-3 py-1 text-[11px] bg-white"
                             style={{ borderColor: "var(--line)" }}
                           >
