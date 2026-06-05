@@ -202,6 +202,22 @@ export default async function VenueOverview() {
   const overdue = payments.filter((p) => p.status !== "paid" && p.due_date && p.due_date < todayIso);
   const overdueTotal = overdue.reduce((s, p) => s + Number(p.amount || 0), 0);
 
+  // "Next up" — a single, prioritised feed of what the venue needs to action:
+  // couple submissions to review, overdue + soon-due payments, then imminent
+  // weddings. Consolidates the old standalone "Action needed" card.
+  const in14 = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+  const dueSoon = payments.filter((p) => p.status !== "paid" && p.due_date && p.due_date >= todayIso && p.due_date <= in14);
+  const within14 = (upcoming ?? []).filter((w) => w.wedding_date && w.wedding_date <= in14);
+  type NextItem = { id: string; name: string; detail: string; action: string; href: string; primary?: boolean };
+  const nextUp: NextItem[] = [];
+  pendingSubs.forEach((s) => {
+    const total = Number((s.totals as { grandTotal?: number } | null)?.grandTotal ?? 0);
+    nextUp.push({ id: `sub-${s.id}`, name: s.wedding?.couple_names ?? "Wedding", detail: `Submitted their selections${total > 0 ? ` · ${fmtRand(total)}` : ""}`, action: "Review & invoice", href: `/venue/weddings/${s.wedding?.slug ?? ""}`, primary: true });
+  });
+  overdue.forEach((p) => nextUp.push({ id: `od-${p.wedding?.slug}-${p.due_date}`, name: p.wedding?.couple_names ?? "Wedding", detail: `Payment overdue · was due ${p.due_date}`, action: `${fmtRand(Number(p.amount))} due`, href: p.wedding ? `/venue/weddings/${p.wedding.slug}` : "/venue/payments" }));
+  dueSoon.forEach((p) => nextUp.push({ id: `ds-${p.wedding?.slug}-${p.due_date}`, name: p.wedding?.couple_names ?? "Wedding", detail: `Payment due ${p.due_date}`, action: `${fmtRand(Number(p.amount))} due`, href: p.wedding ? `/venue/weddings/${p.wedding.slug}` : "/venue/payments" }));
+  within14.forEach((w) => { const days = Math.max(0, Math.round((new Date(w.wedding_date).getTime() - Date.now()) / 86400000)); nextUp.push({ id: `wd-${w.slug}`, name: w.couple_names, detail: days <= 0 ? "Wedding is today 🎉" : `Wedding in ${days} day${days === 1 ? "" : "s"}`, action: "Open", href: `/venue/weddings/${w.slug}` }); });
+
   // Commission potential — what the venue earns at full utilisation across all active items.
   const commissionRentals = (rentalRows ?? []).filter((r) => r.active !== false).reduce((s, r) => s + commissionOf(r as Priced) * Number((r as { stock_total?: number }).stock_total ?? 1), 0);
   const commissionRooms = (roomRows ?? []).filter((r) => r.active !== false).reduce((s, r) => s + commissionOf(r as Priced), 0);
@@ -252,24 +268,10 @@ export default async function VenueOverview() {
   // Notifications.
   const within30 = (upcoming ?? []).filter((w) => w.wedding_date && w.wedding_date <= in30);
   const lowStockRentals = (rentalRows ?? []).filter((r) => Number((r as { stock_total?: number }).stock_total ?? 0) > 0 && Number((r as { stock_total?: number }).stock_total ?? 0) <= 2 && r.active !== false);
+  // Overdue payments + imminent weddings now live in the "Next up" feed; Notifications
+  // keeps the broader setup / commission / stock alerts so the two don't duplicate.
   const notifications: { tone: "warn" | "info" | "success"; icon: string; msg: React.ReactNode; href?: string }[] = [];
-  overdue.slice(0, 5).forEach((p) => {
-    notifications.push({
-      tone: "warn",
-      icon: "⚠",
-      msg: <>Overdue: {fmtRand(Number(p.amount))} from <strong>{p.wedding?.couple_names ?? "wedding"}</strong> · due {p.due_date}</>,
-      href: p.wedding ? `/venue/weddings/${p.wedding.slug}` : "/venue/payments",
-    });
-  });
-  within30.slice(0, 3).forEach((w) => {
-    const days = Math.max(0, Math.round((new Date(w.wedding_date).getTime() - now.getTime()) / 86400000));
-    notifications.push({
-      tone: "info",
-      icon: "📅",
-      msg: <><strong>{w.couple_names}</strong> wedding in {days} day{days === 1 ? "" : "s"}</>,
-      href: `/venue/weddings/${w.slug}`,
-    });
-  });
+  void within30;
   if (pct < 100) {
     notifications.push({
       tone: "info",
@@ -347,29 +349,29 @@ export default async function VenueOverview() {
         </Link>
       </header>
 
-      {/* Couple submissions awaiting review — the couple → venue feedback loop */}
-      {pendingSubs.length > 0 && (
+      {/* Next up — one prioritised feed of what needs action (reviews, payments,
+          imminent weddings). Consolidates submissions, overdue & due-soon payments. */}
+      {nextUp.length > 0 && (
         <section className="vy-card" style={{ border: "2px solid var(--peach)" }}>
           <div className="flex items-center gap-2">
-            <span className="vy-eyebrow">Action needed</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--peach)", color: "var(--poppy-deep)" }}>{pendingSubs.length} to review</span>
+            <span className="vy-eyebrow">Next up</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--peach)", color: "var(--poppy-deep)" }}>{nextUp.length} to action</span>
           </div>
-          <h2 className="vy-h2 mt-1 mb-3">Couples submitted their selections</h2>
+          <h2 className="vy-h2 mt-1 mb-3">What needs your attention</h2>
           <div className="space-y-2">
-            {pendingSubs.map((s) => {
-              const total = Number((s.totals as { grandTotal?: number } | null)?.grandTotal ?? 0);
-              return (
-                <Link key={s.id} href={`/venue/weddings/${s.wedding?.slug ?? ""}`} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 hover:bg-[color:var(--cream)] transition-colors" style={{ border: "1px solid var(--line)" }}>
-                  <div>
-                    <div className="font-medium text-sm">{s.wedding?.couple_names ?? "Wedding"}</div>
-                    <div className="text-xs" style={{ color: "var(--ink-2)" }}>
-                      {s.kind} selection · {new Date(s.created_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}{total > 0 ? ` · R${Math.round(total).toLocaleString("en-ZA")}` : ""}
-                    </div>
-                  </div>
-                  <span className="vy-btn vy-btn-primary text-xs flex-shrink-0">Review &amp; invoice →</span>
-                </Link>
-              );
-            })}
+            {nextUp.slice(0, 8).map((it) => (
+              <Link key={it.id} href={it.href} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 hover:bg-[color:var(--cream)] transition-colors" style={{ border: "1px solid var(--line)" }}>
+                <div>
+                  <div className="font-medium text-sm">{it.name}</div>
+                  <div className="text-xs" style={{ color: "var(--ink-2)" }}>{it.detail}</div>
+                </div>
+                {it.primary ? (
+                  <span className="vy-btn vy-btn-primary text-xs flex-shrink-0">{it.action} →</span>
+                ) : (
+                  <span className="text-xs flex-shrink-0 px-2.5 py-1 rounded-full" style={{ background: "var(--cream)", color: "var(--ink-2)", border: "1px solid var(--line)" }}>{it.action}</span>
+                )}
+              </Link>
+            ))}
           </div>
         </section>
       )}
