@@ -30,7 +30,7 @@ function Wordmark() {
 const TRUST = [
   { title: "Secure & reliable", body: "Your data is safe with enterprise-grade security.", icon: <><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" {...ICON} /><path d="M9 12l2 2 4-4" {...ICON} /></> },
   { title: "Built for venues", body: "Manage bookings, events, and enquiries all in one beautiful place.", icon: <><rect x="3" y="4" width="18" height="17" rx="2" {...ICON} /><path d="M3 9h18M8 2v4M16 2v4" {...ICON} /></> },
-  { title: "Loved by venues", body: "Join hundreds of venues delivering unforgettable weddings.", icon: <path d="M12 21s-7-4.5-9.5-9A5 5 0 0112 5a5 5 0 019.5 7C19 16.5 12 21 12 21z" {...ICON} /> },
+  { title: "Loved by venues", body: "Join hundreds of venues delivering unforgettable weddings.", icon: <path d="M12 3l2.6 5.6 6 .8-4.4 4.1 1.1 6L12 16.8 6.7 19.6l1.1-6L3.4 9.4l6-.8z" {...ICON} /> },
 ];
 
 function TrustBar() {
