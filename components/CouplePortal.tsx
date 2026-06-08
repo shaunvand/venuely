@@ -622,7 +622,7 @@ function PortalItemCard({ name, description, img, price, badge, selected, onTogg
   primary: string; accent: string; heading: React.CSSProperties; cardRadius: string;
 }) {
   return (
-    <div style={{ background: "#fff", border: selected ? `2px solid ${primary}` : "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+    <div className="hover-lift" style={{ background: "#fff", border: selected ? `2px solid ${primary}` : "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius, overflow: "hidden", display: "flex", flexDirection: "column" }}>
       {img ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={img} alt="" style={{ width: "100%", height: 120, objectFit: "cover" }} />

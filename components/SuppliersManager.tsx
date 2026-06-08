@@ -71,7 +71,7 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
           {shown.map((s) => {
             const st = STATUS[s.status || "pending"] || STATUS.pending;
             return (
-              <div key={s.id} style={cardChrome}>
+              <div key={s.id} className="hover-lift" style={cardChrome}>
                 {s.img && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={s.img} alt="" style={{ width: "100%", height: 120, objectFit: "cover" }} />
@@ -103,7 +103,7 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
             {vendors.map((v) => {
               const added = list.some((x) => x.fromVendorId === v.id);
               return (
-                <div key={v.id} style={cardChrome}>
+                <div key={v.id} className="hover-lift" style={cardChrome}>
                   {v.img && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={v.img} alt="" style={{ width: "100%", height: 120, objectFit: "cover" }} />

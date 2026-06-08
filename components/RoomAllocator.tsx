@@ -79,7 +79,7 @@ export function RoomAllocator({ slug, rooms, onAllocated, primary, accent, headi
           const full = inRoom.length >= room.sleeps;
           const isOver = over === room.id;
           return (
-            <div key={room.id}
+            <div key={room.id} className="hover-lift"
               onClick={() => { if (selected && !full) { assign(selected, room.id); setSelected(null); } }}
               onDragOver={(e) => { if (drag) { e.preventDefault(); setOver(room.id); } }}
               onDragLeave={() => setOver((o) => (o === room.id ? null : o))}
