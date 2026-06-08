@@ -36,6 +36,100 @@ const STEPS = [
   { n: 4, label: "Review & go live", blurb: "Final check" },
 ] as const;
 
+/* ── Smart Import explainer ──────────────────────────────────────────────
+   A simple "your files → Smart Import → sorted into your dashboard" diagram
+   so owners understand what to upload and where it lands before they drop
+   anything in. Module-scope helpers (not nested components). */
+const ICON = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+
+function FileGlyph({ kind }: { kind: "pdf" | "sheet" | "doc" }) {
+  return (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden>
+      <path d="M6 2h8l4 4v16H6z" {...ICON} />
+      <path d="M14 2v4h4" {...ICON} />
+      {kind === "sheet" && <path d="M8 13h8M8 17h8M12 11v8" {...ICON} />}
+      {kind === "pdf" && <path d="M8 14h8M8 18h5" {...ICON} />}
+      {kind === "doc" && <path d="M8 12h8M8 15h8M8 18h5" {...ICON} />}
+    </svg>
+  );
+}
+
+function DestGlyph({ name }: { name: "menu" | "box" | "bed" | "people" }) {
+  return (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden>
+      {name === "menu" && <><path d="M5 3v7a2 2 0 002 2v9M5 3v4M9 3v4M7 3v4M16 3c-1.5 0-2 2-2 5s.5 4 2 4v9" {...ICON} /></>}
+      {name === "box" && <><rect x="3" y="4" width="18" height="4" rx="1" {...ICON} /><path d="M5 8v11a1 1 0 001 1h12a1 1 0 001-1V8M10 12h4" {...ICON} /></>}
+      {name === "bed" && <path d="M3 18v-7a2 2 0 012-2h9a4 4 0 014 4v5M3 14h18M3 18v2M21 13v7" {...ICON} />}
+      {name === "people" && <><circle cx="9" cy="8" r="3" {...ICON} /><path d="M3.5 20c0-3 2.5-5.5 5.5-5.5S14.5 17 14.5 20" {...ICON} /><path d="M16 5.5a3 3 0 010 5.8M20.5 20c0-2.4-1.4-4.5-3.5-5.3" {...ICON} /></>}
+    </svg>
+  );
+}
+
+const IMPORT_DOCS = [
+  { kind: "pdf" as const, label: "Quote / brochure PDF" },
+  { kind: "sheet" as const, label: "Stock & rentals sheet" },
+  { kind: "sheet" as const, label: "Rooming spreadsheet" },
+  { kind: "doc" as const, label: "Supplier directory" },
+];
+
+const IMPORT_DESTS = [
+  { name: "menu" as const, label: "Catalogue", sub: "Menus, sorted by course & category" },
+  { name: "box" as const, label: "Rentals", sub: "Included vs paid extras + pricing" },
+  { name: "bed" as const, label: "Accommodation", sub: "Rooms allocated with sleeps & rate" },
+  { name: "people" as const, label: "Suppliers", sub: "Partner vendors grouped by type" },
+];
+
+function ImportExplainer() {
+  return (
+    <div className="mb-6 rounded-2xl p-4 sm:p-5" style={{ border: "1px solid var(--line)", background: "var(--cream)" }}>
+      <div className="grid items-center gap-4 lg:grid-cols-[1fr_auto_1.25fr]">
+        {/* Your documents */}
+        <div>
+          <div className="vy-eyebrow mb-2">1 · Your documents</div>
+          <div className="grid grid-cols-2 gap-2">
+            {IMPORT_DOCS.map((d) => (
+              <div key={d.label} className="flex items-center gap-2 rounded-xl bg-white px-2.5 py-2 text-xs shadow-sm" style={{ border: "1px solid var(--line)" }}>
+                <span className="flex-shrink-0" style={{ color: "var(--ink-2)" }}><FileGlyph kind={d.kind} /></span>
+                <span className="leading-tight">{d.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Smart Import arrow */}
+        <div className="flex flex-col items-center justify-center gap-2 py-1">
+          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-sm" style={{ background: "var(--poppy)" }}>
+            ✨ Smart Import
+          </span>
+          <svg viewBox="0 0 40 24" className="w-10 h-6 rotate-90 lg:rotate-0" aria-hidden style={{ color: "var(--poppy)" }}>
+            <path d="M4 12h28M26 6l8 6-8 6" {...ICON} />
+          </svg>
+          <span className="text-[10px] text-center leading-tight" style={{ color: "var(--ink-2)" }}>reads & sorts<br />for you</span>
+        </div>
+
+        {/* Sorted into your dashboard */}
+        <div>
+          <div className="vy-eyebrow mb-2">2 · Sorted into your dashboard</div>
+          <div className="grid grid-cols-2 gap-2">
+            {IMPORT_DESTS.map((d) => (
+              <div key={d.label} className="rounded-xl bg-white px-3 py-2.5 shadow-sm" style={{ border: "1px solid var(--line)" }}>
+                <div className="flex items-center gap-2">
+                  <span className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "var(--peach)", color: "var(--poppy-deep)" }}><DestGlyph name={d.name} /></span>
+                  <span className="text-sm font-medium">{d.label}</span>
+                </div>
+                <div className="mt-1 text-[11px] leading-snug" style={{ color: "var(--ink-2)" }}>{d.sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <p className="mt-4 text-xs leading-relaxed" style={{ color: "var(--ink-2)" }}>
+        Smart Import reads each file, then files every item into the right place — it even allocates your accommodation rooms and sorts menu items into categories automatically. You review and edit everything on the right before it saves to your dashboard.
+      </p>
+    </div>
+  );
+}
+
 export function WizardClient({
   initialStep,
   venue,
@@ -259,6 +353,7 @@ function StepImport({
       title="Import what you already have"
       intro="Drop in the files you already send couples — quote PDFs, stock lists, brochures, rooming spreadsheets, supplier directories. Smart Import reads them and pre-fills your catalogue, rentals, accommodation and partner vendors. You review everything before it saves."
     >
+      <ImportExplainer />
       {importDone && (
         <div className="mb-4 rounded-xl p-3 flex items-center gap-3 text-sm" style={{ background: "var(--leaf)", color: "#1f5d3e", border: "1px solid var(--line)" }}>
           <span>✓</span> You&apos;ve already imported inventory. Add more files below, or continue.

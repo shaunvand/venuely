@@ -121,5 +121,7 @@ export async function setupVenue(formData: FormData) {
     })));
   }
 
-  redirect("/venue");
+  // Basics done → take the owner straight into Smart Import (Step 2 of the wizard)
+  // so they upload their documents next, rather than dropping onto the dashboard.
+  redirect("/onboarding/wizard?step=2");
 }
