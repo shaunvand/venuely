@@ -8,6 +8,8 @@ export type BulkUploaderHandle = {
   includedCount: number;
   isImporting: boolean;
   imported: boolean;
+  openFilePicker: () => void;
+  openFolderPicker: () => void;
 };
 
 type Item = {
@@ -107,6 +109,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
   ref,
 ) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -196,7 +199,9 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
     includedCount,
     isImporting: isPending,
     imported,
-  }), [includedCount, isPending, imported]);
+    openFilePicker: () => { if (!busy) fileRef.current?.click(); },
+    openFolderPicker: () => { if (!busy) folderRef.current?.click(); },
+  }), [includedCount, isPending, imported, busy]);
 
   useEffect(() => {
     onStateChange?.({ includedCount, isImporting: isPending, imported, hasItems: items.length > 0 });
@@ -484,7 +489,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
         </label>
         <label className={(busy ? BUBBLE_SECONDARY + " opacity-50 cursor-not-allowed" : BUBBLE_SECONDARY + " cursor-pointer")}>
           📁 Choose a folder
-          <input type="file"
+          <input ref={folderRef} type="file"
             disabled={busy}
             {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
             onChange={(e) => pickFiles(e.target.files)}

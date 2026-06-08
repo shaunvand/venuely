@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { SetupVenueForm } from "@/components/SetupVenueForm";
-import { BulkUploader } from "@/components/BulkUploader";
+import { BulkUploader, type BulkUploaderHandle } from "@/components/BulkUploader";
 import { LogoMark } from "@/components/Logo";
 
 type WizardVenue = { id: string; slug: string; name: string };
@@ -79,7 +79,7 @@ const IMPORT_DESTS = [
   { name: "people" as const, label: "Suppliers", sub: "Partner vendors grouped by type" },
 ];
 
-function ImportExplainer() {
+function ImportExplainer({ onSmartImport }: { onSmartImport?: () => void }) {
   return (
     <div className="mb-6 rounded-2xl p-4 sm:p-5" style={{ border: "1px solid var(--line)", background: "var(--cream)" }}>
       <div className="grid items-center gap-4 lg:grid-cols-[1fr_auto_1.25fr]">
@@ -88,23 +88,35 @@ function ImportExplainer() {
           <div className="vy-eyebrow mb-2">1 · Your documents</div>
           <div className="grid grid-cols-2 gap-2">
             {IMPORT_DOCS.map((d) => (
-              <div key={d.label} className="flex items-center gap-2 rounded-xl bg-white px-2.5 py-2 text-xs shadow-sm" style={{ border: "1px solid var(--line)" }}>
+              <button
+                key={d.label}
+                type="button"
+                onClick={onSmartImport}
+                className="flex items-center gap-2 rounded-xl bg-white px-2.5 py-2 text-xs shadow-sm text-left hover-lift cursor-pointer"
+                style={{ border: "1px solid var(--line)" }}
+              >
                 <span className="flex-shrink-0" style={{ color: "var(--ink-2)" }}><FileGlyph kind={d.kind} /></span>
                 <span className="leading-tight">{d.label}</span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Smart Import arrow */}
+        {/* Smart Import — the whole pill is the upload trigger */}
         <div className="flex flex-col items-center justify-center gap-2 py-1">
-          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-sm" style={{ background: "var(--poppy)" }}>
+          <button
+            type="button"
+            onClick={onSmartImport}
+            title="Choose files or a folder to import"
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-sm cursor-pointer transition hover:brightness-105 active:scale-95"
+            style={{ background: "var(--poppy)", boxShadow: "0 8px 20px -10px var(--poppy)" }}
+          >
             ✨ Smart Import
-          </span>
+          </button>
           <svg viewBox="0 0 40 24" className="w-10 h-6 rotate-90 lg:rotate-0" aria-hidden style={{ color: "var(--poppy)" }}>
             <path d="M4 12h28M26 6l8 6-8 6" {...ICON} />
           </svg>
-          <span className="text-[10px] text-center leading-tight" style={{ color: "var(--ink-2)" }}>reads & sorts<br />for you</span>
+          <span className="text-[10px] text-center leading-tight" style={{ color: "var(--ink-2)" }}>click to choose<br />files or a folder</span>
         </div>
 
         {/* Sorted into your dashboard */}
@@ -347,20 +359,21 @@ function StepImport({
   onBack: () => void;
   onContinue: () => void;
 }) {
+  const uploaderRef = useRef<BulkUploaderHandle>(null);
   return (
     <StepShell
       eyebrow="Step 2 of 4 · Import"
       title="Import what you already have"
       intro="Drop in the files you already send couples — quote PDFs, stock lists, brochures, rooming spreadsheets, supplier directories. Smart Import reads them and pre-fills your catalogue, rentals, accommodation and partner vendors. You review everything before it saves."
     >
-      <ImportExplainer />
+      <ImportExplainer onSmartImport={() => uploaderRef.current?.openFilePicker()} />
       {importDone && (
         <div className="mb-4 rounded-xl p-3 flex items-center gap-3 text-sm" style={{ background: "var(--leaf)", color: "#1f5d3e", border: "1px solid var(--line)" }}>
           <span>✓</span> You&apos;ve already imported inventory. Add more files below, or continue.
         </div>
       )}
       {venue ? (
-        <BulkUploader venueId={venue.id} />
+        <BulkUploader ref={uploaderRef} venueId={venue.id} />
       ) : (
         <div className="vy-empty text-sm">Create your venue first (Step 1) to import inventory.</div>
       )}
