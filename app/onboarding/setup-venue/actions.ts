@@ -45,6 +45,18 @@ export async function setupVenue(formData: FormData) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
+  // Guard against duplicate venues: if this user already belongs to a venue,
+  // never create another — send them into their existing venue's import step.
+  // (Repeat sign-ups were creating a new empty venue every time and scattering
+  // inventory across copies.)
+  const { data: existingMember } = await admin
+    .from("venue_members")
+    .select("venue_id")
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+  if (existingMember) redirect("/onboarding/wizard?step=2");
+
   let attemptSlug = slug;
   let venue: { id: string; slug: string } | null = null;
   let lastErr: { message?: string; code?: string } | null = null;
