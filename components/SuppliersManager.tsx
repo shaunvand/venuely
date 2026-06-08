@@ -4,9 +4,9 @@ import { useState } from "react";
 
 export type Supplier = {
   id: string; category: string; name: string; email?: string; phone?: string;
-  price?: string; status?: string; dueDate?: string; description?: string; fromVendorId?: string;
+  price?: string; status?: string; dueDate?: string; description?: string; fromVendorId?: string; img?: string | null;
 };
-type VenuePartner = { id: string; type: string; name: string; description: string; price: number | null; email: string | null; phone: string | null };
+type VenuePartner = { id: string; type: string; name: string; description: string; price: number | null; email: string | null; phone: string | null; img?: string | null };
 
 const serif: React.CSSProperties = { fontFamily: "'Fraunces', Georgia, serif" };
 const CATEGORIES = ["Venue", "Catering", "Photography", "Flowers", "Music", "Hair & Makeup", "Cake", "Waiter/Bar Staff", "Beverages", "Other"];
@@ -38,13 +38,16 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
   function remove(id: string) { commit(list.filter((x) => x.id !== id)); }
   function addFromVenue(v: VenuePartner) {
     if (list.some((x) => x.fromVendorId === v.id)) return;
-    commit([...list, { id: crypto.randomUUID?.() ?? String(Date.now()), category: labelFor(v.type), name: v.name, email: v.email || "", phone: v.phone || "", price: v.price ? String(v.price) : "", status: "contacted", description: v.description || "", fromVendorId: v.id }]);
+    commit([...list, { id: crypto.randomUUID?.() ?? String(Date.now()), category: labelFor(v.type), name: v.name, email: v.email || "", phone: v.phone || "", price: v.price ? String(v.price) : "", status: "contacted", description: v.description || "", fromVendorId: v.id, img: v.img ?? null }]);
   }
 
   const cats = ["All", ...Array.from(new Set(list.map((s) => s.category).filter(Boolean)))];
   const shown = filter === "All" ? list : list.filter((s) => s.category === filter);
 
   const card: React.CSSProperties = { background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius };
+  // Shared card chrome matching the Accommodation / Catalogue cards.
+  const cardChrome: React.CSSProperties = { background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderLeft: `3px solid ${primary}`, borderRadius: cardRadius, overflow: "hidden", boxShadow: "0 2px 8px rgba(28,25,23,0.08)" };
+  const chipStyle: React.CSSProperties = { display: "inline-block", fontSize: 10.5, textTransform: "uppercase", letterSpacing: 1, color: "#57534e", background: `${accent}33`, borderRadius: 999, padding: "3px 9px" };
   const chip = (active: boolean): React.CSSProperties => ({ border: `1px solid ${active ? primary : "rgba(0,0,0,0.15)"}`, background: active ? primary : "#fff", color: active ? "#fff" : "#57534e", borderRadius: 999, padding: "5px 13px", fontSize: 12, fontWeight: 600, cursor: "pointer" });
   const btnSolid: React.CSSProperties = { background: primary, color: "#fff", border: "none", borderRadius: 999, padding: "9px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer", letterSpacing: 0.5 };
   const field: React.CSSProperties = { width: "100%", border: "1px solid rgba(0,0,0,0.15)", borderRadius: 8, padding: "9px 11px", fontSize: 13.5, marginTop: 4 };
@@ -60,12 +63,18 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
             {vendors.map((v) => {
               const added = list.some((x) => x.fromVendorId === v.id);
               return (
-                <div key={v.id} style={{ ...card, padding: 14 }}>
-                  <span style={{ display: "inline-block", fontSize: 10.5, textTransform: "uppercase", letterSpacing: 1, color: "#57534e", background: `${accent}33`, borderRadius: 999, padding: "3px 9px" }}>{labelFor(v.type)}</span>
-                  <div style={{ ...serif, fontSize: 16, marginTop: 8 }}>{v.name}</div>
-                  {v.description && <div style={{ fontSize: 12, color: "#57534e", margin: "4px 0" }}>{v.description}</div>}
-                  {v.price != null && <div style={{ color: primary, fontWeight: 700, fontSize: 13 }}>From {rZA(v.price)}</div>}
-                  <button onClick={() => addFromVenue(v)} disabled={added} style={{ marginTop: 10, width: "100%", border: `1px solid ${added ? "#1a7f4b" : primary}`, background: added ? "#1a7f4b" : "#fff", color: added ? "#fff" : primary, borderRadius: 999, padding: "7px", fontWeight: 600, fontSize: 12.5, cursor: added ? "default" : "pointer" }}>{added ? "✓ Added to my vendors" : "+ Add to my vendors"}</button>
+                <div key={v.id} style={cardChrome}>
+                  {v.img && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={v.img} alt="" style={{ width: "100%", height: 120, objectFit: "cover" }} />
+                  )}
+                  <div style={{ padding: 14 }}>
+                    <span style={chipStyle}>{labelFor(v.type)}</span>
+                    <div style={{ ...serif, fontSize: 16, fontWeight: 700, marginTop: 6 }}>{v.name}</div>
+                    {v.description && <div style={{ fontSize: 12.5, color: "#57534e", fontStyle: "italic", margin: "6px 0" }}>{v.description}</div>}
+                    {v.price != null && <div style={{ color: primary, fontWeight: 700, fontSize: 13 }}>From {rZA(v.price)}</div>}
+                    <button onClick={() => addFromVenue(v)} disabled={added} style={{ marginTop: 10, width: "100%", border: `1px solid ${added ? "#1a7f4b" : primary}`, background: added ? "#1a7f4b" : "#fff", color: added ? "#fff" : primary, borderRadius: 999, padding: "7px", fontWeight: 600, fontSize: 12.5, cursor: added ? "default" : "pointer" }}>{added ? "✓ Added to my vendors" : "+ Add to my vendors"}</button>
+                  </div>
                 </div>
               );
             })}
@@ -87,17 +96,23 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
           {shown.map((s) => {
             const st = STATUS[s.status || "pending"] || STATUS.pending;
             return (
-              <div key={s.id} style={{ ...card, padding: 16, borderLeft: `3px solid ${primary}` }}>
-                <span style={{ display: "inline-block", fontSize: 10.5, textTransform: "uppercase", letterSpacing: 1, color: "#57534e", background: `${accent}33`, borderRadius: 999, padding: "3px 9px" }}>{s.category}</span>
-                <div style={{ ...serif, fontSize: 18, marginTop: 8 }}>{s.name}</div>
-                {(s.email || s.phone) && <div style={{ fontSize: 12, color: "#57534e", marginTop: 4 }}>{[s.phone, s.email].filter(Boolean).join(" · ")}</div>}
-                {rZA(s.price) && <div style={{ color: primary, fontWeight: 700, fontSize: 15, marginTop: 6 }}>{rZA(s.price)}</div>}
-                {s.description && <div style={{ fontSize: 12.5, color: "#57534e", fontStyle: "italic", margin: "8px 0" }}>{s.description}</div>}
-                {s.dueDate && <div style={{ display: "inline-block", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "#b42318", background: "#fdeceb", borderRadius: 6, padding: "3px 8px", margin: "2px 0 8px" }}>Balance due · {fmtDate(s.dueDate)}</div>}
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: st.color, margin: "6px 0 10px" }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: st.color }} />{st.label}</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => setEditing(s)} style={{ background: `${accent}33`, color: "#57534e", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", letterSpacing: 0.5, textTransform: "uppercase" }}>Edit</button>
-                  <button onClick={() => remove(s.id)} style={{ background: "#fff", color: "#b42318", border: "1px solid #f0c9c5", borderRadius: 8, padding: "6px 14px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", letterSpacing: 0.5, textTransform: "uppercase" }}>Remove</button>
+              <div key={s.id} style={cardChrome}>
+                {s.img && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={s.img} alt="" style={{ width: "100%", height: 120, objectFit: "cover" }} />
+                )}
+                <div style={{ padding: 16 }}>
+                  <span style={chipStyle}>{s.category}</span>
+                  <div style={{ ...serif, fontSize: 18, fontWeight: 700, marginTop: 6 }}>{s.name}</div>
+                  {(s.email || s.phone) && <div style={{ fontSize: 12, color: "#57534e", marginTop: 4 }}>{[s.phone, s.email].filter(Boolean).join(" · ")}</div>}
+                  {rZA(s.price) && <div style={{ color: primary, fontWeight: 700, fontSize: 15, marginTop: 6 }}>{rZA(s.price)}</div>}
+                  {s.description && <div style={{ fontSize: 12.5, color: "#57534e", fontStyle: "italic", margin: "8px 0" }}>{s.description}</div>}
+                  {s.dueDate && <div style={{ display: "inline-block", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "#b42318", background: "#fdeceb", borderRadius: 6, padding: "3px 8px", margin: "2px 0 8px" }}>Balance due · {fmtDate(s.dueDate)}</div>}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: st.color, margin: "6px 0 10px" }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: st.color }} />{st.label}</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setEditing(s)} style={{ background: `${accent}33`, color: "#57534e", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", letterSpacing: 0.5, textTransform: "uppercase" }}>Edit</button>
+                    <button onClick={() => remove(s.id)} style={{ background: "#fff", color: "#b42318", border: "1px solid #f0c9c5", borderRadius: 8, padding: "6px 14px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", letterSpacing: 0.5, textTransform: "uppercase" }}>Remove</button>
+                  </div>
                 </div>
               </div>
             );

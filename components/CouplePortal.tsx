@@ -479,7 +479,7 @@ export function CouplePortal({
         {tab === "Suppliers" && (
           <SuppliersManager
             venueName={venue.name}
-            vendors={vendors.map((v) => ({ id: v.id, type: v.type, name: v.name, description: v.description, price: v.price, email: v.email, phone: v.phone }))}
+            vendors={vendors.map((v) => ({ id: v.id, type: v.type, name: v.name, description: v.description, price: v.price, email: v.email, phone: v.phone, img: v.img }))}
             suppliers={((state as Record<string, unknown>).suppliers as import("@/components/SuppliersManager").Supplier[]) ?? []}
             onChange={(next) => persist({ ...state, suppliers: next })}
             primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius}
