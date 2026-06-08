@@ -49,7 +49,30 @@ export function RoomAllocator({ slug, rooms, onAllocated, primary, accent, headi
         <div style={{ color: "#57534e", fontSize: 13, marginTop: 2 }}>Click a guest then a room — or drag them in · {guests.length - unassigned.length}/{guests.length} allocated</div>
       </div>
 
-      {/* Rooms on top — who's staying where */}
+      {/* Guest pool on top — pick a guest, then a room below */}
+      <div style={card({ padding: 14 })}
+        onDragOver={(e) => { if (drag) e.preventDefault(); }}
+        onDrop={(e) => { e.preventDefault(); if (drag) assign(drag, null); setDrag(null); }}>
+        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: primary, fontWeight: 700, marginBottom: 10 }}>Guests to allocate ({unassigned.length}){selected ? " · now click a room below" : ""}</div>
+        {loading ? <span style={{ color: "#8a8a8a", fontSize: 13 }}>Loading…</span> : unassigned.length === 0 ? <span style={{ color: "#8a8a8a", fontSize: 12.5 }}>Everyone has a room 🎉 — drag a name back here to move them.</span> : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {unassigned.map((g) => {
+              const isSel = selected === g.id;
+              return (
+              <span key={g.id} draggable onDragStart={() => setDrag(g.id)} onClick={() => setSelected(isSel ? null : g.id)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, background: isSel ? `${primary}14` : "var(--bone,#FFF6F0)", border: isSel ? `2px solid ${primary}` : "1px solid rgba(0,0,0,0.12)", borderRadius: 999, padding: "5px 6px 5px 12px", cursor: "pointer", fontWeight: isSel ? 700 : 500 }}>
+                {g.full_name}{g.is_child ? " 🧒" : ""}
+                <select defaultValue="" onClick={(e) => e.stopPropagation()} onChange={(e) => { if (e.target.value) assign(g.id, e.target.value); }} title="Put in…" style={{ fontSize: 10.5, border: "1px solid rgba(0,0,0,0.15)", borderRadius: 999, padding: "2px 4px", cursor: "pointer" }}>
+                  <option value="">Room…</option>
+                  {rooms.map((room) => { const n = guests.filter((x) => x.room_id === room.id).length; return <option key={room.id} value={room.id} disabled={n >= room.sleeps}>{room.name}{n >= room.sleeps ? " (full)" : ""}</option>; })}
+                </select>
+              </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Rooms below — drop guests from the pool above */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 12 }}>
         {rooms.map((room) => {
           const inRoom = guests.filter((g) => g.room_id === room.id);
@@ -89,28 +112,6 @@ export function RoomAllocator({ slug, rooms, onAllocated, primary, accent, headi
         })}
       </div>
 
-      {/* Guest pool underneath — drag from here into a room above */}
-      <div style={card({ padding: 14 })}
-        onDragOver={(e) => { if (drag) e.preventDefault(); }}
-        onDrop={(e) => { e.preventDefault(); if (drag) assign(drag, null); setDrag(null); }}>
-        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: primary, fontWeight: 700, marginBottom: 10 }}>Guests to allocate ({unassigned.length}){selected ? " · now click a room above" : ""}</div>
-        {loading ? <span style={{ color: "#8a8a8a", fontSize: 13 }}>Loading…</span> : unassigned.length === 0 ? <span style={{ color: "#8a8a8a", fontSize: 12.5 }}>Everyone has a room 🎉 — drag a name back here to move them.</span> : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {unassigned.map((g) => {
-              const isSel = selected === g.id;
-              return (
-              <span key={g.id} draggable onDragStart={() => setDrag(g.id)} onClick={() => setSelected(isSel ? null : g.id)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, background: isSel ? `${primary}14` : "var(--bone,#FFF6F0)", border: isSel ? `2px solid ${primary}` : "1px solid rgba(0,0,0,0.12)", borderRadius: 999, padding: "5px 6px 5px 12px", cursor: "pointer", fontWeight: isSel ? 700 : 500 }}>
-                {g.full_name}{g.is_child ? " 🧒" : ""}
-                <select defaultValue="" onClick={(e) => e.stopPropagation()} onChange={(e) => { if (e.target.value) assign(g.id, e.target.value); }} title="Put in…" style={{ fontSize: 10.5, border: "1px solid rgba(0,0,0,0.15)", borderRadius: 999, padding: "2px 4px", cursor: "pointer" }}>
-                  <option value="">Room…</option>
-                  {rooms.map((room) => { const n = guests.filter((x) => x.room_id === room.id).length; return <option key={room.id} value={room.id} disabled={n >= room.sleeps}>{room.name}{n >= room.sleeps ? " (full)" : ""}</option>; })}
-                </select>
-              </span>
-              );
-            })}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
