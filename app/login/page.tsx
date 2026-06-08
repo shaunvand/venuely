@@ -27,18 +27,6 @@ function Wordmark() {
   );
 }
 
-function Divider() {
-  return (
-    <div className="flex items-center justify-center gap-3 mt-10" aria-hidden style={{ color: "var(--sage)" }}>
-      <svg viewBox="0 0 40 24" className="w-12 h-5"><path d="M2 12c8 0 14-1 18-9M8 8c1 2 3 3 6 3" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" /></svg>
-      <span className="h-px w-10" style={{ background: "var(--line)" }} />
-      <svg viewBox="0 0 24 24" className="w-5 h-5"><path d="M12 21s-7-4.5-9.5-9A5 5 0 0112 5a5 5 0 019.5 7C19 16.5 12 21 12 21z" fill="currentColor" opacity="0.65" /></svg>
-      <span className="h-px w-10" style={{ background: "var(--line)" }} />
-      <svg viewBox="0 0 40 24" className="w-12 h-5"><path d="M38 12c-8 0-14-1-18-9M32 8c-1 2-3 3-6 3" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" /></svg>
-    </div>
-  );
-}
-
 const TRUST = [
   { title: "Secure & reliable", body: "Your data is safe with enterprise-grade security.", icon: <><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" {...ICON} /><path d="M9 12l2 2 4-4" {...ICON} /></> },
   { title: "Built for venues", body: "Manage bookings, events, and enquiries all in one beautiful place.", icon: <><rect x="3" y="4" width="18" height="17" rx="2" {...ICON} /><path d="M3 9h18M8 2v4M16 2v4" {...ICON} /></> },
@@ -155,7 +143,6 @@ export default function LoginPage() {
         <Suspense fallback={<div className="mt-10" style={{ color: "var(--ink-2)" }}>Loading…</div>}>
           <LoginForm />
         </Suspense>
-        <Divider />
       </div>
       <TrustBar />
     </main>
