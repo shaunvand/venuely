@@ -333,7 +333,7 @@ export function CouplePortal({
         <div style={{ padding: "0 6px 18px" }}>
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt={venue.name} title={venue.name} style={{ width: "100%", maxHeight: 76, objectFit: "contain", objectPosition: "left center", display: "block" }} />
+            <img src={logoUrl} alt={venue.name} title={venue.name} style={{ maxWidth: "100%", maxHeight: 72, width: "auto", height: "auto", objectFit: "contain", objectPosition: "left center", display: "block" }} />
           ) : (
             <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: 19, color: primary, lineHeight: 1.15 }}>{venue.name}</div>
           )}
