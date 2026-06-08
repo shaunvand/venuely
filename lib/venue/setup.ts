@@ -28,7 +28,7 @@ export async function computeSetupSteps(supabase: SupabaseClient, venue: VenueRo
     supabase.from("rental_items").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
     supabase.from("accommodation_rooms").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
     supabase.from("payments").select("*, wedding:weddings!inner(venue_id)", { count: "exact", head: true }).eq("wedding.venue_id", venue.id),
-    supabase.from("suppliers").select("*, wedding:weddings!inner(venue_id)", { count: "exact", head: true }).eq("wedding.venue_id", venue.id),
+    supabase.from("vendor_partners").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
     supabase.from("media_assets").select("*", { count: "exact", head: true }).eq("venue_id", venue.id).eq("owner_type", "venue"),
     supabase.from("venue_areas").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
   ]);
@@ -107,11 +107,11 @@ export async function computeSetupSteps(supabase: SupabaseClient, venue: VenueRo
       key: "suppliers",
       title: "Recommend suppliers",
       description: "Photographers, florists, caterers you trust. Couples browse your list instead of guessing.",
-      href: "/venue/weddings",
-      cta: "Per-wedding suppliers →",
+      href: "/venue/marketplace/caterers",
+      cta: "Recommended venue suppliers →",
       done: (suppliersCount ?? 0) > 0,
       count: suppliersCount,
-      hint: "Add suppliers from a wedding's detail page.",
+      hint: "Add your preferred partner vendors — couples see them in their portal.",
     },
     {
       key: "payments",
