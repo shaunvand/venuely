@@ -37,7 +37,7 @@ export function VenueSidebar() {
               <span className="text-2xl font-bold tracking-tight" style={{ color: "var(--poppy)", fontFamily: "'Fraunces', Georgia, serif" }}>
                 Venuely.
               </span>
-              <span className="text-[10px] tracking-wide" style={{ color: "var(--ink-2)" }}>Weddings Made Easy</span>
+              <span className="vy-slogan text-[9px]" style={{ color: "var(--ink-2)" }}>Weddings Made Easy</span>
             </span>
           )}
         </Link>

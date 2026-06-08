@@ -98,7 +98,7 @@ function Nav({ signedIn }: { signedIn: boolean }) {
             >
               Venuely.
             </span>
-            <span className="text-[11px] tracking-wide" style={{ color: "var(--ink-2)" }}>Weddings Made Easy</span>
+            <span className="vy-slogan text-[10px]" style={{ color: "var(--ink-2)" }}>Weddings Made Easy</span>
           </span>
         </Link>
         <nav className="hidden md:flex items-center gap-8 text-sm" style={{ color: "var(--ink)" }}>

@@ -183,12 +183,16 @@ export function SetupVenueForm({
           placeholder="Pat Busch Mountain Reserve" className="w-full border rounded px-3 py-2" />
       </div>
 
-      <VenueAddressPicker key={pickerKey} apiKey={mapsKey} name="address" initial={{ region, address: addressSeed }} />
-      {addressSeed && (
-        <p className="-mt-3 text-xs text-amber-700">
-          We prefilled the address from your website — click into the field and pick the matching Google result to lock in the exact location.
-        </p>
-      )}
+      <div>
+        <div className="mb-2 flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-sm font-semibold text-red-700">
+          <span aria-hidden className="text-lg leading-none">↓</span>
+          <span>
+            You must click into the address field below and pick your venue from the Google results to lock in the exact location.
+            {addressSeed ? " The address prefilled from your website is not enough — confirm it here to complete setup." : " Selecting a Google result is required to complete setup."}
+          </span>
+        </div>
+        <VenueAddressPicker key={pickerKey} apiKey={mapsKey} name="address" initial={{ region, address: addressSeed }} />
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
