@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { bulkDelete, bulkSetActive, bulkSetPrice, bulkSetCommission, bulkSetCostTreatment, updateItem, bulkInsert, addItem } from "@/app/venue/_inventory/actions";
 import type { InventoryType } from "@/lib/inventory/schemas";
 
@@ -37,6 +38,9 @@ export function InventoryManager({
   const [editDraft, setEditDraft] = useState<Record<string, unknown>>({});
   const [uploadingImg, setUploadingImg] = useState(false);
   const [siteImgBusy, setSiteImgBusy] = useState(false);
+  const [siteAllBusy, setSiteAllBusy] = useState(false);
+  const [siteAllMsg, setSiteAllMsg] = useState("");
+  const router = useRouter();
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
   const [bulkPrice, setBulkPrice] = useState("");
   const [bulkCommission, setBulkCommission] = useState("");
@@ -162,6 +166,26 @@ export function InventoryManager({
     } finally { setSiteImgBusy(false); }
   }
 
+  // Bulk: for every shown item that has a website but no image, pull a picture from
+  // their site and save it.
+  async function pullAllSiteImages() {
+    const targets = displayed.filter((i) => String(i.website_url ?? "").trim() && !String(i.image_url ?? "").trim());
+    if (!targets.length) { setSiteAllMsg("No suppliers with a website and a missing image."); return; }
+    setSiteAllBusy(true);
+    let done = 0, failed = 0;
+    for (const i of targets) {
+      setSiteAllMsg(`Fetching ${done + failed + 1} of ${targets.length}…`);
+      try {
+        const res = await fetch("/api/venue/site-image", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: String(i.website_url), venue_id: venueId }) });
+        const j = await res.json();
+        if (res.ok && j.ok && j.url) { await updateItem(type, i.id, { image_url: j.url }); done++; } else failed++;
+      } catch { failed++; }
+    }
+    setSiteAllBusy(false);
+    setSiteAllMsg(`Done — ${done} updated${failed ? `, ${failed} had no usable image` : ""}.`);
+    startTransition(() => router.refresh());
+  }
+
   function doBulkDelete() {
     if (!selected.size) return;
     if (!confirm(`Delete ${selected.size} item(s)?`)) return;
@@ -260,6 +284,7 @@ export function InventoryManager({
   const hasCategory = fields.some((f) => f.key === "category");
   const hasStock = fields.some((f) => f.key === "stock_total");
   const hasCommission = fields.some((f) => f.key === "commission_value");
+  const hasWebsite = fields.some((f) => f.key === "website_url");
 
   return (
     <div className="vy-card space-y-4">
@@ -285,8 +310,14 @@ export function InventoryManager({
           <a href={`/api/venue/inventory/template?type=${type}`} className={BUBBLE_GHOST}>
             ↓ Download template
           </a>
+          {hasWebsite && (
+            <button type="button" onClick={pullAllSiteImages} disabled={siteAllBusy} className={BUBBLE_SECONDARY} title="Pull a picture from each supplier's website (for those with a website + no image)">
+              {siteAllBusy ? "Fetching images…" : "📷 Images from websites"}
+            </button>
+          )}
         </div>
       </div>
+      {siteAllMsg && <p className="text-xs" style={{ color: "var(--ink-2)" }}>{siteAllMsg}</p>}
 
       {/* Bulk bar (shown only when any row is selected) */}
       {selected.size > 0 && (
