@@ -338,6 +338,7 @@ export function LogoUploadField({
   return (
     <div className="space-y-1">
       <label className="text-sm font-medium">Logo (optional)</label>
+      <p className="text-xs text-stone-500">For the crispest logo, upload an <strong>SVG</strong> or a large <strong>PNG</strong> (≈500px+, transparent background). Logos auto-pulled from your website are often small favicons and can look pixelated when enlarged.</p>
       <div className="flex items-center gap-3">
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -347,7 +348,7 @@ export function LogoUploadField({
         )}
         <label className="px-4 py-2 rounded bg-white border border-stone-300 text-sm font-medium cursor-pointer hover:bg-stone-100">
           {uploading ? "Uploading…" : "Upload logo"}
-          <input type="file" accept="image/*" className="hidden" onChange={(e) => upload(e.target.files)} />
+          <input type="file" accept=".svg,.png,.jpg,.jpeg,.webp,image/svg+xml,image/*" className="hidden" onChange={(e) => upload(e.target.files)} />
         </label>
       </div>
       {err && <p className="text-xs text-amber-700">{err}</p>}

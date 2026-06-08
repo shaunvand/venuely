@@ -38,6 +38,34 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+// Best-effort highest-quality logo: a header/nav <img> that looks like a logo wins
+// (usually the real, larger artwork); otherwise the largest icon link (apple-touch-
+// icon ≈180px beats a 32px favicon). Browser-tab favicons are tiny and pixelate when
+// shown large, so we only fall back to them.
+function bestLogo(html: string, base: string): string | null {
+  // 1. An <img> whose tag or src mentions "logo".
+  for (const m of html.matchAll(/<img[^>]+>/gi)) {
+    const tag = m[0];
+    const src = tag.match(/\bsrc=["']([^"']+)["']/i)?.[1];
+    if (!src || /^data:/i.test(src)) continue;
+    if (/logo/i.test(tag) || /logo/i.test(src)) return abs(src, base);
+  }
+  // 2. Icon <link>s — prefer apple-touch-icon + the largest declared size.
+  let best: string | null = null;
+  let bestScore = -1;
+  for (const m of html.matchAll(/<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]*>/gi)) {
+    const tag = m[0];
+    const href = tag.match(/\bhref=["']([^"']+)["']/i)?.[1];
+    if (!href) continue;
+    const rel = (tag.match(/\brel=["']([^"']+)["']/i)?.[1] || "").toLowerCase();
+    const sizes = tag.match(/\bsizes=["']([^"']+)["']/i)?.[1] || "";
+    const dim = parseInt(sizes.split(/[x×]/)[0], 10) || (rel.includes("apple-touch") ? 180 : 32);
+    const score = dim + (rel.includes("apple-touch") ? 1000 : 0);
+    if (score > bestScore) { bestScore = score; best = href; }
+  }
+  return best ? abs(best, base) : null;
+}
+
 function extractMeta(html: string, base: string) {
   const pick = (re: RegExp) => html.match(re)?.[1]?.trim() ?? null;
   const title = pick(/<title[^>]*>([^<]+)<\/title>/i);
@@ -45,12 +73,11 @@ function extractMeta(html: string, base: string) {
   const ogDesc = pick(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i);
   const ogImg = pick(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
   const desc = pick(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
-  const logo = pick(/<link[^>]+rel=["'](?:icon|shortcut icon|apple-touch-icon)["'][^>]+href=["']([^"']+)["']/i);
   return {
     title: ogTitle ?? title,
     description: ogDesc ?? desc,
     hero_image: ogImg ? abs(ogImg, base) : null,
-    logo: logo ? abs(logo, base) : null,
+    logo: bestLogo(html, base),
   };
 }
 
