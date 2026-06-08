@@ -39,16 +39,6 @@ function Wordmark() {
   );
 }
 
-function Divider() {
-  return (
-    <div className="flex items-center justify-center gap-3 mt-8" aria-hidden style={{ color: "var(--sage)" }}>
-      <span className="h-px w-16" style={{ background: "var(--line)" }} />
-      <svg viewBox="0 0 24 24" className="w-5 h-5"><path d="M12 21s-7-4.5-9.5-9A5 5 0 0112 5a5 5 0 019.5 7C19 16.5 12 21 12 21z" fill="currentColor" opacity="0.65" /></svg>
-      <span className="h-px w-16" style={{ background: "var(--line)" }} />
-    </div>
-  );
-}
-
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -136,9 +126,7 @@ export default function SignupPage() {
           </p>
         </form>
 
-        <Divider />
-
-        <p className="text-xs text-center mt-6 max-w-sm mx-auto leading-relaxed" style={{ color: "var(--ink-2)" }}>
+        <p className="text-xs text-center mt-8 max-w-sm mx-auto leading-relaxed" style={{ color: "var(--ink-2)" }}>
           Couples: you don&apos;t sign up here. Your venue will email you an invitation with a private portal link.
         </p>
       </div>
