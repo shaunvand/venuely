@@ -94,7 +94,7 @@ export function WeddingRowActions({
           <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Paid</span>
         )}
         <Link href={`/venue/weddings/${slug}`} className="px-2 py-1 rounded-full border border-stone-300 bg-white hover:bg-stone-100">Manage</Link>
-        <Link href={`/${slug}`} target="_blank" className="px-2 py-1 rounded-full bg-stone-900 text-white hover:bg-stone-700">Open ↗</Link>
+        <Link href={`/${slug}`} target="_blank" className="px-2 py-1 rounded-full text-white hover:brightness-105" style={{ background: "var(--poppy)" }}>Open ↗</Link>
         {deleteAction && (
           <button onClick={remove} disabled={isPending} className="px-2 py-1 rounded-full border border-red-200 text-red-700 bg-white hover:bg-red-50 disabled:opacity-50" title="Delete wedding">
             Delete
