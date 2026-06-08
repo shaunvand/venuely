@@ -4,7 +4,64 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { LogoMark } from "@/components/Logo";
+
+const ICON = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+
+function MailIcon() {
+  return <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" aria-hidden><rect x="3" y="5" width="18" height="14" rx="2" {...ICON} /><path d="M3 7l9 6 9-6" {...ICON} /></svg>;
+}
+function LockIcon() {
+  return <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" aria-hidden><rect x="4" y="11" width="16" height="9" rx="2" {...ICON} /><path d="M8 11V8a4 4 0 018 0v3" {...ICON} /></svg>;
+}
+
+function Wordmark() {
+  return (
+    <div className="text-center anim-fade-up">
+      <Link href="/" className="inline-block font-serif leading-none" style={{ color: "var(--poppy)", fontWeight: 900, letterSpacing: "-0.04em", fontSize: "clamp(3.5rem, 9vw, 5.5rem)" }}>
+        Venuely.
+      </Link>
+      <div className="mt-2 text-center" style={{ color: "var(--ink-2)", textTransform: "uppercase", letterSpacing: "0.28em", fontWeight: 600, fontSize: "0.8rem" }}>
+        Weddings Made Easy
+      </div>
+    </div>
+  );
+}
+
+function Divider() {
+  return (
+    <div className="flex items-center justify-center gap-3 mt-10" aria-hidden style={{ color: "var(--sage)" }}>
+      <svg viewBox="0 0 40 24" className="w-12 h-5"><path d="M2 12c8 0 14-1 18-9M8 8c1 2 3 3 6 3" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" /></svg>
+      <span className="h-px w-10" style={{ background: "var(--line)" }} />
+      <svg viewBox="0 0 24 24" className="w-5 h-5"><path d="M12 21s-7-4.5-9.5-9A5 5 0 0112 5a5 5 0 019.5 7C19 16.5 12 21 12 21z" fill="currentColor" opacity="0.65" /></svg>
+      <span className="h-px w-10" style={{ background: "var(--line)" }} />
+      <svg viewBox="0 0 40 24" className="w-12 h-5"><path d="M38 12c-8 0-14-1-18-9M32 8c-1 2-3 3-6 3" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" /></svg>
+    </div>
+  );
+}
+
+const TRUST = [
+  { title: "Secure & reliable", body: "Your data is safe with enterprise-grade security.", icon: <><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" {...ICON} /><path d="M9 12l2 2 4-4" {...ICON} /></> },
+  { title: "Built for venues", body: "Manage bookings, events, and enquiries all in one beautiful place.", icon: <><rect x="3" y="4" width="18" height="17" rx="2" {...ICON} /><path d="M3 9h18M8 2v4M16 2v4" {...ICON} /></> },
+  { title: "Loved by venues", body: "Join hundreds of venues delivering unforgettable weddings.", icon: <path d="M12 21s-7-4.5-9.5-9A5 5 0 0112 5a5 5 0 019.5 7C19 16.5 12 21 12 21z" {...ICON} /> },
+];
+
+function TrustBar() {
+  return (
+    <footer className="border-t mt-12" style={{ borderColor: "var(--line)", background: "rgba(255,255,255,0.4)" }}>
+      <div className="max-w-3xl mx-auto px-6 py-8 grid sm:grid-cols-3 gap-6">
+        {TRUST.map((t) => (
+          <div key={t.title} className="flex flex-col items-center text-center sm:items-start sm:text-left gap-2">
+            <span className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: "var(--peach)", color: "var(--poppy-deep)" }}>
+              <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden>{t.icon}</svg>
+            </span>
+            <div className="text-sm font-semibold" style={{ color: "var(--ink)" }}>{t.title}</div>
+            <div className="text-xs leading-relaxed" style={{ color: "var(--ink-2)" }}>{t.body}</div>
+          </div>
+        ))}
+      </div>
+    </footer>
+  );
+}
 
 function LoginForm() {
   const router = useRouter();
@@ -25,139 +82,82 @@ function LoginForm() {
     if (mode === "magic") {
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
-        },
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}` },
       });
       setMsg(error ? { tone: "error", text: error.message } : { tone: "info", text: "Check your inbox for the magic link." });
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        setMsg({ tone: "error", text: error.message });
-      } else {
-        router.push(redirect);
-        router.refresh();
-      }
+      if (error) setMsg({ tone: "error", text: error.message });
+      else { router.push(redirect); router.refresh(); }
     }
     setLoading(false);
   }
 
-  const tab = (active: boolean): React.CSSProperties =>
+  const seg = (active: boolean): React.CSSProperties =>
     active
-      ? { background: "var(--poppy)", color: "#fff", borderColor: "var(--poppy)" }
-      : { background: "#fff", color: "var(--ink-2)", borderColor: "var(--line)" };
+      ? { background: "var(--ink)", color: "#fff" }
+      : { background: "transparent", color: "var(--ink-2)" };
 
   return (
-    <div className="w-full max-w-md anim-fade-up">
-      {/* Brand lockup */}
-      <Link href="/" className="flex items-center gap-2.5 mb-6 justify-center">
-        <LogoMark size={34} />
-        <span className="font-serif text-2xl" style={{ color: "var(--poppy)", fontWeight: 900, letterSpacing: "-0.03em" }}>
-          Venuely.
-        </span>
-      </Link>
+    <div className="mt-10 anim-fade-up">
+      <h1 className="vy-h1" style={{ fontSize: "2rem" }}>Sign in to Venuely</h1>
+      <p className="text-sm mt-2 max-w-md" style={{ color: "var(--ink-2)" }}>
+        Venues use a password. Couples should use the magic-link option after their venue invites them.
+      </p>
 
-      <div className="vy-card" style={{ padding: "1.6rem 1.6rem 1.8rem" }}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <h1 className="vy-h1" style={{ fontSize: "1.9rem" }}>Sign in to Venuely</h1>
-            <p className="text-sm mt-2" style={{ color: "var(--ink-2)" }}>
-              Venues use a password. Couples should use the magic-link option after their venue invites them.
-            </p>
-          </div>
-
-          <div className="flex gap-2 text-sm">
-            <button
-              type="button"
-              onClick={() => setMode("password")}
-              className="px-4 py-1.5 rounded-full font-medium border transition press"
-              style={tab(mode === "password")}
-            >
-              Venue staff
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("magic")}
-              className="px-4 py-1.5 rounded-full font-medium border transition press"
-              style={tab(mode === "magic")}
-            >
-              Couple (email link)
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <label className="vy-label">Email</label>
-              <input
-                type="email"
-                required
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="vy-input"
-              />
-            </div>
-
-            {mode === "password" && (
-              <div>
-                <label className="vy-label">Password</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="vy-input"
-                />
-              </div>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="vy-btn vy-btn-primary w-full justify-center"
-            style={{ padding: "0.7rem 1rem", fontSize: "0.95rem" }}
-          >
-            {loading ? "…" : mode === "magic" ? "Send magic link" : "Sign in"}
-          </button>
-
-          {msg && (
-            <div
-              role={msg.tone === "error" ? "alert" : "status"}
-              className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-sm"
-              style={
-                msg.tone === "error"
-                  ? { background: "#fde2dd", color: "#a3210e", border: "1px solid var(--line)" }
-                  : { background: "var(--leaf)", color: "#1f5d3e", border: "1px solid var(--line)" }
-              }
-            >
-              <span className="leading-none mt-0.5">{msg.tone === "error" ? "⚠" : "✓"}</span>
-              <span className="flex-1">{msg.text}</span>
-            </div>
-          )}
-
-          <p className="text-sm pt-1" style={{ color: "var(--ink-2)" }}>
-            No account?{" "}
-            <Link href="/signup" className="font-medium" style={{ color: "var(--poppy)" }}>
-              Sign up
-            </Link>
-          </p>
-        </form>
+      {/* Segmented toggle */}
+      <div className="inline-flex gap-1 p-1 rounded-full mt-5" style={{ background: "var(--bone)", border: "1px solid var(--line)" }}>
+        <button type="button" onClick={() => setMode("password")} className="px-4 py-1.5 rounded-full text-sm font-medium transition press" style={seg(mode === "password")}>
+          Venue staff
+        </button>
+        <button type="button" onClick={() => setMode("magic")} className="px-4 py-1.5 rounded-full text-sm font-medium transition press" style={seg(mode === "magic")}>
+          Couple (email link)
+        </button>
       </div>
+
+      <form onSubmit={handleSubmit} className="mt-5 space-y-3">
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--ink-2)" }}><MailIcon /></span>
+          <input type="email" required placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="vy-input" style={{ paddingLeft: "2.5rem", paddingTop: "0.7rem", paddingBottom: "0.7rem" }} />
+        </div>
+
+        {mode === "password" && (
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--ink-2)" }}><LockIcon /></span>
+            <input type="password" required placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} className="vy-input" style={{ paddingLeft: "2.5rem", paddingTop: "0.7rem", paddingBottom: "0.7rem" }} />
+          </div>
+        )}
+
+        <button type="submit" disabled={loading} className="vy-btn vy-btn-primary w-full justify-center" style={{ padding: "0.8rem 1rem", fontSize: "0.95rem" }}>
+          {loading ? "…" : mode === "magic" ? "Send magic link" : "Sign in"}
+        </button>
+      </form>
+
+      {msg && (
+        <p className="text-sm mt-4" style={{ color: msg.tone === "error" ? "#a3210e" : "#1f5d3e" }}>
+          {msg.text}
+        </p>
+      )}
+
+      <p className="text-sm mt-4" style={{ color: "var(--ink-2)" }}>
+        No account?{" "}
+        <Link href="/signup" className="font-semibold" style={{ color: "var(--poppy)" }}>Sign up</Link>
+      </p>
     </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <main
-      className="min-h-screen flex items-center justify-center p-6"
-      style={{ background: "linear-gradient(180deg, #FCE7DA 0%, var(--cream) 360px)" }}
-    >
-      <Suspense fallback={<div style={{ color: "var(--ink-2)" }}>Loading…</div>}>
-        <LoginForm />
-      </Suspense>
+    <main className="min-h-screen flex flex-col" style={{ background: "var(--cream)" }}>
+      <div className="flex-1 w-full max-w-md mx-auto px-6 pt-14 pb-6">
+        <Wordmark />
+        <Suspense fallback={<div className="mt-10" style={{ color: "var(--ink-2)" }}>Loading…</div>}>
+          <LoginForm />
+        </Suspense>
+        <Divider />
+      </div>
+      <TrustBar />
     </main>
   );
 }
