@@ -36,6 +36,7 @@ export function InventoryManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Record<string, unknown>>({});
   const [uploadingImg, setUploadingImg] = useState(false);
+  const [siteImgBusy, setSiteImgBusy] = useState(false);
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
   const [bulkPrice, setBulkPrice] = useState("");
   const [bulkCommission, setBulkCommission] = useState("");
@@ -144,6 +145,21 @@ export function InventoryManager({
     } catch (e) {
       alert(`Upload error: ${e instanceof Error ? e.message : String(e)}`);
     } finally { setUploadingImg(false); }
+  }
+
+  // Pull a picture from the supplier's own website to use as their image.
+  async function pullSiteImage() {
+    const site = String(editDraft.website_url ?? "").trim();
+    if (!site) return;
+    setSiteImgBusy(true);
+    try {
+      const res = await fetch("/api/venue/site-image", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: site, venue_id: venueId }) });
+      const j = await res.json();
+      if (res.ok && j.ok && j.url) setEditDraft((d) => ({ ...d, image_url: j.url }));
+      else alert(`Couldn't get an image from that website: ${j.error ?? "nothing usable found"}`);
+    } catch (e) {
+      alert(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally { setSiteImgBusy(false); }
   }
 
   function doBulkDelete() {
@@ -544,6 +560,9 @@ export function InventoryManager({
                   <input type="file" accept="image/*" className="hidden"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadImage(f); }} />
                 </label>
+                {String(editDraft.website_url ?? "").trim() ? (
+                  <button type="button" onClick={pullSiteImage} disabled={siteImgBusy} className={BUBBLE_SECONDARY}>{siteImgBusy ? "Fetching…" : "📷 From website"}</button>
+                ) : null}
                 {editDraft.image_url ? (
                   <button type="button" onClick={() => setEditDraft({ ...editDraft, image_url: "" })} className={BUBBLE_GHOST}>Remove</button>
                 ) : null}
