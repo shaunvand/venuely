@@ -123,6 +123,47 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
   const [nowTick, setNowTick] = useState(Date.now());
   const [isPending, startTransition] = useTransition();
 
+  // Smart Import progress: a single bar that climbs to ~90% while we read & detect,
+  // then a fixed 10-second "finishing" countdown that walks 90 → 100 before the
+  // reviewed items are revealed. phase drives which copy + bar we show.
+  const [phase, setPhase] = useState<"idle" | "reading" | "finishing" | "done">("idle");
+  const [progress, setProgress] = useState(0);
+  const [finishLeft, setFinishLeft] = useState(0);
+  const climbRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const finishRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function stopTimers() {
+    if (climbRef.current) { clearInterval(climbRef.current); climbRef.current = null; }
+    if (finishRef.current) { clearInterval(finishRef.current); finishRef.current = null; }
+  }
+  useEffect(() => () => stopTimers(), []);
+
+  // While the parse request is in flight, ease the bar toward 90% (never past it —
+  // the last 10% belongs to the finishing countdown).
+  function startClimb() {
+    stopTimers();
+    climbRef.current = setInterval(() => {
+      setProgress((p) => (p >= 90 ? 90 : p + Math.max(0.6, (90 - p) * 0.07)));
+    }, 320);
+  }
+
+  // The fixed 10-second flourish: animate 90 → 100 and tick a seconds-remaining label.
+  function runFinishCountdown(): Promise<void> {
+    return new Promise((resolve) => {
+      stopTimers();
+      const stepMs = 100, totalMs = 10000;
+      let elapsed = 0;
+      setFinishLeft(10);
+      finishRef.current = setInterval(() => {
+        elapsed += stepMs;
+        const frac = Math.min(1, elapsed / totalMs);
+        setProgress(90 + frac * 10);
+        setFinishLeft(Math.max(0, Math.ceil((totalMs - elapsed) / 1000)));
+        if (elapsed >= totalMs) { stopTimers(); resolve(); }
+      }, stepMs);
+    });
+  }
+
   // Tick once a second while an undo window is open so the countdown updates + auto-hides.
   useEffect(() => {
     if (!undo) return;
@@ -133,9 +174,19 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
     if (undo && nowTick >= undo.expiresAt) setUndo(null);
   }, [undo, nowTick]);
 
+  const SUPPORTED_RE = /\.(pdf|xlsx|xls|csv|txt)$/i;
+  // Accept a file OR folder selection, keep only supported docs, then kick off the
+  // read automatically — no separate "parse" click. Folder picks (webkitdirectory)
+  // can include anything, so we always filter by extension first.
   function pickFiles(list: FileList | null) {
-    if (!list) return;
-    setFiles(Array.from(list));
+    if (!list || !list.length) return;
+    const arr = Array.from(list).filter((f) => SUPPORTED_RE.test(f.name));
+    if (!arr.length) {
+      setStatus({ tone: "error", text: "No PDF, Excel or CSV files found in that selection — choose a folder or files containing those." });
+      return;
+    }
+    setFiles(arr);
+    parse(arr);
   }
 
   const includedCount = items.filter((it) => it._include).length;
@@ -151,16 +202,23 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
     onStateChange?.({ includedCount, isImporting: isPending, imported, hasItems: items.length > 0 });
   }, [includedCount, isPending, imported, items.length, onStateChange]);
 
-  async function parse() {
-    if (!files.length) return;
-    setBusy(true); setStatus({ tone: "info", text: `Reading ${files.length} file${files.length === 1 ? "" : "s"} — this can take 30-60 seconds for large PDFs.` }); setMsg(null); setItems([]); setImported(false); setCommitResults(null); setUndo(null);
+  async function parse(fileList?: File[]) {
+    const toParse = fileList ?? files;
+    if (!toParse.length) return;
+    setBusy(true); setPhase("reading"); setProgress(6); startClimb();
+    setStatus({ tone: "info", text: `Reading ${toParse.length} file${toParse.length === 1 ? "" : "s"} — this can take 30-60 seconds for large PDFs.` });
+    setMsg(null); setItems([]); setImported(false); setCommitResults(null); setUndo(null);
     try {
       const fd = new FormData();
-      files.forEach((f) => fd.append("files", f));
+      toParse.forEach((f) => fd.append("files", f));
       fd.append("venue_id", venueId);
       const res = await fetch("/api/venue/uploads/parse", { method: "POST", body: fd });
       const j = await res.json();
-      if (!res.ok || !j.ok) { setStatus({ tone: "error", text: `Reading failed: ${j.error ?? "unknown error"}` }); return; }
+      if (!res.ok || !j.ok) {
+        stopTimers(); setPhase("idle"); setProgress(0);
+        setStatus({ tone: "error", text: `Reading failed: ${j.error ?? "unknown error"}` });
+        return;
+      }
       // Option A: when the file gave us embedded photos, default each item to YOUR
       // photo (by order) instead of an online stock image — correctable per item.
       const imgs = (j.images ?? []) as Array<{ url: string }>;
@@ -168,16 +226,28 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
       const withFileImages = imgs.length
         ? parsed.map((it, idx) => idx < imgs.length ? { ...it, data: { ...it.data, image_url: imgs[idx].url }, image_source: "embedded" as const } : it)
         : parsed;
+      const counts = Object.entries(j.counts as Record<string, number>).map(([k, v]) => `${v} ${CATEGORY_LABELS[k] ?? k}`).join(", ");
+
+      // Nothing usable — skip the finishing flourish and surface the per-file report.
+      if (!withFileImages.length) {
+        stopTimers(); setPhase("idle"); setProgress(0);
+        setFileReports(j.files ?? []);
+        setStatus({ tone: "error", text: "Nothing recognisable found — see per-file report below." });
+        return;
+      }
+
+      // Read done → fixed 10-second finishing countdown (90 → 100) before reveal.
+      stopTimers(); setProgress(90); setPhase("finishing");
+      setStatus({ tone: "info", text: `Found: ${counts}. Organising and finishing up…` });
+      await runFinishCountdown();
+
       setItems(withFileImages);
       setFileReports(j.files ?? []);
       setExtractedImages(j.images ?? []);
-      const counts = Object.entries(j.counts as Record<string, number>).map(([k, v]) => `${v} ${CATEGORY_LABELS[k] ?? k}`).join(", ");
-      if (counts) {
-        setStatus({ tone: "success", text: `Found: ${counts}. Now review below and click "Import" to save into your dashboard.` });
-      } else {
-        setStatus({ tone: "error", text: "Nothing recognisable found — see per-file report below." });
-      }
+      setProgress(100); setPhase("done");
+      setStatus({ tone: "success", text: `Found: ${counts}. Review below and click "Import" to save into your dashboard.` });
     } catch (e) {
+      stopTimers(); setPhase("idle"); setProgress(0);
       setStatus({ tone: "error", text: `Error: ${e instanceof Error ? e.message : String(e)}` });
     } finally { setBusy(false); }
   }
@@ -405,17 +475,26 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
       )}
 
       <div className="flex gap-2 items-center flex-wrap">
-        <label className={BUBBLE_SECONDARY + " cursor-pointer"}>
+        <label className={(busy ? BUBBLE_PRIMARY + " opacity-50 cursor-not-allowed" : BUBBLE_PRIMARY + " cursor-pointer")}>
           {files.length ? "Change files" : "Choose files (PDF / Excel / CSV)"}
           <input ref={fileRef} type="file" multiple accept=".pdf,.xlsx,.xls,.csv,.txt"
+            disabled={busy}
             onChange={(e) => pickFiles(e.target.files)}
             className="hidden" />
         </label>
-        <button disabled={!files.length || busy} onClick={parse} className={BUBBLE_PRIMARY}>
-          {busy ? "Uploading…" : "Upload files"}
-        </button>
+        <label className={(busy ? BUBBLE_SECONDARY + " opacity-50 cursor-not-allowed" : BUBBLE_SECONDARY + " cursor-pointer")}>
+          📁 Choose a folder
+          <input type="file"
+            disabled={busy}
+            {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
+            onChange={(e) => pickFiles(e.target.files)}
+            className="hidden" />
+        </label>
+        {!busy && files.length > 0 && !items.length && (
+          <button type="button" onClick={() => parse()} className={BUBBLE_GHOST + " text-xs"}>↻ Re-read</button>
+        )}
         {!files.length && !items.length && (
-          <span className="text-xs text-stone-500">Drop in the same docs you send couples — quotes, brochures, stock lists, rooming spreadsheets.</span>
+          <span className="text-xs text-stone-500">Pick a folder or files — quotes, brochures, stock lists, rooming spreadsheets. We read them automatically.</span>
         )}
       </div>
 
@@ -439,9 +518,22 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
         </div>
       )}
 
-      {busy && (
-        <div className="h-1.5 w-full overflow-hidden rounded bg-stone-200">
-          <div className="h-full w-1/3 animate-[vyImportBar_1.1s_ease-in-out_infinite] rounded bg-stone-900" />
+      {(phase === "reading" || phase === "finishing") && (
+        <div className="space-y-1.5">
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-stone-200">
+            <div
+              className="h-full rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${progress}%`, background: "var(--poppy)" }}
+            />
+          </div>
+          <div className="flex items-center justify-between text-[11px]" style={{ color: "var(--ink-2)" }}>
+            <span>
+              {phase === "reading"
+                ? "Reading & detecting your items…"
+                : `Finishing up — organising into your dashboard (${finishLeft}s)`}
+            </span>
+            <span className="tabular-nums font-medium">{Math.round(progress)}%</span>
+          </div>
         </div>
       )}
 
