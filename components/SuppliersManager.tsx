@@ -41,7 +41,9 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
     commit([...list, { id: crypto.randomUUID?.() ?? String(Date.now()), category: labelFor(v.type), name: v.name, email: v.email || "", phone: v.phone || "", price: v.price ? String(v.price) : "", status: "contacted", description: v.description || "", fromVendorId: v.id, img: v.img ?? null }]);
   }
 
-  const cats = ["All", ...Array.from(new Set(list.map((s) => s.category).filter(Boolean)))];
+  // Always show the full standard category set so couples can filter by any of them,
+  // plus any custom categories they've added.
+  const cats = ["All", ...CATEGORIES, ...Array.from(new Set(list.map((s) => s.category).filter((c) => c && !CATEGORIES.includes(c)) as string[]))];
   const shown = filter === "All" ? list : list.filter((s) => s.category === filter);
 
   const card: React.CSSProperties = { background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius };
