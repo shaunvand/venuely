@@ -11,7 +11,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <LogoMark size={44} />
           <span className="text-2xl font-bold tracking-tight" style={{ color: "var(--poppy)", fontFamily: "'Fraunces', Georgia, serif" }}>Venuely.</span>
         </Link>
-        <div className="vy-slogan mb-5 text-[10px] text-[color:var(--ink-2)]">Weddings Made Easy</div>
+        <div className="mb-5 text-xs text-[color:var(--ink-2)]">Weddings Made Easy</div>
         <nav className="flex flex-col flex-1">
           <Link href="/admin" className="vy-side-link">Dashboard</Link>
           <Link href="/admin/venues" className="vy-side-link">Venues</Link>
