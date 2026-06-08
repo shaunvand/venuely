@@ -107,7 +107,7 @@ export async function computeSetupSteps(supabase: SupabaseClient, venue: VenueRo
       key: "suppliers",
       title: "Recommend suppliers",
       description: "Photographers, florists, caterers you trust. Couples browse your list instead of guessing.",
-      href: "/venue/marketplace/caterers",
+      href: "/venue/suppliers",
       cta: "Recommended venue suppliers →",
       done: (suppliersCount ?? 0) > 0,
       count: suppliersCount,

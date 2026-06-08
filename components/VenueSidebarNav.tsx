@@ -20,6 +20,7 @@ const TOP_LINKS: (Item & { icon: IconName })[] = [
   { href: "/venue/enquiries", label: "Enquiries", icon: "enquiries" },
   { href: "/venue/weddings", label: "Weddings", icon: "weddings" },
   { href: "/venue/calendar", label: "Calendar", icon: "calendar" },
+  { href: "/venue/suppliers", label: "Suppliers", icon: "vendors" },
   { href: "/venue/uploads", label: "Smart Import", icon: "import" },
 ];
 
@@ -41,19 +42,6 @@ const GROUPS: Group[] = [
       { href: "/venue/accommodation", label: "Accommodation", icon: "bed" },
       { href: "/venue/areas", label: "Areas", icon: "areas" },
       { href: "/venue/seating", label: "Seating & tables", icon: "seat" },
-    ],
-  },
-  {
-    label: "Partner vendors",
-    icon: "vendors",
-    items: [
-      { href: "/venue/marketplace/caterers", label: "Caterers", icon: "catering" },
-      { href: "/venue/marketplace/planners", label: "Planners", icon: "planner" },
-      { href: "/venue/marketplace/florists", label: "Florists", icon: "flowers" },
-      { href: "/venue/marketplace/djs", label: "DJs", icon: "music" },
-      { href: "/venue/marketplace/photographers", label: "Photographers", icon: "camera" },
-      { href: "/venue/marketplace/decor", label: "Decor", icon: "decor" },
-      { href: "/venue/marketplace/bar", label: "Bar services", icon: "bar" },
     ],
   },
   { label: "Money", icon: "money", items: [{ href: "/venue/payments", label: "Payments", icon: "card" }, { href: "/venue/billing", label: "Payouts & fees", icon: "payout" }] },
