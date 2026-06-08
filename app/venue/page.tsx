@@ -319,7 +319,7 @@ export default async function VenueOverview() {
   const donutCirc = 2 * Math.PI * 36;
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 anim-fade-up">
       {showWelcome && <WelcomeImportModal venueId={venue.id} venueName={venue.name} />}
 
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -387,7 +387,7 @@ export default async function VenueOverview() {
       />
 
       {/* Headline stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 vy-stagger">
         {stats.map((s) => (
           <Link key={s.label} href={s.href} className="vy-stat hover:shadow-md transition-shadow relative overflow-hidden">
             <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: s.accent }} />

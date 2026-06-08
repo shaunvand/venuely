@@ -365,6 +365,7 @@ export function CouplePortal({
 
         {/* BODY */}
         <main style={{ flex: 1, padding: isMobile ? "16px 14px 80px" : "24px 28px 90px", width: "100%" }}>
+        <div key={tab} className="anim-fade-up">
         {tab === "Overview" && (
           <CoupleOverview slug={slug} venue={venue} coupleNames={coupleNames} daysToGo={daysToGo} dateLabel={dateLabel} totalDue={totalDue} rooms={rooms} rentals={rentals} state={state} cover={cover} onNavigate={(t) => setTab(t as Tab)} />
         )}
@@ -538,6 +539,7 @@ export function CouplePortal({
             </div>
           </div>
         )}
+        </div>
       </main>
 
       {/* Running total + submit */}

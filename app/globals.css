@@ -127,6 +127,41 @@ body {
   border-color: rgba(28, 25, 23, 0.2);
 }
 
+/* ── Tasteful animation toolkit (used across website + dashboard + portals) ── */
+@keyframes scale-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes pop      { 0% { opacity: 0; transform: scale(0.9); } 60% { transform: scale(1.02); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes float    { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+.anim-rise      { animation: fade-up 0.6s ease-out both; }
+.anim-scale-in  { animation: scale-in 0.5s ease-out both; }
+.anim-pop       { animation: pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-float     { animation: float 6s ease-in-out infinite; }
+
+.delay-600 { animation-delay: 0.6s; }
+.delay-700 { animation-delay: 0.7s; }
+.delay-800 { animation-delay: 0.8s; }
+
+/* Hover affordances — opt-in per element */
+.hover-lift { transition: transform 0.25s ease-out, box-shadow 0.25s ease-out; }
+.hover-lift:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -16px rgba(28, 25, 23, 0.22); }
+.hover-grow { transition: transform 0.4s ease-out; }
+.hover-grow:hover { transform: scale(1.04); }
+.press { transition: transform 0.12s ease; }
+.press:active { transform: scale(0.97); }
+
+/* Staggered entrance for a list/grid of children */
+.vy-stagger > * { animation: fade-up 0.55s ease-out both; }
+.vy-stagger > *:nth-child(1)  { animation-delay: 0.03s; }
+.vy-stagger > *:nth-child(2)  { animation-delay: 0.08s; }
+.vy-stagger > *:nth-child(3)  { animation-delay: 0.13s; }
+.vy-stagger > *:nth-child(4)  { animation-delay: 0.18s; }
+.vy-stagger > *:nth-child(5)  { animation-delay: 0.23s; }
+.vy-stagger > *:nth-child(6)  { animation-delay: 0.28s; }
+.vy-stagger > *:nth-child(7)  { animation-delay: 0.33s; }
+.vy-stagger > *:nth-child(8)  { animation-delay: 0.38s; }
+.vy-stagger > *:nth-child(9)  { animation-delay: 0.43s; }
+.vy-stagger > *:nth-child(n+10) { animation-delay: 0.48s; }
+
 /* ── Admin/Venue dashboard primitives ─────────────────────────────────
    Card / panel / button utility classes that match the couple-portal feel
    without forking the entire static portal CSS.
@@ -176,6 +211,11 @@ body {
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 1.1rem 1.3rem;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.vy-card:hover {
+  box-shadow: 0 10px 28px -16px rgba(28, 25, 23, 0.18);
+  border-color: rgba(28, 25, 23, 0.16);
 }
 .vy-card-hero {
   background: linear-gradient(180deg, var(--cream) 0%, #fff 100%);
@@ -188,6 +228,11 @@ body {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 1rem 1.15rem;
+  transition: transform 0.25s ease-out, box-shadow 0.25s ease-out;
+}
+.vy-stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px -14px rgba(28, 25, 23, 0.2);
 }
 .vy-stat-label {
   font-size: 0.7rem;
@@ -211,9 +256,10 @@ body {
   border-radius: 8px;
   font-weight: 500;
   font-size: 0.85rem;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.12s ease, box-shadow 0.2s ease;
   cursor: pointer;
 }
+.vy-btn:active { transform: translateY(1px) scale(0.985); }
 .vy-btn-primary {
   background: var(--forest);
   color: #fff;
@@ -222,6 +268,7 @@ body {
 .vy-btn-primary:hover {
   background: var(--forest-deep);
   border-color: var(--forest-deep);
+  box-shadow: 0 8px 20px -10px var(--forest);
 }
 .vy-btn-secondary {
   background: #fff;
@@ -280,6 +327,7 @@ body {
   border-bottom: 1px solid var(--line);
 }
 .vy-table tbody tr:last-child td { border-bottom: none; }
+.vy-table tbody tr { transition: background 0.15s ease; }
 .vy-table tbody tr:hover { background: var(--bone); }
 .vy-input,
 .vy-select {
@@ -326,9 +374,9 @@ body {
   border-radius: 10px;
   font-size: 0.84rem;
   color: #44403c;
-  transition: background 0.12s;
+  transition: background 0.15s ease, transform 0.15s ease, color 0.15s ease;
 }
-.vy-side-link:hover { background: var(--bone); }
+.vy-side-link:hover { background: var(--bone); transform: translateX(2px); }
 .vy-side-link.active {
   background: var(--cream);
   color: var(--forest);
@@ -343,10 +391,19 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim-fade-up, .anim-fade-in, .anim-drift, .logo-arch, .text-shimmer, .reveal {
+  .anim-fade-up, .anim-fade-in, .anim-drift, .logo-arch, .text-shimmer, .reveal,
+  .anim-rise, .anim-scale-in, .anim-pop, .anim-float, .vy-stagger > * {
     animation: none !important;
     transition: none !important;
     opacity: 1 !important;
+    transform: none !important;
+  }
+  .hover-lift, .hover-grow, .press, .lift,
+  .vy-card, .vy-stat, .vy-side-link, .vy-btn {
+    transition: none !important;
+  }
+  .hover-lift:hover, .hover-grow:hover, .lift:hover,
+  .vy-stat:hover, .vy-side-link:hover, .vy-btn:active, .press:active {
     transform: none !important;
   }
 }
