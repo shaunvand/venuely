@@ -57,33 +57,6 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
 
   return (
     <div style={{ display: "grid", gap: 22 }}>
-      {/* Recommended by venue */}
-      {vendors.length > 0 && (
-        <div>
-          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1.5, color: "#a8a29e", fontWeight: 700, marginBottom: 10 }}>Recommended by {venueName}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(230px,1fr))", gap: 12 }}>
-            {vendors.map((v) => {
-              const added = list.some((x) => x.fromVendorId === v.id);
-              return (
-                <div key={v.id} style={cardChrome}>
-                  {v.img && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={v.img} alt="" style={{ width: "100%", height: 120, objectFit: "cover" }} />
-                  )}
-                  <div style={{ padding: 14 }}>
-                    <span style={chipStyle}>{labelFor(v.type)}</span>
-                    <div style={{ ...serif, fontSize: 16, fontWeight: 700, marginTop: 6 }}>{v.name}</div>
-                    {v.description && <div style={{ fontSize: 12.5, color: "#57534e", fontStyle: "italic", margin: "6px 0" }}>{v.description}</div>}
-                    {v.price != null && <div style={{ color: primary, fontWeight: 700, fontSize: 13 }}>From {rZA(v.price)}</div>}
-                    <button onClick={() => addFromVenue(v)} disabled={added} style={{ marginTop: 10, width: "100%", border: `1px solid ${added ? "#1a7f4b" : primary}`, background: added ? "#1a7f4b" : "#fff", color: added ? "#fff" : primary, borderRadius: 999, padding: "7px", fontWeight: 600, fontSize: 12.5, cursor: added ? "default" : "pointer" }}>{added ? "✓ Added to my vendors" : "+ Add to my vendors"}</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* My Vendors tracker */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
         <h2 style={{ ...heading, fontSize: 26, margin: 0 }}>Vendor <span style={{ ...serif, fontStyle: "italic" }}>Tracker</span></h2>
@@ -92,7 +65,7 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{cats.map((c) => <button key={c} onClick={() => setFilter(c)} style={chip(filter === c)}>{c}</button>)}</div>
 
       {shown.length === 0 ? (
-        <div style={{ ...card, padding: 26, textAlign: "center", color: "#8a8a8a", fontSize: 13 }}>No vendors yet — add your own, or pick from your venue&apos;s recommendations above.</div>
+        <div style={{ ...card, padding: 26, textAlign: "center", color: "#8a8a8a", fontSize: 13 }}>No vendors yet — add your own, or pick from your venue&apos;s recommendations below.</div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 14 }}>
           {shown.map((s) => {
@@ -119,6 +92,33 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Recommended by venue — below the couple's own tracker */}
+      {vendors.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1.5, color: "#a8a29e", fontWeight: 700, marginBottom: 10 }}>Recommended by {venueName}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(230px,1fr))", gap: 12 }}>
+            {vendors.map((v) => {
+              const added = list.some((x) => x.fromVendorId === v.id);
+              return (
+                <div key={v.id} style={cardChrome}>
+                  {v.img && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={v.img} alt="" style={{ width: "100%", height: 120, objectFit: "cover" }} />
+                  )}
+                  <div style={{ padding: 14 }}>
+                    <span style={chipStyle}>{labelFor(v.type)}</span>
+                    <div style={{ ...serif, fontSize: 16, fontWeight: 700, marginTop: 6 }}>{v.name}</div>
+                    {v.description && <div style={{ fontSize: 12.5, color: "#57534e", fontStyle: "italic", margin: "6px 0" }}>{v.description}</div>}
+                    {v.price != null && <div style={{ color: primary, fontWeight: 700, fontSize: 13 }}>From {rZA(v.price)}</div>}
+                    <button onClick={() => addFromVenue(v)} disabled={added} style={{ marginTop: 10, width: "100%", border: `1px solid ${added ? "#1a7f4b" : primary}`, background: added ? "#1a7f4b" : "#fff", color: added ? "#fff" : primary, borderRadius: 999, padding: "7px", fontWeight: 600, fontSize: 12.5, cursor: added ? "default" : "pointer" }}>{added ? "✓ Added to my vendors" : "+ Add to my vendors"}</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
