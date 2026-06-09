@@ -93,6 +93,18 @@ const SELECT_FIELD_OPTIONS: Record<string, string[]> = {
   price_unit: ["fixed", "per_person", "per_hour"],
 };
 
+// Rotating status lines shown on the progress bar so Smart Import looks busy.
+const READING_MESSAGES = [
+  "Reading your documents…",
+  "Detecting items…",
+  "Categorising your catalogue…",
+  "Sorting rentals & extras…",
+  "Allocating accommodation rooms…",
+  "Matching your suppliers…",
+  "Checking prices…",
+  "Almost there…",
+];
+
 const BUBBLE = "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition";
 const BUBBLE_PRIMARY = `${BUBBLE} bg-[var(--poppy)] text-white hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed`;
 const BUBBLE_SECONDARY = `${BUBBLE} bg-white border border-stone-300 text-stone-800 hover:bg-stone-100`;
@@ -101,7 +113,7 @@ const BUBBLE_GHOST = `${BUBBLE} text-stone-700 hover:bg-stone-100`;
 type BulkUploaderProps = {
   venueId: string;
   embedded?: boolean;
-  onStateChange?: (s: { includedCount: number; isImporting: boolean; imported: boolean; hasItems: boolean }) => void;
+  onStateChange?: (s: { includedCount: number; isImporting: boolean; imported: boolean; hasItems: boolean; processing: boolean }) => void;
 };
 
 export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(function BulkUploader(
@@ -126,44 +138,58 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
   const [nowTick, setNowTick] = useState(Date.now());
   const [isPending, startTransition] = useTransition();
 
-  // Smart Import progress: a single bar that climbs to ~90% while we read & detect,
-  // then a fixed 10-second "finishing" countdown that walks 90 → 100 before the
-  // reviewed items are revealed. phase drives which copy + bar we show.
+  // Smart Import progress: a single bar that slow-loads while we read & detect —
+  // pace scaled to the upload size, with rotating status messages so it never looks
+  // frozen — then speeds up to 100% the moment parsing finishes.
   const [phase, setPhase] = useState<"idle" | "reading" | "finishing" | "done">("idle");
   const [progress, setProgress] = useState(0);
-  const [finishLeft, setFinishLeft] = useState(0);
+  const [phaseMsg, setPhaseMsg] = useState("");
   const climbRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const finishRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function stopTimers() {
-    if (climbRef.current) { clearInterval(climbRef.current); climbRef.current = null; }
-    if (finishRef.current) { clearInterval(finishRef.current); finishRef.current = null; }
+    for (const r of [climbRef, finishRef, msgRef]) {
+      if (r.current) { clearInterval(r.current); r.current = null; }
+    }
   }
   useEffect(() => () => stopTimers(), []);
 
-  // While the parse request is in flight, ease the bar toward 90% (never past it —
-  // the last 10% belongs to the finishing countdown).
-  function startClimb() {
+  // Slow, size-scaled climb toward a ceiling (never reaches 100 until done). Bigger
+  // uploads ease more slowly; a small floor keeps the bar always inching forward so
+  // it never appears stuck. Status messages rotate to look like constant work.
+  function startProgress(totalBytes: number) {
     stopTimers();
+    const mb = totalBytes / (1024 * 1024);
+    const ease = Math.max(0.012, 0.06 / (1 + mb / 2.5)); // bigger files → slower climb
+    const ceiling = 96;
     climbRef.current = setInterval(() => {
-      setProgress((p) => (p >= 90 ? 90 : p + Math.max(0.6, (90 - p) * 0.07)));
-    }, 320);
+      setProgress((p) =>
+        p >= ceiling ? Math.min(98, p + 0.05) : p + Math.max(0.1, (ceiling - p) * ease)
+      );
+    }, 250);
+    setPhaseMsg(READING_MESSAGES[0]);
+    let last = 0;
+    msgRef.current = setInterval(() => {
+      let i = last;
+      while (i === last) i = Math.floor(Math.random() * READING_MESSAGES.length);
+      last = i;
+      setPhaseMsg(READING_MESSAGES[i]);
+    }, 2200);
   }
 
-  // The fixed 10-second flourish: animate 90 → 100 and tick a seconds-remaining label.
-  function runFinishCountdown(): Promise<void> {
+  // Parsing finished → speed up to 100% quickly, then resolve.
+  function finishFast(): Promise<void> {
     return new Promise((resolve) => {
       stopTimers();
-      const stepMs = 100, totalMs = 10000;
-      let elapsed = 0;
-      setFinishLeft(10);
+      setPhaseMsg("Finishing up…");
       finishRef.current = setInterval(() => {
-        elapsed += stepMs;
-        const frac = Math.min(1, elapsed / totalMs);
-        setProgress(90 + frac * 10);
-        setFinishLeft(Math.max(0, Math.ceil((totalMs - elapsed) / 1000)));
-        if (elapsed >= totalMs) { stopTimers(); resolve(); }
-      }, stepMs);
+        setProgress((p) => {
+          const next = p + Math.max(2, (100 - p) * 0.35);
+          if (next >= 100) { stopTimers(); resolve(); return 100; }
+          return next;
+        });
+      }, 40);
     });
   }
 
@@ -204,13 +230,14 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
   }), [includedCount, isPending, imported, busy]);
 
   useEffect(() => {
-    onStateChange?.({ includedCount, isImporting: isPending, imported, hasItems: items.length > 0 });
-  }, [includedCount, isPending, imported, items.length, onStateChange]);
+    onStateChange?.({ includedCount, isImporting: isPending, imported, hasItems: items.length > 0, processing: busy || isPending });
+  }, [includedCount, isPending, imported, items.length, busy, onStateChange]);
 
   async function parse(fileList?: File[]) {
     const toParse = fileList ?? files;
     if (!toParse.length) return;
-    setBusy(true); setPhase("reading"); setProgress(6); startClimb();
+    const totalBytes = toParse.reduce((s, f) => s + f.size, 0);
+    setBusy(true); setPhase("reading"); setProgress(4); startProgress(totalBytes);
     setStatus({ tone: "info", text: `Reading ${toParse.length} file${toParse.length === 1 ? "" : "s"} — this can take 30-60 seconds for large PDFs.` });
     setMsg(null); setItems([]); setImported(false); setCommitResults(null); setUndo(null);
     try {
@@ -241,10 +268,10 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
         return;
       }
 
-      // Read done → fixed 10-second finishing countdown (90 → 100) before reveal.
-      stopTimers(); setProgress(90); setPhase("finishing");
+      // Read done → speed up to 100% quickly, then reveal.
+      setPhase("finishing");
       setStatus({ tone: "info", text: `Found: ${counts}. Organising and finishing up…` });
-      await runFinishCountdown();
+      await finishFast();
 
       setItems(withFileImages);
       setFileReports(j.files ?? []);
@@ -532,11 +559,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
             />
           </div>
           <div className="flex items-center justify-between text-[11px]" style={{ color: "var(--ink-2)" }}>
-            <span>
-              {phase === "reading"
-                ? "Reading & detecting your items…"
-                : `Finishing up — organising into your dashboard (${finishLeft}s)`}
-            </span>
+            <span>{phaseMsg || "Reading & detecting your items…"}</span>
             <span className="tabular-nums font-medium">{Math.round(progress)}%</span>
           </div>
         </div>

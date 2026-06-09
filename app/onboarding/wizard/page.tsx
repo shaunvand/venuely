@@ -21,9 +21,10 @@ import { WizardClient } from "./WizardClient";
 export default async function OnboardingWizard({
   searchParams,
 }: {
-  searchParams: Promise<{ step?: string }>;
+  searchParams: Promise<{ step?: string; created?: string }>;
 }) {
-  const { step: stepParam } = await searchParams;
+  const { step: stepParam, created } = await searchParams;
+  const justCreated = created === "1";
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?redirect=/onboarding/wizard");
@@ -76,6 +77,8 @@ export default async function OnboardingWizard({
     : "/venue/weddings";
 
   // Default landing step when a venue already exists: jump past Basics to Import (step 2).
+  // Just after creation we land on step 1 with ?created=1 so the wizard can flash a
+  // confirmation and auto-advance to Import.
   const parsed = Number(stepParam);
   const initialStep = parsed >= 1 && parsed <= 4 ? parsed : 2;
 
@@ -85,6 +88,7 @@ export default async function OnboardingWizard({
       venue={{ id: venue.id, slug: venue.slug, name: venue.name }}
       mapsKey={mapsKey}
       setupAction={setupVenue}
+      justCreated={justCreated}
       setup={{
         steps,
         doneCount,

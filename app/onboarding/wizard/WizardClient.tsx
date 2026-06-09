@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { SetupVenueForm } from "@/components/SetupVenueForm";
 import { BulkUploader, type BulkUploaderHandle } from "@/components/BulkUploader";
@@ -149,6 +149,7 @@ export function WizardClient({
   setupAction,
   setup,
   previewHref,
+  justCreated = false,
 }: {
   initialStep: number;
   venue: WizardVenue | null;
@@ -156,6 +157,7 @@ export function WizardClient({
   setupAction: (formData: FormData) => void;
   setup: WizardSetup | null;
   previewHref: string | null;
+  justCreated?: boolean;
 }) {
   const [step, setStep] = useState<number>(initialStep);
 
@@ -266,7 +268,7 @@ export function WizardClient({
           {/* Step content */}
           <section className="min-w-0">
             {step === 1 && (
-              <StepBasics venue={venue} mapsKey={mapsKey} setupAction={setupAction} onContinue={() => setStep(2)} />
+              <StepBasics venue={venue} mapsKey={mapsKey} setupAction={setupAction} justCreated={justCreated} onContinue={() => setStep(2)} />
             )}
             {step === 2 && (
               <StepImport venue={venue} importDone={importDone} onBack={() => setStep(1)} onContinue={() => setStep(3)} />
@@ -297,17 +299,40 @@ function StepShell({ eyebrow, title, intro, children }: { eyebrow: string; title
   );
 }
 
+function VenueSetupToast({ venueName }: { venueName: string }) {
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-6" style={{ background: "rgba(28,25,23,0.35)" }}>
+      <div className="anim-pop bg-white rounded-2xl shadow-xl px-8 py-7 text-center max-w-sm w-full" style={{ border: "1px solid var(--line)" }}>
+        <div className="mx-auto w-14 h-14 rounded-full flex items-center justify-center text-2xl" style={{ background: "var(--leaf)", color: "#1f5d3e" }}>✓</div>
+        <h2 className="vy-h2 mt-4">Your venue is set up</h2>
+        <p className="text-sm mt-1.5" style={{ color: "var(--ink-2)" }}>{venueName} is ready — taking you to Smart Import…</p>
+      </div>
+    </div>
+  );
+}
+
 function StepBasics({
   venue,
   mapsKey,
   setupAction,
+  justCreated,
   onContinue,
 }: {
   venue: WizardVenue | null;
   mapsKey: string | null;
   setupAction: (formData: FormData) => void;
+  justCreated: boolean;
   onContinue: () => void;
 }) {
+  // Just created → flash a 2-second confirmation, then auto-advance to Import.
+  useEffect(() => {
+    if (venue && justCreated) {
+      const t = setTimeout(onContinue, 2000);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venue, justCreated]);
+
   // Venue already created — show a done summary and let them continue.
   if (venue) {
     return (
@@ -316,6 +341,7 @@ function StepBasics({
         title="Your venue is set up"
         intro="The essentials are saved. You can edit name, address, branding and your story any time from venue settings."
       >
+        {justCreated && <VenueSetupToast venueName={venue.name} />}
         <div className="rounded-xl p-4 flex items-center gap-3" style={{ background: "var(--leaf)", border: "1px solid var(--line)" }}>
           <span className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.7)", color: "#1f5d3e" }}>✓</span>
           <div className="text-sm">
@@ -360,6 +386,20 @@ function StepImport({
   onContinue: () => void;
 }) {
   const uploaderRef = useRef<BulkUploaderHandle>(null);
+  const [up, setUp] = useState({ processing: false, imported: false, hasItems: false, includedCount: 0, isImporting: false });
+
+  // Once an import lands, automatically move on to Your spaces (after a beat so the
+  // success state is visible) — no manual "Continue" click needed.
+  useEffect(() => {
+    if (up.imported) {
+      const t = setTimeout(onContinue, 1600);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [up.imported]);
+
+  const working = up.processing || up.imported;
+
   return (
     <StepShell
       eyebrow="Step 2 of 4 · Import"
@@ -367,21 +407,28 @@ function StepImport({
       intro="Drop in the files you already send couples — quote PDFs, stock lists, brochures, rooming spreadsheets, supplier directories. Smart Import reads them and pre-fills your catalogue, rentals, accommodation and partner vendors. You review everything before it saves."
     >
       <ImportExplainer onSmartImport={() => uploaderRef.current?.openFilePicker()} />
-      {importDone && (
+      {importDone && !up.processing && !up.imported && (
         <div className="mb-4 rounded-xl p-3 flex items-center gap-3 text-sm" style={{ background: "var(--leaf)", color: "#1f5d3e", border: "1px solid var(--line)" }}>
           <span>✓</span> You&apos;ve already imported inventory. Add more files below, or continue.
         </div>
       )}
       {venue ? (
-        <BulkUploader ref={uploaderRef} venueId={venue.id} />
+        <BulkUploader ref={uploaderRef} venueId={venue.id} onStateChange={setUp} />
       ) : (
         <div className="vy-empty text-sm">Create your venue first (Step 1) to import inventory.</div>
       )}
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
         <button type="button" onClick={onBack} className="vy-btn vy-btn-ghost">← Back</button>
-        <button type="button" onClick={onContinue} className="vy-btn vy-btn-primary">
-          {importDone ? "Continue → Your spaces" : "Skip for now → Your spaces"}
-        </button>
+        {working ? (
+          <span className="inline-flex items-center gap-2.5 text-sm" style={{ color: "var(--ink-2)" }}>
+            <span className="inline-block w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: "var(--peach)", borderTopColor: "var(--poppy)" }} />
+            {up.imported ? "Imported — opening Your spaces…" : "Setting up your dashboard…"}
+          </span>
+        ) : (
+          <button type="button" onClick={onContinue} className="text-sm hover:underline" style={{ color: "var(--ink-2)" }}>
+            Skip for now → Your spaces
+          </button>
+        )}
       </div>
     </StepShell>
   );

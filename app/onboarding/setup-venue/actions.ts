@@ -133,7 +133,7 @@ export async function setupVenue(formData: FormData) {
     })));
   }
 
-  // Basics done → take the owner straight into Smart Import (Step 2 of the wizard)
-  // so they upload their documents next, rather than dropping onto the dashboard.
-  redirect("/onboarding/wizard?step=2");
+  // Basics done → land on Step 1 with a "created" flag so the wizard flashes a brief
+  // "Your venue is set up" confirmation, then auto-advances into Smart Import.
+  redirect("/onboarding/wizard?step=1&created=1");
 }
