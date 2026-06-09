@@ -550,20 +550,34 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
         </div>
       )}
 
-      {(phase === "reading" || phase === "finishing") && (
-        <div className="space-y-1.5">
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-stone-200">
-            <div
-              className="h-full rounded-full transition-all duration-300 ease-out"
-              style={{ width: `${progress}%`, background: "var(--poppy)" }}
-            />
+      {(phase === "reading" || phase === "finishing") && (() => {
+        // Near the top while still reading = it's taking a while → reassure + warn.
+        const lateReading = phase === "reading" && progress >= 97.5;
+        return (
+          <div className="space-y-1.5">
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-stone-200">
+              <div
+                className="h-full rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${progress}%`, background: "var(--poppy)" }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px]" style={{ color: "var(--ink-2)" }}>
+              <span>
+                {lateReading
+                  ? "Setting up your dashboard — please be patient, this is taking longer than normal…"
+                  : (phaseMsg || "Reading & detecting your items…")}
+              </span>
+              <span className="tabular-nums font-medium">{Math.round(progress)}%</span>
+            </div>
+            {lateReading && (
+              <div className="flex items-start gap-1.5 text-[11px] font-medium" style={{ color: "#a3210e" }}>
+                <span aria-hidden>⚠</span>
+                <span>Please don&apos;t refresh or close this page — we&apos;re almost there.</span>
+              </div>
+            )}
           </div>
-          <div className="flex items-center justify-between text-[11px]" style={{ color: "var(--ink-2)" }}>
-            <span>{phaseMsg || "Reading & detecting your items…"}</span>
-            <span className="tabular-nums font-medium">{Math.round(progress)}%</span>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {msg && <p className="text-sm text-stone-700">{msg}</p>}
 
