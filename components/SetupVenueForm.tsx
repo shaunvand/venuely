@@ -184,11 +184,12 @@ export function SetupVenueForm({
       </div>
 
       <div>
-        <div className="mb-2 flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-sm font-semibold text-red-700">
-          <span aria-hidden className="text-lg leading-none">↓</span>
+        <div className="mb-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+          <span aria-hidden className="text-base leading-none">📍</span>
           <span>
-            You must click into the address field below and pick your venue from the Google results to lock in the exact location.
-            {addressSeed ? " The address prefilled from your website is not enough — confirm it here to complete setup." : " Selecting a Google result is required to complete setup."}
+            {addressSeed
+              ? "We've auto-located your venue from your website — check the pin below is in the right spot. If it's off, start typing and pick the correct Google result."
+              : "Start typing your address and pick the matching Google result so we can drop an exact pin."}
           </span>
         </div>
         <VenueAddressPicker key={pickerKey} apiKey={mapsKey} name="address" initial={{ region, address: addressSeed }} />

@@ -99,11 +99,12 @@ export function VenueAddressPicker({
       try {
         await loadGoogleMaps(apiKey);
         if (cancelled || !inputRef.current || !mapRef.current) return;
-        // Pull in Map + Marker + Autocomplete via importLibrary (works with loading=async).
-        const [{ Map }, { Marker }, { Autocomplete }] = await Promise.all([
+        // Pull in Map + Marker + Autocomplete + Geocoder via importLibrary (works with loading=async).
+        const [{ Map }, { Marker }, { Autocomplete }, { Geocoder }] = await Promise.all([
           google.maps.importLibrary("maps") as Promise<google.maps.MapsLibrary>,
           google.maps.importLibrary("marker") as Promise<google.maps.MarkerLibrary>,
           google.maps.importLibrary("places") as Promise<google.maps.PlacesLibrary>,
+          google.maps.importLibrary("geocoding") as Promise<google.maps.GeocodingLibrary>,
         ]);
         if (cancelled) return;
 
@@ -122,6 +123,22 @@ export function VenueAddressPicker({
           });
         }
 
+        // Apply a resolved location (from a picked prediction OR an auto-geocode):
+        // update state + hidden fields, recenter the map and drop the pin.
+        const applyResult = (next: AddressValue) => {
+          setValue(next);
+          onChange?.(next);
+          if (next.latitude != null && next.longitude != null) {
+            const pos = { lat: next.latitude, lng: next.longitude };
+            if (mapInstance.current) {
+              mapInstance.current.setCenter(pos);
+              mapInstance.current.setZoom(15);
+            }
+            if (markerInstance.current) markerInstance.current.setMap(null);
+            markerInstance.current = new Marker({ map: mapInstance.current!, position: pos });
+          }
+        };
+
         const ac = new Autocomplete(inputRef.current, {
           fields: ["formatted_address", "place_id", "geometry", "address_components", "url"],
           componentRestrictions: { country: ["za"] },
@@ -131,30 +148,45 @@ export function VenueAddressPicker({
           const place = ac.getPlace();
           const loc = place.geometry?.location;
           if (!loc || !place.place_id || !place.formatted_address) return;
-          const lat = loc.lat();
-          const lng = loc.lng();
           const region = place.address_components ? regionFromComponents(place.address_components) : "";
           const mapsUrl = place.url ?? `https://www.google.com/maps/place/?q=place_id:${place.place_id}`;
-          const next: AddressValue = {
+          applyResult({
             address: place.formatted_address,
             region,
-            latitude: lat,
-            longitude: lng,
+            latitude: loc.lat(),
+            longitude: loc.lng(),
             google_place_id: place.place_id,
             google_maps_url: mapsUrl,
-          };
-          setValue(next);
-          onChange?.(next);
-          if (mapInstance.current) {
-            mapInstance.current.setCenter({ lat, lng });
-            mapInstance.current.setZoom(15);
-          }
-          if (markerInstance.current) markerInstance.current.setMap(null);
-          markerInstance.current = new Marker({
-            map: mapInstance.current!,
-            position: { lat, lng },
           });
         });
+
+        // Auto-select the first Google result for a seeded address (e.g. pre-filled
+        // from the venue's website) so the pin loads without the user having to click
+        // into the field. They can still type to pick a different result afterwards.
+        if (value.address && value.latitude == null && !value.google_place_id) {
+          try {
+            const geocoder = new Geocoder();
+            const { results } = await geocoder.geocode({
+              address: value.address,
+              componentRestrictions: { country: "ZA" },
+            });
+            const r = results?.[0];
+            const loc = r?.geometry?.location;
+            if (!cancelled && r && loc && r.place_id && r.formatted_address) {
+              if (inputRef.current) inputRef.current.value = r.formatted_address;
+              applyResult({
+                address: r.formatted_address,
+                region: r.address_components ? regionFromComponents(r.address_components) : value.region,
+                latitude: loc.lat(),
+                longitude: loc.lng(),
+                google_place_id: r.place_id,
+                google_maps_url: `https://www.google.com/maps/place/?q=place_id:${r.place_id}`,
+              });
+            }
+          } catch {
+            // Geocode failed (ambiguous / no match) — leave the seed text for the user to pick manually.
+          }
+        }
 
         // Geolocation hint — only if no initial location.
         if (!value.latitude && navigator.geolocation) {
@@ -188,7 +220,7 @@ export function VenueAddressPicker({
           placeholder="Start typing your venue address…"
           className="w-full border rounded px-3 py-2"
         />
-        <p className="text-xs text-stone-500">Powered by Google Places — pick a result for an exact location.</p>
+        <p className="text-xs text-stone-500">Powered by Google Places — we auto-locate from your details; start typing to pick a different result if the pin is off.</p>
       </div>
 
       <div
