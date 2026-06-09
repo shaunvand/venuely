@@ -729,14 +729,14 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                             no image
                           </div>
                         )}
-                        <div className="flex items-center justify-center gap-2 w-full">
+                        <div className="flex flex-col gap-2 w-full">
                           <select
                             value=""
                             onChange={(e) => { if (e.target.value) updateItem(it._id, { data: { ...it.data, image_url: e.target.value }, image_source: "embedded" }); }}
-                            className="border rounded-full px-3 py-1 text-[11px] bg-white"
-                            style={{ borderColor: "var(--line)" }}
+                            className="w-full box-border rounded-full px-3 py-1.5 text-[11px] bg-white truncate"
+                            style={{ border: "1px solid var(--line)" }}
                           >
-                            <option value="">pick from file…</option>
+                            <option value="">Pick from file…</option>
                             {extractedImages.map((img) => (
                               <option key={img.url} value={img.url}>{img.source_file.slice(0, 12)}…#{img.ordinal + 1}</option>
                             ))}
@@ -744,10 +744,10 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                           <button
                             type="button"
                             onClick={() => findOnline(it._id)}
-                            className="rounded-full px-3 py-1 text-[11px] whitespace-nowrap"
+                            className="w-full box-border rounded-full px-3 py-1.5 text-[11px] text-center truncate"
                             style={{ background: "var(--ink)", color: "#fff" }}
                           >
-                            🔍 Find online
+                            🔍 Find a different image online
                           </button>
                         </div>
                       </div>
@@ -846,16 +846,23 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
               <button onClick={() => setItems((c) => c.map((it) => ({ ...it, _include: false })))} className={BUBBLE_GHOST + " text-xs"}>Select none</button>
             </div>
             {!embedded && (
-              <button disabled={isPending || !includedCount} onClick={commit} className={BUBBLE_PRIMARY}>
-                {isPending ? (
-                  <>
-                    <span className="inline-block w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                    Importing — don&apos;t close this tab…
-                  </>
-                ) : (
-                  `Import ${includedCount} item${includedCount === 1 ? "" : "s"} →`
+              <div className="flex items-center gap-3 flex-wrap justify-end">
+                {!isPending && includedCount > 0 && (
+                  <span className="text-xs font-bold flex items-center gap-1" style={{ color: "var(--ink-2)" }}>
+                    You can edit these later <span aria-hidden>→</span>
+                  </span>
                 )}
-              </button>
+                <button disabled={isPending || !includedCount} onClick={commit} className={BUBBLE_PRIMARY}>
+                  {isPending ? (
+                    <>
+                      <span className="inline-block w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      Importing — don&apos;t close this tab…
+                    </>
+                  ) : (
+                    `Import ${includedCount} item${includedCount === 1 ? "" : "s"} →`
+                  )}
+                </button>
+              </div>
             )}
           </div>
         </>
