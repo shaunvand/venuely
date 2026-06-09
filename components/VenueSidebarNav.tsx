@@ -17,10 +17,10 @@ type Group = { label: string; icon: IconName; items: Item[] };
 const TOP_LINKS: (Item & { icon: IconName })[] = [
   { href: "/venue", label: "Overview", icon: "overview" },
   { href: "/venue/your-venue", label: "Your Venue", icon: "venue" },
-  { href: "/venue/enquiries", label: "Enquiries", icon: "enquiries" },
   { href: "/venue/weddings", label: "Weddings", icon: "weddings" },
   { href: "/venue/calendar", label: "Calendar", icon: "calendar" },
   { href: "/venue/suppliers", label: "Suppliers", icon: "vendors" },
+  { href: "/venue/enquiries", label: "Enquiries", icon: "enquiries" },
   { href: "/venue/uploads", label: "Smart Import", icon: "import" },
 ];
 
