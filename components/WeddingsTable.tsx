@@ -1,0 +1,143 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { statusColor } from "@/lib/wedding/status";
+
+export type WeddingRow = {
+  id: string;
+  couple: string;
+  date: string | null;
+  endDate: string | null;
+  guests: number | null;
+  status: string;
+  portalShort: string; // e.g. venuely.co.za/h-s-2027
+  portalFull: string;
+  actions: React.ReactNode; // server-bound <WeddingRowActions />
+};
+
+const PAGE_SIZE = 10;
+
+// "All weddings" card from the dashboard mock: count badge, search, status
+// filter, table with copyable portal URLs and pagination.
+export function WeddingsTable({ rows }: { rows: WeddingRow[] }) {
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState("all");
+  const [page, setPage] = useState(1);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const statuses = useMemo(() => Array.from(new Set(rows.map((r) => r.status))).sort(), [rows]);
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (status !== "all" && r.status !== status) return false;
+      if (needle && !`${r.couple} ${r.portalShort}`.toLowerCase().includes(needle)) return false;
+      return true;
+    });
+  }, [rows, q, status]);
+
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pages);
+  const visible = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  function copy(r: WeddingRow) {
+    navigator.clipboard.writeText(r.portalFull).then(() => {
+      setCopiedId(r.id);
+      setTimeout(() => setCopiedId(null), 1500);
+    });
+  }
+
+  return (
+    <div className="vy-card p-0 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 pb-4">
+        <div className="flex items-center gap-2">
+          <h2 className="font-serif text-xl" style={{ color: "var(--ink)" }}>All weddings</h2>
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--cream)", color: "var(--poppy-deep)" }}>{filtered.length}</span>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--ink-2)" }}>
+              <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" aria-hidden><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+            </span>
+            <input
+              value={q}
+              onChange={(e) => { setQ(e.target.value); setPage(1); }}
+              placeholder="Search weddings…"
+              className="vy-input text-sm"
+              style={{ paddingLeft: "2.1rem", paddingTop: "0.45rem", paddingBottom: "0.45rem", width: "230px" }}
+            />
+          </div>
+          <select
+            value={status}
+            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+            className="vy-select text-sm"
+            style={{ paddingTop: "0.45rem", paddingBottom: "0.45rem" }}
+            aria-label="Filter by status"
+          >
+            <option value="all">Filter: all</option>
+            {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <table className="vy-table">
+        <thead>
+          <tr>
+            <th>Couple</th>
+            <th>Date</th>
+            <th>Guests</th>
+            <th>Status</th>
+            <th>Portal URL</th>
+            <th className="text-right">&nbsp;</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visible.map((r) => (
+            <tr key={r.id}>
+              <td><div className="font-medium">{r.couple}</div></td>
+              <td className="whitespace-nowrap">{r.date ? (r.endDate ? `${r.date} → ${r.endDate}` : r.date) : "—"}</td>
+              <td>{r.guests ?? "—"}</td>
+              <td>
+                <span className="text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-full whitespace-nowrap" style={{ background: statusColor(r.status).bg, color: statusColor(r.status).text }}>
+                  {r.status}
+                </span>
+              </td>
+              <td>
+                <span className="inline-flex items-center gap-1.5 font-mono text-xs text-stone-500 max-w-[220px]">
+                  <span className="truncate" title={r.portalFull}>{r.portalShort}</span>
+                  <button type="button" onClick={() => copy(r)} aria-label="Copy portal URL" className="press shrink-0" style={{ color: copiedId === r.id ? "#1f5d3e" : "var(--ink-2)" }}>
+                    {copiedId === r.id ? "✓" : (
+                      <svg viewBox="0 0 14 14" className="w-3.5 h-3.5" aria-hidden><rect x="4" y="4" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.2" /><path d="M10 4V3a1.5 1.5 0 0 0-1.5-1.5h-5A1.5 1.5 0 0 0 2 3v5A1.5 1.5 0 0 0 3.5 9.5H4" fill="none" stroke="currentColor" strokeWidth="1.2" /></svg>
+                    )}
+                  </button>
+                </span>
+              </td>
+              <td className="text-right whitespace-nowrap">{r.actions}</td>
+            </tr>
+          ))}
+          {!visible.length && (
+            <tr><td colSpan={6} className="text-center text-sm py-8" style={{ color: "var(--ink-2)" }}>No weddings match — clear the search or filter.</td></tr>
+          )}
+        </tbody>
+      </table>
+
+      {pages > 1 && (
+        <div className="flex items-center justify-center gap-1 py-3 border-t" style={{ borderColor: "var(--line)" }}>
+          <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="w-8 h-8 rounded-lg border border-stone-200 disabled:opacity-40 press" aria-label="Previous page">‹</button>
+          {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPage(p)}
+              className="w-8 h-8 rounded-lg text-sm font-medium press"
+              style={p === safePage ? { background: "var(--cream)", color: "var(--poppy-deep)", border: "1px solid var(--peach)" } : { color: "var(--ink-2)" }}
+            >
+              {p}
+            </button>
+          ))}
+          <button type="button" disabled={safePage >= pages} onClick={() => setPage(safePage + 1)} className="w-8 h-8 rounded-lg border border-stone-200 disabled:opacity-40 press" aria-label="Next page">›</button>
+        </div>
+      )}
+    </div>
+  );
+}

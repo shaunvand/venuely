@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
+// Row actions matching the dashboard mock: [Open ↗] [⚙ Manage] [⋯ menu] —
+// the overflow menu holds copy-URL, portal-password controls, mark-paid and delete.
 export function WeddingRowActions({
   portalUrl,
   slug,
@@ -24,29 +26,41 @@ export function WeddingRowActions({
   markCouplePaidAction: () => void;
   deleteAction?: () => void;
 }) {
+  const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
   const [pw, setPw] = useState("");
   const [isPending, startTransition] = useTransition();
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) { setOpen(false); setPwOpen(false); }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
 
   function copy() {
     navigator.clipboard.writeText(portalUrl).then(() => {
-      setCopied(true); setTimeout(() => setCopied(false), 1500);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     });
   }
   function savePw() {
     const fd = new FormData();
     fd.set("password", pw);
-    startTransition(async () => { await setPasswordAction(fd); setPwOpen(false); setPw(""); });
+    startTransition(async () => { await setPasswordAction(fd); setPwOpen(false); setPw(""); setOpen(false); });
   }
   function clearPw() {
     const fd = new FormData();
     fd.set("password", "");
-    startTransition(async () => { await setPasswordAction(fd); });
+    startTransition(async () => { await setPasswordAction(fd); setOpen(false); });
   }
   function markPaid() {
     if (!confirm("Mark this couple as paid?")) return;
-    startTransition(async () => { await markCouplePaidAction(); });
+    startTransition(async () => { await markCouplePaidAction(); setOpen(false); });
   }
   function remove() {
     if (!deleteAction) return;
@@ -54,51 +68,67 @@ export function WeddingRowActions({
     startTransition(async () => { await deleteAction(); });
   }
 
+  const itemCls = "w-full text-left px-3 py-2 text-xs hover:bg-[color:var(--cream)] disabled:opacity-50";
+
   return (
-    <div className="flex flex-col gap-1.5 items-end text-xs">
-      <div className="flex gap-1 items-center">
-        <button onClick={copy} className="px-2 py-1 rounded-full border border-stone-300 bg-white hover:bg-stone-100 font-mono text-[11px]" title={portalUrl}>
-          {copied ? "✓ Copied" : "📋 Copy URL"}
+    <div className="flex items-center justify-end gap-2 text-xs">
+      <Link
+        href={`/${slug}`}
+        target="_blank"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium border transition hover:bg-[color:var(--cream)]"
+        style={{ borderColor: "var(--poppy)", color: "var(--poppy)" }}
+      >
+        Open
+        <svg viewBox="0 0 12 12" className="w-3 h-3" aria-hidden><path d="M4 2h6v6M10 2L3 9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </Link>
+      <Link
+        href={`/venue/weddings/${slug}`}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium border border-stone-200 bg-white transition hover:bg-stone-50"
+        style={{ color: "var(--ink)" }}
+      >
+        <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" aria-hidden><circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" strokeWidth="1.3" /><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6L11 5M5 11l-1.4 1.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+        Manage
+      </Link>
+
+      <div className="relative" ref={menuRef}>
+        <button
+          type="button"
+          onClick={() => { setOpen((v) => !v); setPwOpen(false); }}
+          aria-label="More actions"
+          className="inline-flex items-center justify-center w-9 h-8 rounded-lg border border-stone-200 bg-white transition hover:bg-stone-50 font-semibold tracking-widest"
+          style={{ color: "var(--ink-2)" }}
+        >
+          …
         </button>
-        <span className={`px-2 py-1 rounded-full text-[10px] ${passwordSet ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-stone-50 text-stone-500 border border-stone-200"}`}>
-          {passwordSet ? "🔒 password set" : "🔓 open"}
-        </span>
-      </div>
-
-      {!pwOpen ? (
-        <div className="flex gap-1">
-          <button onClick={() => setPwOpen(true)} className="px-2 py-1 rounded-full border border-stone-300 bg-white hover:bg-stone-100">
-            {passwordSet ? "Change password" : "Set password"}
-          </button>
-          {passwordSet && (
-            <button onClick={clearPw} disabled={isPending} className="px-2 py-1 rounded-full border border-stone-300 bg-white hover:bg-stone-100">
-              Remove
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="flex gap-1">
-          <input autoFocus value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Password" className="border rounded-full px-2 py-1 text-xs w-32" />
-          <button disabled={isPending || !pw.trim()} onClick={savePw} className="px-2 py-1 rounded-full bg-stone-900 text-white hover:bg-stone-700 disabled:opacity-50">Save</button>
-          <button onClick={() => { setPwOpen(false); setPw(""); }} className="px-2 py-1 rounded-full border border-stone-300 bg-white">×</button>
-        </div>
-      )}
-
-      <div className="flex gap-1">
-        {invoicedAt && !couplePaidAt && (
-          <button onClick={markPaid} disabled={isPending} className="px-2 py-1 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50">
-            ✓ Mark paid
-          </button>
-        )}
-        {couplePaidAt && (
-          <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Paid</span>
-        )}
-        <Link href={`/venue/weddings/${slug}`} className="px-2 py-1 rounded-full border border-stone-300 bg-white hover:bg-stone-100">Manage</Link>
-        <Link href={`/${slug}`} target="_blank" className="px-2 py-1 rounded-full text-white hover:brightness-105" style={{ background: "var(--poppy)" }}>Open ↗</Link>
-        {deleteAction && (
-          <button onClick={remove} disabled={isPending} className="px-2 py-1 rounded-full border border-red-200 text-red-700 bg-white hover:bg-red-50 disabled:opacity-50" title="Delete wedding">
-            Delete
-          </button>
+        {open && (
+          <div className="absolute right-0 top-9 z-20 w-52 rounded-xl bg-white shadow-lg overflow-hidden anim-fade-in" style={{ border: "1px solid var(--line)" }}>
+            <button type="button" onClick={copy} className={itemCls}>{copied ? "✓ Copied" : "📋 Copy portal URL"}</button>
+            <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider border-t" style={{ color: "var(--ink-2)", borderColor: "var(--line)" }}>
+              Portal access · {passwordSet ? "🔒 password set" : "🔓 open"}
+            </div>
+            {!pwOpen ? (
+              <>
+                <button type="button" onClick={() => setPwOpen(true)} className={itemCls}>{passwordSet ? "Change password" : "Set password"}</button>
+                {passwordSet && <button type="button" onClick={clearPw} disabled={isPending} className={itemCls}>Remove password</button>}
+              </>
+            ) : (
+              <div className="flex gap-1 px-3 py-2">
+                <input autoFocus value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Password" className="border rounded-lg px-2 py-1 text-xs w-full" style={{ borderColor: "var(--line)" }} />
+                <button disabled={isPending || !pw.trim()} onClick={savePw} className="px-2.5 py-1 rounded-lg text-white text-xs disabled:opacity-50" style={{ background: "var(--ink)" }}>Save</button>
+              </div>
+            )}
+            {(invoicedAt && !couplePaidAt) || couplePaidAt || deleteAction ? (
+              <div className="border-t" style={{ borderColor: "var(--line)" }}>
+                {invoicedAt && !couplePaidAt && (
+                  <button type="button" onClick={markPaid} disabled={isPending} className={itemCls} style={{ color: "#1f5d3e" }}>✓ Mark couple paid</button>
+                )}
+                {couplePaidAt && <div className="px-3 py-2 text-xs" style={{ color: "#1f5d3e" }}>✓ Couple paid</div>}
+                {deleteAction && (
+                  <button type="button" onClick={remove} disabled={isPending} className={itemCls} style={{ color: "#b03a2e" }}>Delete wedding…</button>
+                )}
+              </div>
+            ) : null}
+          </div>
         )}
       </div>
     </div>
