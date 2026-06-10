@@ -16,7 +16,7 @@ type Group = { label: string; icon: IconName; items: Item[] };
 
 const TOP_LINKS: (Item & { icon: IconName })[] = [
   { href: "/venue", label: "Overview", icon: "overview" },
-  { href: "/venue/your-venue", label: "Your Venue", icon: "venue" },
+  { href: "/venue/your-venue", label: "Couple Experience", icon: "venue" },
   { href: "/venue/weddings", label: "Weddings", icon: "weddings" },
   // Accommodation is half the business for farm/lodge venues — first-class nav.
   { href: "/venue/accommodation", label: "Accommodation", icon: "bed" },

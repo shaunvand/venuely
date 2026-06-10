@@ -64,12 +64,12 @@ export default async function YourVenuePage() {
   return (
     <div className="space-y-8">
       <header>
-        <div className="vy-eyebrow">Overview</div>
-        <h1 className="vy-h1 mt-1">Your Venue</h1>
-        <p className="text-stone-600 text-sm mt-1">
-          Photos and videos of your venue, grouped by location. These power the
-          &ldquo;Our Venue&rdquo; gallery couples see in their portal. Use Smart
-          Import to auto-pull and label images already uploaded elsewhere.
+        <div className="vy-eyebrow">Couple Experience</div>
+        <h1 className="vy-h1 mt-1">Design Your Couple Portal</h1>
+        <p className="text-stone-600 text-sm mt-1 max-w-2xl">
+          Everything couples see before, during and after their wedding.
+          Personalise the experience once and Venuely automatically creates a
+          beautiful wedding portal for every booking.
         </p>
       </header>
 
