@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 
 type Booking = { slug: string; couple_names: string; wedding_date: string; wedding_end_date?: string | null; status?: string | null };
 
@@ -54,17 +57,19 @@ const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
 export function BookingsCalendar({
   bookings,
-  months: monthsToShow = 6,
   roomNights,
   rentalHolds,
   weddingHref = "/venue/weddings",
 }: {
   bookings: Booking[];
-  months?: number;
+  months?: number; // accepted for back-compat; the grid now shows one month with nav
   roomNights?: RoomNight[];
   rentalHolds?: RentalHold[];
   weddingHref?: string;
 }) {
+  // One month at a time; offset (in months) from the current month, navigable
+  // forward into future months and back into past ones.
+  const [offset, setOffset] = useState(0);
   // Group bookings by ISO date (yyyy-mm-dd), expanding multi-day spans so each
   // covered day shows the wedding.
   const byDate = new Map<string, Booking[]>();
@@ -99,15 +104,12 @@ export function BookingsCalendar({
   const today = new Date();
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
-  const months: { year: number; month: number; label: string }[] = [];
-  for (let i = 0; i < monthsToShow; i++) {
-    const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
-    months.push({
-      year: d.getFullYear(),
-      month: d.getMonth(),
-      label: d.toLocaleDateString("en-ZA", { month: "long", year: "numeric" }),
-    });
-  }
+  const visibleDate = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+  const visible = {
+    year: visibleDate.getFullYear(),
+    month: visibleDate.getMonth(),
+    label: visibleDate.toLocaleDateString("en-ZA", { month: "long", year: "numeric" }),
+  };
 
   type Cell = {
     day: number;
@@ -149,16 +151,21 @@ export function BookingsCalendar({
 
   return (
     <section className="vy-card">
-      <div className="flex flex-wrap items-baseline justify-between gap-3 mb-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div>
           <div className="vy-eyebrow">Bookings calendar</div>
-          <h2 className="vy-h2 mt-1">
-            {monthsToShow === 1
-              ? months[0]?.label ?? "This month"
-              : `Next ${monthsToShow} months`}
-          </h2>
+          <h2 className="vy-h2 mt-1">{visible.label}</h2>
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-xs" style={{ color: "var(--ink-2)" }}>
+        <div className="flex items-center gap-1.5">
+          {offset !== 0 && (
+            <button type="button" onClick={() => setOffset(0)} className="text-xs px-3 py-1.5 rounded-lg transition hover:bg-[color:var(--cream)]" style={{ border: "1px solid var(--line)", color: "var(--ink)" }}>Today</button>
+          )}
+          <button type="button" onClick={() => setOffset((o) => o - 1)} aria-label="Previous month" className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:bg-[color:var(--cream)]" style={{ border: "1px solid var(--line)", color: "var(--ink-2)" }}>‹</button>
+          <button type="button" onClick={() => setOffset((o) => o + 1)} aria-label="Next month" className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:bg-[color:var(--cream)]" style={{ border: "1px solid var(--line)", color: "var(--ink-2)" }}>›</button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 text-xs mb-5" style={{ color: "var(--ink-2)" }}>
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#8a9a86" }} /> Confirmed
           </span>
@@ -184,15 +191,14 @@ export function BookingsCalendar({
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full" style={{ outline: "2px solid var(--sage)", background: "transparent" }} /> Today
           </span>
-        </div>
       </div>
 
-      <div className={hasOverlays ? "grid sm:grid-cols-2 gap-6" : "grid sm:grid-cols-2 lg:grid-cols-3 gap-6"}>
-        {months.map((m) => {
+      <div>
+        {(() => {
+          const m = visible;
           const cells = buildGrid(m.year, m.month);
           return (
-            <div key={m.label}>
-              <div className="font-serif text-base mb-2" style={{ color: "var(--ink)" }}>{m.label}</div>
+            <div>
               <div
                 className="grid grid-cols-7 rounded-xl overflow-hidden"
                 style={{ border: "1px solid var(--line)", background: "var(--line)", gap: "1px" }}
@@ -332,7 +338,7 @@ export function BookingsCalendar({
               </div>
             </div>
           );
-        })}
+        })()}
       </div>
 
       {bookings.length === 0 && !hasOverlays && (
