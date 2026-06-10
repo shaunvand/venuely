@@ -376,8 +376,9 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-10 anim-fade-up">
-      {/* Onboarding-complete celebration: logo opener plays once (gated in-component). */}
-      {welcome === "1" && <VenuelyOpener trigger="welcome" />}
+      {/* Onboarding-complete celebration: logo opener plays once (gated in-component;
+          ?welcome=force replays it for previewing). */}
+      {(welcome === "1" || welcome === "force") && <VenuelyOpener trigger="welcome" />}
       {showWelcome && <WelcomeImportModal venueId={venue.id} venueName={venue.name} />}
 
       <header className="flex flex-wrap items-end justify-between gap-4">

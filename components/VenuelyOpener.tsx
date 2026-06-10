@@ -226,31 +226,45 @@ function Tagline({ t }: { t: number }) {
 
 export function VenuelyOpener({ trigger }: { trigger: "landing" | "welcome" }) {
   const [show, setShow] = useState(false);
+  const [reduced, setReduced] = useState(false);
+  const [staticFade, setStaticFade] = useState(false);
   const [t, setT] = useState(0);
   const [scale, setScale] = useState(0.5);
   const textRef = useRef<HTMLDivElement | null>(null);
   const [offset, setOffset] = useState(330);
 
-  // Gate: once per session (landing) / once ever (welcome), skip on reduced motion.
+  // Gate: once per session (landing) / once ever (welcome). Force-params bypass
+  // the gates for previewing: /?intro=1 on the landing, /venue?welcome=force.
+  // Reduced-motion users get a static lockup that simply fades (no animation).
   useEffect(() => {
     try {
-      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-      if (trigger === "landing") {
-        if (sessionStorage.getItem("vy-intro-shown")) return;
-        sessionStorage.setItem("vy-intro-shown", "1");
-      } else {
-        if (localStorage.getItem("vy-welcome-opener-shown")) return;
-        localStorage.setItem("vy-welcome-opener-shown", "1");
+      const params = new URLSearchParams(window.location.search);
+      const force = trigger === "landing" ? params.get("intro") === "1" : params.get("welcome") === "force";
+      if (!force) {
+        if (trigger === "landing") {
+          if (sessionStorage.getItem("vy-opener-shown")) return;
+          sessionStorage.setItem("vy-opener-shown", "1");
+        } else {
+          if (localStorage.getItem("vy-welcome-opener-shown")) return;
+          localStorage.setItem("vy-welcome-opener-shown", "1");
+        }
       }
+      setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
       setShow(true);
     } catch {
       /* private mode etc. — skip the intro */
     }
   }, [trigger]);
 
-  // RAF clock.
+  // RAF clock (animated mode) / short static fade (reduced motion).
   useEffect(() => {
     if (!show) return;
+    if (reduced) {
+      setT(5.7); // final composed frame, no motion
+      const fadeId = setTimeout(() => setStaticFade(true), 1300);
+      const endId = setTimeout(() => setShow(false), 1900);
+      return () => { clearTimeout(fadeId); clearTimeout(endId); };
+    }
     let raf = 0;
     const start = performance.now();
     const step = (now: number) => {
@@ -261,7 +275,7 @@ export function VenuelyOpener({ trigger }: { trigger: "landing" | "welcome" }) {
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [show]);
+  }, [show, reduced]);
 
   // Responsive lockup scale (the composition is ~1000px wide at scale 1).
   useEffect(() => {
@@ -298,7 +312,8 @@ export function VenuelyOpener({ trigger }: { trigger: "landing" | "welcome" }) {
         position: "fixed", inset: 0, zIndex: 100,
         background: C.offwhite,
         display: "flex", alignItems: "center", justifyContent: "center",
-        opacity: 1 - easeInOutCubic(fadeP),
+        opacity: reduced ? (staticFade ? 0 : 1) : 1 - easeInOutCubic(fadeP),
+        transition: reduced ? "opacity 0.55s ease" : undefined,
         pointerEvents: "none",
         overflow: "hidden",
       }}

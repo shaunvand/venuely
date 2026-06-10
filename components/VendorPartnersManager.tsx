@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addItem, updateItem, bulkDelete } from "@/app/venue/_inventory/actions";
 import { VENDOR_TYPES, VENDOR_LABELS, VENDOR_DB_VALUE } from "@/lib/inventory/schemas";
+
+// Generic stock placeholders (attached during Smart Import) — a supplier's own
+// website image always beats these, so the auto-pull treats them as replaceable.
+const isStockImage = (u: unknown) => /images\.(pexels|unsplash)\.com/i.test(String(u ?? ""));
+const needsSiteImage = (i: Record<string, unknown>) =>
+  String(i.website_url ?? "").trim() !== "" &&
+  (String(i.image_url ?? "").trim() === "" || isStockImage(i.image_url));
 
 type Row = Record<string, unknown> & { id: string };
 const serif: React.CSSProperties = { fontFamily: "'Fraunces', Georgia, serif" };
@@ -31,9 +38,19 @@ export function VendorPartnersManager({ venueId, items }: { venueId: string; ite
     if (!editing || !editing.name.trim()) return;
     setBusy(true);
     try {
+      // No photo chosen but a website given → pull their site image automatically
+      // (the Upload / From website / Remove controls still override it any time).
+      let imageUrl = editing.image_url;
+      if (!imageUrl.trim() && editing.website_url.trim()) {
+        try {
+          const r = await fetch("/api/venue/site-image", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: editing.website_url, venue_id: venueId }) });
+          const j = await r.json();
+          if (r.ok && j.ok && j.url) imageUrl = j.url;
+        } catch { /* save proceeds without an image */ }
+      }
       const patch = {
         name: editing.name.trim(), description: editing.description, price_from: editing.price_from === "" ? null : Number(editing.price_from.replace(/[^\d.]/g, "")) || 0,
-        contact_phone: editing.contact_phone, contact_email: editing.contact_email, website_url: editing.website_url, image_url: editing.image_url,
+        contact_phone: editing.contact_phone, contact_email: editing.contact_email, website_url: editing.website_url, image_url: imageUrl,
         vendor_type: VENDOR_DB_VALUE[editing.typeSlug as keyof typeof VENDOR_DB_VALUE],
       };
       if (editing.id) await updateItem("caterers", editing.id, patch);
@@ -63,20 +80,38 @@ export function VendorPartnersManager({ venueId, items }: { venueId: string; ite
       const j = await r.json(); if (r.ok && j.ok && j.url) setEditing((d) => d ? { ...d, image_url: j.url } : d); else alert(`No image: ${j.error ?? "nothing usable"}`);
     } finally { setImgBusy(false); }
   }
-  async function pullAllImages() {
-    const targets = items.filter((i) => String(i.website_url ?? "").trim() && !String(i.image_url ?? "").trim());
-    if (!targets.length) { setBulkMsg("No suppliers with a website and a missing image."); return; }
+  async function pullAllImages(auto = false) {
+    const targets = items.filter(needsSiteImage);
+    if (!targets.length) { if (!auto) setBulkMsg("No suppliers with a website and a missing or stock image."); return; }
     setBulkBusy(true); let done = 0, failed = 0;
     for (const i of targets) {
-      setBulkMsg(`Fetching ${done + failed + 1} of ${targets.length}…`);
+      setBulkMsg(`${auto ? "Auto-fetching supplier photos from their websites — " : ""}${done + failed + 1} of ${targets.length}…`);
       try {
         const r = await fetch("/api/venue/site-image", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: String(i.website_url), venue_id: venueId }) });
         const j = await r.json();
         if (r.ok && j.ok && j.url) { await updateItem("caterers", i.id, { image_url: j.url }); done++; } else failed++;
       } catch { failed++; }
+      if (done && (done + failed) % 8 === 0) router.refresh(); // surface progress as cards update
     }
-    setBulkBusy(false); setBulkMsg(`Done — ${done} updated${failed ? `, ${failed} had no usable image` : ""}.`); router.refresh();
+    setBulkBusy(false); setBulkMsg(`Done — ${done} supplier photo${done === 1 ? "" : "s"} pulled from their websites${failed ? `, ${failed} had no usable image` : ""}.`); router.refresh();
   }
+
+  // Auto-pull: any supplier with a website but no photo (or just a generic stock
+  // placeholder from import) gets their real site image fetched automatically —
+  // once per session per venue; the Edit dialog still lets people override it.
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (autoRan.current || bulkBusy) return;
+    if (!items.some(needsSiteImage)) return;
+    try {
+      const key = `vy-vendor-autopull-${venueId}`;
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch { return; }
+    autoRan.current = true;
+    void pullAllImages(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, venueId]);
 
   const chip = (active: boolean): React.CSSProperties => ({ border: `1px solid ${active ? "var(--poppy)" : "var(--line)"}`, background: active ? "var(--poppy)" : "#fff", color: active ? "#fff" : "var(--ink-2)", borderRadius: 999, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" });
   const cardChrome: React.CSSProperties = { background: "#fff", border: "1px solid var(--line)", borderLeft: "3px solid var(--poppy)", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 8px rgba(28,25,23,0.08)" };
@@ -88,7 +123,7 @@ export function VendorPartnersManager({ venueId, items }: { venueId: string; ite
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="text-sm text-stone-600">{shown.length} supplier{shown.length === 1 ? "" : "s"}</div>
         <div className="flex gap-2 flex-wrap items-center">
-          <button onClick={pullAllImages} disabled={bulkBusy} className="vy-btn vy-btn-secondary">{bulkBusy ? "Fetching images…" : "📷 Images from websites"}</button>
+          <button onClick={() => pullAllImages()} disabled={bulkBusy} className="vy-btn vy-btn-secondary">{bulkBusy ? "Fetching images…" : "📷 Images from websites"}</button>
           <button onClick={() => setEditing(blank())} className="vy-btn vy-btn-primary">+ Add supplier</button>
         </div>
       </div>
