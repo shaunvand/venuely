@@ -1,8 +1,6 @@
-// Couple-portal design templates. Each template is a full bundle of
-// presentational tokens (fonts, radii, surfaces, nav/hero treatments, dividers,
-// chips) that both the venue-side designer preview AND the live couple portal
-// render against the venue's chosen theme colours — so what the venue saves is
-// exactly what every couple sees (WYSIWYG).
+// Couple-portal design templates. Each template is a bundle of presentational
+// tokens (fonts, radii, button/tab/hero styles) that the on-venue preview — and,
+// later, the live couple portal — render against the venue's chosen theme colours.
 // Kept framework-free (plain data) so both a client preview and a server portal
 // can consume it.
 
@@ -19,39 +17,15 @@ export type TemplateTokens = {
   id: PortalTemplateId;
   name: string;
   blurb: string;
-
-  // Type
   headingFont: string;
   bodyFont: string;
-  headingWeight: number;
-  headingLetterSpacing: string;   // applied to all headings
-  headingItalic?: boolean;
-  eyebrowTracking: string;        // letter-spacing for small uppercase labels
-  heroNameTransform?: "uppercase"; // editorial caption-style couple names
-
-  // Shape
   cardRadius: string;
   buttonRadius: string;
-  chipRadius: string;
-
-  // Buttons / chips
   buttonStyle: "solid" | "outline";
-  buttonCase?: "uppercase";       // editorial buttons are small-caps style
-  chipStyle: "tint" | "outline" | "solid"; // filter chips / tags / badges
-
-  // Layout systems
-  navStyle: "sidebar" | "tabs" | "segmented" | "pills";
-  heroStyle: "overlay" | "framed" | "split" | "arch";
-
-  // Surfaces
-  surface: string;     // page background
-  surfaceCard: string; // card background
-  cardBorder: string;  // card border (CSS border value)
-  cardShadow: string;  // card shadow ("none" allowed)
-  divider: string;     // hairline rule (CSS border value)
-  cardTint?: string;   // hex-alpha of accent layered over white cards (romantic)
-  softTopGlow?: boolean; // soft accent fade at the top of the main column
-  flourish?: string;   // decorative mark between hero name & date (romantic ✦)
+  tabStyle: "underline" | "pill" | "segmented" | "sidebar";
+  heroStyle: "overlay" | "framed" | "split";
+  surface: string;       // page background tint
+  headingItalic?: boolean;
 };
 
 const FRAUNCES = "'Fraunces', Georgia, serif";
@@ -61,97 +35,55 @@ export const PORTAL_TEMPLATES: Record<PortalTemplateId, TemplateTokens> = {
   classic: {
     id: "classic",
     name: "Classic",
-    blurb: "Warm and timeless — cream surface, serif headings, soft shadows, an elegant full-bleed cover.",
+    blurb: "Warm and timeless — serif headings, soft pill buttons, underlined tabs.",
     headingFont: FRAUNCES,
     bodyFont: SATOSHI,
-    headingWeight: 600,
-    headingLetterSpacing: "0.01em",
-    eyebrowTracking: "0.16em",
     cardRadius: "1rem",
     buttonRadius: "999px",
-    chipRadius: "999px",
     buttonStyle: "solid",
-    chipStyle: "tint",
-    navStyle: "sidebar",
+    tabStyle: "underline",
     heroStyle: "overlay",
-    surface: "#FAF4EC",
-    surfaceCard: "#FFFFFF",
-    cardBorder: "1px solid rgba(93,64,35,0.10)",
-    cardShadow: "0 2px 14px rgba(93,64,35,0.07)",
-    divider: "1px solid rgba(93,64,35,0.12)",
-    softTopGlow: true,
+    surface: "#FFF6F0",
   },
   editorial: {
     id: "editorial",
     name: "Editorial",
-    blurb: "Magazine-style — stark white, big serif display type, hairline rules, a matted cover plate, numbered tabs.",
+    blurb: "Magazine-style — big serif type, square edges, a framed cover image.",
     headingFont: FRAUNCES,
     bodyFont: SATOSHI,
-    headingWeight: 700,
-    headingLetterSpacing: "-0.015em",
-    eyebrowTracking: "0.22em",
-    heroNameTransform: "uppercase",
-    cardRadius: "0",
-    buttonRadius: "0",
-    chipRadius: "0",
+    cardRadius: "0.25rem",
+    buttonRadius: "0.25rem",
     buttonStyle: "outline",
-    buttonCase: "uppercase",
-    chipStyle: "outline",
-    navStyle: "tabs",
+    tabStyle: "segmented",
     heroStyle: "framed",
     surface: "#FFFFFF",
-    surfaceCard: "#FFFFFF",
-    cardBorder: "1px solid #1c1917",
-    cardShadow: "none",
-    divider: "1px solid #1c1917",
   },
   modern: {
     id: "modern",
     name: "Modern",
-    blurb: "Clean and bold — all sans, heavy weights, bordered rounded cards, a split colour-block hero, segmented tabs.",
+    blurb: "Clean and bold — sans type, rounded cards, a split hero, segmented tabs.",
     headingFont: SATOSHI,
     bodyFont: SATOSHI,
-    headingWeight: 800,
-    headingLetterSpacing: "-0.02em",
-    eyebrowTracking: "0.1em",
-    cardRadius: "1.1rem",
-    buttonRadius: "0.65rem",
-    chipRadius: "0.55rem",
+    cardRadius: "0.9rem",
+    buttonRadius: "0.6rem",
     buttonStyle: "solid",
-    chipStyle: "solid",
-    navStyle: "segmented",
+    tabStyle: "segmented",
     heroStyle: "split",
-    surface: "#F4F4F1",
-    surfaceCard: "#FFFFFF",
-    cardBorder: "1.5px solid #E5E3DC",
-    cardShadow: "none",
-    divider: "1px solid #E5E3DC",
+    surface: "#FAFAF9",
   },
   romantic: {
     id: "romantic",
     name: "Romantic",
-    blurb: "Soft and dreamy — blush surface, italic serif, an arched cover, pastel-tinted cards, pill tabs.",
+    blurb: "Soft and pretty — italic serif, very rounded, pastel tints, pill tabs.",
     headingFont: FRAUNCES,
     bodyFont: SATOSHI,
-    headingWeight: 500,
-    headingLetterSpacing: "0.01em",
-    headingItalic: true,
-    eyebrowTracking: "0.2em",
     cardRadius: "1.5rem",
     buttonRadius: "999px",
-    chipRadius: "999px",
     buttonStyle: "solid",
-    chipStyle: "tint",
-    navStyle: "pills",
-    heroStyle: "arch",
-    surface: "#FBEFEA",
-    surfaceCard: "#FFFCFB",
-    cardBorder: "1px solid rgba(190,120,110,0.16)",
-    cardShadow: "0 6px 22px rgba(190,120,110,0.10)",
-    divider: "1px solid rgba(190,120,110,0.22)",
-    cardTint: "12",
-    softTopGlow: true,
-    flourish: "✦",
+    tabStyle: "pill",
+    heroStyle: "overlay",
+    surface: "#FFF1EA",
+    headingItalic: true,
   },
 };
 

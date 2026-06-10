@@ -309,51 +309,18 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
   );
 }
 
-// Tiny visual glyph for the template thumbnail — shows the surface, the hero
-// shape (full-bleed / matted plate / split block / arch) and the nav style so
-// the four templates read as genuinely different at a glance.
+// Tiny visual glyph for the template thumbnail (hero bar + tabs + button).
 function TemplateGlyph({ tokens, primary, accent }: { tokens: TemplateTokens; primary: string; accent: string }) {
-  const grad = `linear-gradient(120deg, ${primary}, ${accent})`;
   return (
     <div className="rounded-md overflow-hidden" style={{ border: "1px solid var(--line)", background: tokens.surface }}>
-      {/* hero shape */}
-      {tokens.heroStyle === "framed" ? (
-        <div className="p-1">
-          <div className="h-6" style={{ border: "1px solid #1c1917", padding: 1.5 }}>
-            <div className="w-full h-full" style={{ background: grad }} />
-          </div>
-        </div>
-      ) : tokens.heroStyle === "split" ? (
-        <div className="h-7 grid grid-cols-2">
-          <div style={{ background: primary }} />
-          <div style={{ background: grad }} />
-        </div>
-      ) : tokens.heroStyle === "arch" ? (
-        <div className="pt-1.5 flex justify-center">
-          <div style={{ width: "55%", height: 22, borderRadius: "999px 999px 4px 4px", background: grad }} />
-        </div>
-      ) : (
-        <div className="h-7" style={{ background: grad }} />
-      )}
-      {/* nav style */}
-      <div className="flex gap-1 p-1.5 items-center">
-        {tokens.navStyle === "sidebar" ? (
-          <>
-            <span style={{ width: 8, height: 14, background: "#fff", border: "1px solid var(--line)", borderRadius: 2 }} />
-            {[0, 1].map((i) => <span key={i} className="h-1.5 flex-1" style={{ background: i === 0 ? primary : "var(--line)", borderRadius: 999 }} />)}
-          </>
-        ) : tokens.navStyle === "segmented" ? (
-          <span className="flex-1 flex overflow-hidden" style={{ border: "1px solid var(--line)", borderRadius: 4 }}>
-            {[0, 1, 2].map((i) => <span key={i} className="h-2 flex-1" style={{ background: i === 0 ? primary : "#fff" }} />)}
-          </span>
-        ) : tokens.navStyle === "pills" ? (
-          [0, 1, 2].map((i) => <span key={i} className="h-2 flex-1" style={{ background: i === 0 ? `${accent}88` : "#fff", border: "1px solid var(--line)", borderRadius: 999 }} />)
-        ) : (
-          [0, 1, 2].map((i) => <span key={i} className="h-1.5 flex-1" style={{ background: i === 0 ? "#1c1917" : "var(--line)", borderRadius: 0 }} />)
-        )}
+      <div className="h-7" style={{ background: `linear-gradient(120deg, ${primary}, ${accent})` }} />
+      <div className="flex gap-1 p-1.5">
+        {[0, 1, 2].map((i) => (
+          <span key={i} className="h-1.5 flex-1" style={{ background: i === 0 ? primary : "var(--line)", borderRadius: tokens.buttonRadius === "999px" ? "999px" : tokens.buttonRadius === "0.25rem" ? "1px" : "3px" }} />
+        ))}
       </div>
       <div className="px-1.5 pb-1.5">
-        <span className="inline-block text-[7px] px-1.5 py-0.5" style={{ background: tokens.buttonStyle === "solid" ? primary : "transparent", color: tokens.buttonStyle === "solid" ? "#fff" : primary, border: tokens.buttonStyle === "outline" ? `1px solid ${primary}` : "none", borderRadius: tokens.buttonRadius, fontFamily: tokens.headingFont, fontStyle: tokens.headingItalic ? "italic" : "normal" }}>Aa</span>
+        <span className="inline-block text-[7px] px-1.5 py-0.5" style={{ background: tokens.buttonStyle === "solid" ? primary : "transparent", color: tokens.buttonStyle === "solid" ? "#fff" : primary, border: tokens.buttonStyle === "outline" ? `1px solid ${primary}` : "none", borderRadius: tokens.buttonRadius, fontFamily: tokens.headingFont }}>Aa</span>
       </div>
     </div>
   );
@@ -372,15 +339,11 @@ function PortalPreview({
   onEditCover?: () => void;
   editLabel?: string;
 }) {
-  const headingStyle: React.CSSProperties = { fontFamily: tokens.headingFont, fontStyle: tokens.headingItalic ? "italic" : "normal", fontWeight: tokens.headingWeight, letterSpacing: tokens.headingLetterSpacing };
-  const btn: React.CSSProperties = {
-    ...(tokens.buttonStyle === "solid"
+  const headingStyle: React.CSSProperties = { fontFamily: tokens.headingFont, fontStyle: tokens.headingItalic ? "italic" : "normal" };
+  const btn: React.CSSProperties =
+    tokens.buttonStyle === "solid"
       ? { background: primary, color: "#fff", borderRadius: tokens.buttonRadius }
-      : { background: "transparent", color: primary, border: `1.5px solid ${primary}`, borderRadius: tokens.buttonRadius }),
-    ...(tokens.buttonCase === "uppercase" ? { textTransform: "uppercase" as const, letterSpacing: "0.1em" } : {}),
-  };
-  const cardBg = tokens.cardTint ? `linear-gradient(0deg, ${accent}${tokens.cardTint}, ${accent}${tokens.cardTint}), #FFFFFF` : tokens.surfaceCard;
-  const cardStyle: React.CSSProperties = { background: cardBg, border: tokens.cardBorder, borderRadius: tokens.cardRadius, boxShadow: tokens.cardShadow };
+      : { background: "transparent", color: primary, border: `1.5px solid ${primary}`, borderRadius: tokens.buttonRadius };
 
   const heroImg = coverUrl
     ? { backgroundImage: `url(${coverUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
@@ -391,106 +354,65 @@ function PortalPreview({
     : {};
   const coverEditClass = onEditCover ? "group cursor-pointer" : "";
 
-  const body = (
-    <>
-      <div className="p-4" style={cardStyle}>
-        <div className="text-base" style={{ ...headingStyle, color: "var(--ink)" }}>Welcome to your planning portal</div>
-        <p className="text-[11px] mt-1" style={{ color: "var(--ink-2)" }}>Pick your menu, manage guests, track your budget and timeline — all in one place.</p>
-        <button className="mt-3 text-[11px] px-3 py-1.5 font-medium" style={btn}>Start planning</button>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="p-3" style={{ ...cardStyle, background: accent + "2e" }}>
-          <div className="text-[10px] uppercase" style={{ color: "var(--ink-2)", letterSpacing: tokens.eyebrowTracking }}>Countdown</div>
-          <div className="text-lg" style={{ ...headingStyle, color: primary }}>112 days</div>
-        </div>
-        <div className="p-3" style={cardStyle}>
-          <div className="text-[10px] uppercase" style={{ color: "var(--ink-2)", letterSpacing: tokens.eyebrowTracking }}>Checklist</div>
-          <div className="text-lg" style={{ ...headingStyle, color: "var(--ink)" }}>3 / 8 done</div>
-        </div>
-      </div>
-    </>
-  );
-
   return (
     <div className="rounded-2xl overflow-hidden shadow-sm" style={{ border: "1px solid var(--line)", background: tokens.surface, fontFamily: tokens.bodyFont }}>
       {/* HERO */}
       {tokens.heroStyle === "split" ? (
-        // Modern — solid primary block (names/date/countdown) beside the cover image.
         <div className="grid grid-cols-2">
-          <div className="p-4 flex flex-col justify-center gap-1" style={{ background: primary, color: "#fff" }}>
-            <div className="text-[9px] uppercase opacity-85" style={{ letterSpacing: tokens.eyebrowTracking }}>Wedding portal</div>
-            <div className="text-2xl leading-tight" style={headingStyle}>Adam &amp; Eve</div>
-            <div className="text-[11px] opacity-95">14 Dec 2025</div>
-            <div className="mt-1 self-start px-2.5 py-1 text-[10px] font-bold" style={{ background: "rgba(255,255,255,0.18)", borderRadius: tokens.buttonRadius }}>112 days to go</div>
-          </div>
           <div {...coverProps} className={`relative h-40 ${coverEditClass}`} style={heroImg as React.CSSProperties}>
             <div className="absolute top-3 left-3 z-10"><PreviewLogo logoUrl={logoUrl} venueName={venueName} headingStyle={headingStyle} /></div>
             {onEditCover && <CoverEditHint label={editLabel} />}
           </div>
+          <div className="p-4 flex flex-col justify-center" style={{ background: accent + "33" }}>
+            <div className="text-[10px] uppercase tracking-widest" style={{ color: "var(--ink-2)" }}>Wedding portal</div>
+            <div className="text-2xl leading-tight" style={{ ...headingStyle, color: "var(--ink)" }}>Adam &amp; Eve</div>
+            <div className="text-[11px]" style={{ color: "var(--ink-2)" }}>{venueName} · 14 Dec 2025</div>
+          </div>
         </div>
       ) : tokens.heroStyle === "framed" ? (
-        // Editorial — matted magazine plate, caption-style names below the frame.
         <div className="p-3">
-          <div style={{ border: "1px solid #1c1917", padding: 4 }}>
-            <div {...coverProps} className={`relative h-32 ${coverEditClass}`} style={{ ...(heroImg as React.CSSProperties), border: "1px solid #1c1917" }}>
-              <div className="absolute top-2 left-2 z-10"><PreviewLogo logoUrl={logoUrl} venueName={venueName} headingStyle={headingStyle} /></div>
-              {onEditCover && <CoverEditHint label={editLabel} />}
-            </div>
-          </div>
-          <div className="pt-3 flex items-end justify-between gap-2 flex-wrap">
-            <div>
-              <div className="text-[9px] uppercase" style={{ color: "var(--ink-2)", letterSpacing: tokens.eyebrowTracking }}>The wedding of</div>
-              <div className="text-2xl leading-tight uppercase" style={{ ...headingStyle, color: "var(--ink)" }}>Adam &amp; Eve</div>
-            </div>
-            <div className="text-[10px] uppercase text-right" style={{ color: "var(--ink)", letterSpacing: "0.18em" }}>14 Dec 2025<div style={{ color: "var(--ink-2)" }}>112 days to go</div></div>
-          </div>
-        </div>
-      ) : tokens.heroStyle === "arch" ? (
-        // Romantic — arch-shaped cover, flourish divider, italic names below.
-        <div className="pt-4 px-4 text-center">
-          <div {...coverProps} className={`relative mx-auto overflow-hidden ${coverEditClass}`} style={{ ...(heroImg as React.CSSProperties), width: "68%", height: 140, borderRadius: "999px 999px 16px 16px", boxShadow: tokens.cardShadow }}>
+          <div {...coverProps} className={`relative h-36 ${coverEditClass}`} style={{ ...(heroImg as React.CSSProperties), border: `1px solid var(--line)` }}>
+            <div className="absolute top-3 left-3 z-10"><PreviewLogo logoUrl={logoUrl} venueName={venueName} headingStyle={headingStyle} /></div>
             {onEditCover && <CoverEditHint label={editLabel} />}
           </div>
-          <div className="flex items-center justify-center gap-2 mt-2.5" style={{ color: primary }}>
-            <span style={{ width: 28, borderTop: `1px solid ${primary}66` }} />
-            <span className="text-[10px] leading-none">{tokens.flourish ?? "✦"}</span>
-            <span style={{ width: 28, borderTop: `1px solid ${primary}66` }} />
+          <div className="pt-3">
+            <div className="text-[10px] uppercase tracking-widest" style={{ color: "var(--ink-2)" }}>Wedding portal</div>
+            <div className="text-2xl leading-tight" style={{ ...headingStyle, color: "var(--ink)" }}>Adam &amp; Eve</div>
+            <div className="text-[11px]" style={{ color: "var(--ink-2)" }}>{venueName} · 14 Dec 2025</div>
           </div>
-          <div className="text-2xl leading-tight mt-1" style={{ ...headingStyle, color: "var(--ink)" }}>Adam &amp; Eve</div>
-          <div className="text-[11px]" style={{ color: "var(--ink-2)" }}>{venueName} · 14 Dec 2025</div>
         </div>
       ) : (
-        // Classic — full-bleed cover, dark gradient, centred serif names + date.
         <div {...coverProps} className={`relative h-44 ${coverEditClass}`} style={heroImg as React.CSSProperties}>
-          <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.2), rgba(0,0,0,0.55))" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.05), rgba(0,0,0,0.55))" }} />
           <div className="absolute top-3 left-3 z-10"><PreviewLogo logoUrl={logoUrl} venueName={venueName} headingStyle={headingStyle} /></div>
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center px-4">
-            <div className="text-[9px] uppercase" style={{ color: "rgba(255,255,255,0.85)", letterSpacing: tokens.eyebrowTracking }}>Wedding portal</div>
-            <div className="text-2xl leading-tight text-white mt-1" style={headingStyle}>Adam &amp; Eve</div>
+          <div className="absolute bottom-3 left-3 right-3 z-10">
+            <div className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.85)" }}>Wedding portal</div>
+            <div className="text-xl leading-tight text-white" style={headingStyle}>Adam &amp; Eve</div>
             <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.9)" }}>{venueName} · 14 Dec 2025</div>
           </div>
           {onEditCover && <CoverEditHint label={editLabel} />}
         </div>
       )}
 
-      {/* NAV + BODY — classic shows its left sidebar; the rest use top tabs */}
-      {tokens.navStyle === "sidebar" ? (
-        <div className="flex">
-          <div className="w-[104px] shrink-0 p-2.5 space-y-1" style={{ background: tokens.surfaceCard, borderRight: tokens.divider }}>
-            {SAMPLE_TABS.map((t, i) => (
-              <div key={t} className="text-[10px] px-1.5 py-1" style={{ color: i === 0 ? primary : "var(--ink-2)", fontWeight: i === 0 ? 700 : 500 }}>
-                <span style={{ borderBottom: i === 0 ? `2px solid ${primary}` : "2px solid transparent", paddingBottom: 1 }}>{t}</span>
-              </div>
-            ))}
+      {/* TABS + BODY */}
+      <div className="p-4 space-y-4">
+        <PreviewTabs tokens={tokens} primary={primary} />
+        <div className="rounded-xl p-4" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: tokens.cardRadius }}>
+          <div className="text-base" style={{ ...headingStyle, color: "var(--ink)" }}>Welcome to your planning portal</div>
+          <p className="text-[11px] mt-1" style={{ color: "var(--ink-2)" }}>Pick your menu, manage guests, track your budget and timeline — all in one place.</p>
+          <button className="mt-3 text-[11px] px-3 py-1.5 font-medium" style={btn}>Start planning</button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3" style={{ background: accent + "2e", borderRadius: tokens.cardRadius }}>
+            <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--ink-2)" }}>Countdown</div>
+            <div className="text-lg" style={{ ...headingStyle, color: primary }}>112 days</div>
           </div>
-          <div className="flex-1 p-3 space-y-3">{body}</div>
+          <div className="p-3" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: tokens.cardRadius }}>
+            <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--ink-2)" }}>Checklist</div>
+            <div className="text-lg" style={{ ...headingStyle, color: "var(--ink)" }}>3 / 8 done</div>
+          </div>
         </div>
-      ) : (
-        <div className="p-4 space-y-4">
-          <PreviewTabs tokens={tokens} primary={primary} accent={accent} />
-          {body}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -512,35 +434,30 @@ function PreviewLogo({ logoUrl, venueName, headingStyle }: { logoUrl: string | n
   );
 }
 
-function PreviewTabs({ tokens, primary, accent }: { tokens: TemplateTokens; primary: string; accent: string }) {
+function PreviewTabs({ tokens, primary }: { tokens: TemplateTokens; primary: string }) {
   const base = "text-[11px] px-2.5 py-1 transition";
-  if (tokens.navStyle === "pills") {
-    // Romantic — soft pills, accent tint when active.
+  if (tokens.tabStyle === "pill") {
     return (
       <div className="flex flex-wrap gap-1.5">
         {SAMPLE_TABS.map((t, i) => (
-          <span key={t} className={base} style={{ borderRadius: 999, background: i === 0 ? `${accent}55` : "rgba(255,255,255,0.65)", color: i === 0 ? primary : "var(--ink-2)", border: `1px solid ${i === 0 ? `${primary}55` : "rgba(0,0,0,0.1)"}`, fontWeight: i === 0 ? 700 : 500 }}>{t}</span>
+          <span key={t} className={base} style={{ borderRadius: 999, background: i === 0 ? primary : "transparent", color: i === 0 ? "#fff" : "var(--ink-2)", border: i === 0 ? "none" : "1px solid var(--line)" }}>{t}</span>
         ))}
       </div>
     );
   }
-  if (tokens.navStyle === "segmented") {
-    // Modern — joined pill-group control.
+  if (tokens.tabStyle === "segmented") {
     return (
-      <div className="inline-flex overflow-hidden" style={{ border: tokens.cardBorder, borderRadius: "0.6rem", background: "#fff" }}>
+      <div className="inline-flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--line)" }}>
         {SAMPLE_TABS.map((t, i) => (
-          <span key={t} className={base} style={{ background: i === 0 ? primary : "#fff", color: i === 0 ? "#fff" : "var(--ink-2)", borderLeft: i === 0 ? "none" : tokens.divider, fontWeight: i === 0 ? 700 : 500 }}>{t}</span>
+          <span key={t} className={base} style={{ background: i === 0 ? primary : "#fff", color: i === 0 ? "#fff" : "var(--ink-2)" }}>{t}</span>
         ))}
       </div>
     );
   }
-  // Editorial — numbered uppercase text tabs over a hairline rule.
   return (
-    <div className="flex flex-wrap gap-4" style={{ borderBottom: tokens.divider }}>
+    <div className="flex flex-wrap gap-4 border-b" style={{ borderColor: "var(--line)" }}>
       {SAMPLE_TABS.map((t, i) => (
-        <span key={t} className="text-[10px] pb-1.5 uppercase" style={{ letterSpacing: "0.12em", color: i === 0 ? "var(--ink)" : "var(--ink-2)", boxShadow: i === 0 ? "inset 0 -2px 0 #1c1917" : "none", fontWeight: i === 0 ? 700 : 500 }}>
-          <span style={{ fontSize: 8, marginRight: 4, color: i === 0 ? primary : "#a8a29e" }}>{String(i + 1).padStart(2, "0")}</span>{t}
-        </span>
+        <span key={t} className="text-[11px] pb-1.5" style={{ color: i === 0 ? primary : "var(--ink-2)", borderBottom: i === 0 ? `2px solid ${primary}` : "2px solid transparent", fontWeight: i === 0 ? 600 : 400 }}>{t}</span>
       ))}
     </div>
   );
