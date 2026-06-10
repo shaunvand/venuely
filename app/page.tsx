@@ -90,17 +90,17 @@ function Nav({ signedIn }: { signedIn: boolean }) {
   ];
   return (
     <header className="sticky top-0 z-30 backdrop-blur-sm" style={{ background: "rgba(255,246,240,0.85)" }}>
-      <div className="max-w-7xl mx-auto px-6 lg:px-10 py-5 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
-          <LogoMark size={52} />
-          <span className="flex flex-col leading-none">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-4 sm:py-5 flex items-center justify-between gap-3">
+        <Link href="/" className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition-opacity min-w-0">
+          <span className="shrink-0"><LogoMark size={44} /></span>
+          <span className="flex flex-col leading-none min-w-0">
             <span
-              className="font-serif text-3xl"
+              className="font-serif text-2xl sm:text-3xl truncate"
               style={{ color: "var(--poppy)", fontWeight: 900, letterSpacing: "-0.03em" }}
             >
               Venuely.
             </span>
-            <span className="text-[11px] tracking-wide" style={{ color: "var(--ink-2)" }}>Weddings Made Easy</span>
+            <span className="text-[10px] sm:text-[11px] tracking-wide truncate" style={{ color: "var(--ink-2)" }}>Weddings Made Easy</span>
           </span>
         </Link>
         <nav className="hidden md:flex items-center gap-8 text-sm" style={{ color: "var(--ink)" }}>
@@ -110,13 +110,13 @@ function Nav({ signedIn }: { signedIn: boolean }) {
             </a>
           ))}
         </nav>
-        <div className="flex items-center gap-5 text-sm">
-          <Link href="/login" className="hover:opacity-60 transition-opacity">
+        <div className="flex items-center gap-3 sm:gap-5 text-sm shrink-0">
+          <Link href="/login" className="hover:opacity-60 transition-opacity whitespace-nowrap">
             {signedIn ? "Dashboard" : "Log in"}
           </Link>
           <Link
             href="/signup"
-            className="cta-scale px-5 py-2.5 rounded-lg font-medium text-white transition-all hover:scale-[1.03] active:scale-[0.98]"
+            className="cta-scale px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-lg font-medium text-white transition-all hover:scale-[1.03] active:scale-[0.98] whitespace-nowrap"
             style={{ background: "var(--poppy)" }}
           >
             Get Started
@@ -258,7 +258,7 @@ function Hero() {
       <Blob className="w-[420px] h-[420px] -right-32 top-0 opacity-90" color="var(--sage-2)" />
       <Blob className="w-64 h-64 right-10 -bottom-10 opacity-70" color="var(--peach)" />
 
-      <div className="relative z-10">
+      <div className="relative z-10 min-w-0">
         <p className="text-xs uppercase tracking-[0.32em] mb-6" style={{ color: "var(--sage)" }}>
           Built for wedding venues.
         </p>
@@ -285,7 +285,7 @@ function Hero() {
       </div>
 
       {/* Arch illustration */}
-      <div className="relative z-10 flex justify-center lg:justify-end">
+      <div className="relative z-10 flex justify-center lg:justify-end min-w-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/hero-arch.png"
@@ -541,20 +541,20 @@ function ForCouples() {
             <div className="px-4 py-2 text-xs border-b" style={{ borderColor: "var(--line)", color: "var(--ink-2)" }}>
               venuely.co.za/<span style={{ color: "var(--poppy)" }}>smith-jones</span>
             </div>
-            <div className="grid grid-cols-[120px_1fr] min-h-[340px]">
-              <div className="p-3 space-y-1 border-r text-[11px]" style={{ borderColor: "var(--line)" }}>
+            <div className="grid grid-cols-[92px_1fr] sm:grid-cols-[120px_1fr] min-h-[340px]">
+              <div className="p-2 sm:p-3 space-y-1 border-r text-[11px] min-w-0" style={{ borderColor: "var(--line)" }}>
                 {tabs.map((t, i) => (
                   <div
                     key={t}
-                    className="px-2 py-1.5 rounded-md"
+                    className="px-2 py-1.5 rounded-md truncate"
                     style={i === 0 ? { background: "var(--cream)", color: "var(--poppy)", fontWeight: 600 } : { color: "var(--ink-2)" }}
                   >
                     {t}
                   </div>
                 ))}
               </div>
-              <div className="p-5">
-                <div className="flex items-baseline justify-between">
+              <div className="p-3.5 sm:p-5 min-w-0">
+                <div className="flex items-baseline justify-between flex-wrap gap-2 min-w-0">
                   <div>
                     <div className="font-serif text-lg">Hi Sarah &amp; James</div>
                     <div className="text-[11px]" style={{ color: "var(--ink-2)" }}>12 Dec 2025 · Riverstone Estate</div>
@@ -896,7 +896,7 @@ function Footer() {
           <span style={{ color: "var(--ink-2)" }}>·</span>
           <span className="text-sm" style={{ color: "var(--ink-2)" }}>Cape Town, South Africa</span>
         </div>
-        <div className="flex gap-7 text-sm" style={{ color: "var(--ink-2)" }}>
+        <div className="flex flex-wrap gap-x-7 gap-y-2 text-sm" style={{ color: "var(--ink-2)" }}>
           <a href="mailto:hello@venuely.co.za" className="hover:opacity-60 transition-opacity">hello@venuely.co.za</a>
           <Link href="/login" className="hover:opacity-60 transition-opacity">Log in</Link>
           <Link href="/signup" className="hover:opacity-60 transition-opacity">Get Started</Link>

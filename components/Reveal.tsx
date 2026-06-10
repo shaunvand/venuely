@@ -36,7 +36,10 @@ export function Reveal({
   }, [delay]);
 
   return (
-    <div ref={ref} className={className}>
+    // min-w-0: Reveal blocks sit as grid/flex children all over the landing page —
+    // without this, large OS font scaling inflates their min-content width and
+    // stretches whole grid columns past the viewport (clipped text on mobile).
+    <div ref={ref} className={`min-w-0 ${className}`}>
       {children}
     </div>
   );
