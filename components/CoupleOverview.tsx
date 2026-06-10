@@ -83,6 +83,26 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
 
   const docIcon = (m: string | null) => (m?.includes("pdf") ? "PDF" : m?.startsWith("image") ? "IMG" : "DOC");
 
+  // Thin line icons matching the dashboard mock (stroke, round caps).
+  const lineIcon = (name: string, size = 20) => {
+    const P: Record<string, React.ReactNode> = {
+      home: <><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>,
+      bed: <><path d="M3 18v-7a2 2 0 0 1 2-2h9a4 4 0 0 1 4 4v5" /><path d="M3 14h18" /><path d="M3 18v2M21 13v7" /><circle cx="7" cy="11.5" r="1.2" /></>,
+      cutlery: <><path d="M7 3v7a2 2 0 0 0 2 2v9" /><path d="M5 3v4M9 3v4" /><path d="M16 3c-1.5 1.5-2 4-2 6 0 1.5 1 2.5 2 2.5V21" /></>,
+      clipboard: <><rect x="6" y="4" width="12" height="17" rx="2" /><path d="M9 4a3 3 0 0 1 6 0" /><path d="M9 11h6M9 15h6" /></>,
+      calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></>,
+      dollar: <><circle cx="12" cy="12" r="9" /><path d="M12 7v10M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.5 0-2.5.8-2.5 2s1 1.7 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1.1 0-2-.4-2.5-1.2" /></>,
+      users: <><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3 3-5 6-5s6 2 6 5" /><path d="M16 5.2a3 3 0 0 1 0 5.6" /><path d="M21 20c0-2.2-1.6-3.7-4-4.2" /></>,
+      glass: <><path d="M8 3h8l-1.2 7a3 3 0 0 1-5.6 0z" /><path d="M12 13v7M9 21h6" /></>,
+      check: <path d="M5 12l5 5 9-10" />,
+    };
+    return (
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        {P[name] ?? P.home}
+      </svg>
+    );
+  };
+
   // ── Wedding progress (6 signals, mirrors the venue-side engine) ──
   const cateringDone = rentReserved > 0;
   const checklistFrac = checklist.length ? tasksDone / checklist.length : 0;
@@ -93,27 +113,22 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
   const balance = Math.max(0, invoiced - paid);
   type ChipState = "done" | "progress" | "due";
   const chips: Array<{ icon: string; label: string; sub: string; state: ChipState }> = [
-    { icon: "🏡", label: "Venue & Date", sub: weddingDate ? "Confirmed" : "To confirm", state: weddingDate ? "done" : "progress" },
-    { icon: "🛏", label: "Accommodation", sub: roomsBooked > 0 ? "Selected" : "To do", state: roomsBooked > 0 ? "done" : "progress" },
-    { icon: "🍴", label: "Catering", sub: cateringDone ? "Selected" : "To do", state: cateringDone ? "done" : "progress" },
-    { icon: "👥", label: "Guest List", sub: invited === 0 ? "To do" : confirmed >= invited ? "Complete" : "In progress", state: invited > 0 && confirmed >= invited ? "done" : "progress" },
-    { icon: "📅", label: "Timeline", sub: timeline.length >= 5 ? "Planned" : timeline.length > 0 ? "In progress" : "To do", state: timeline.length >= 5 ? "done" : "progress" },
-    { icon: "💰", label: "Payments", sub: balance > 0 ? "1 due" : paid > 0 ? "Up to date" : "None due", state: balance > 0 ? "due" : paid > 0 ? "done" : "progress" },
+    { icon: "home", label: "Venue & Date", sub: weddingDate ? "Confirmed" : "To confirm", state: weddingDate ? "done" : "progress" },
+    { icon: "bed", label: "Accommodation", sub: roomsBooked > 0 ? "Selected" : "To do", state: roomsBooked > 0 ? "done" : "progress" },
+    { icon: "cutlery", label: "Catering", sub: cateringDone ? "Selected" : "To do", state: cateringDone ? "done" : "progress" },
+    { icon: "clipboard", label: "Guest List", sub: invited === 0 ? "To do" : confirmed >= invited ? "Complete" : "In progress", state: invited > 0 && confirmed >= invited ? "done" : "progress" },
+    { icon: "calendar", label: "Timeline", sub: timeline.length >= 5 ? "Planned" : timeline.length > 0 ? "In progress" : "To do", state: timeline.length >= 5 ? "done" : "progress" },
+    { icon: "dollar", label: "Payments", sub: balance > 0 ? "1 due" : paid > 0 ? "Up to date" : "None due", state: balance > 0 ? "due" : paid > 0 ? "done" : "progress" },
   ];
-  const chipBadge: Record<ChipState, { glyph: string; bg: string; fg: string }> = {
-    done: { glyph: "✓", bg: "#dcefe2", fg: "#1a7f4b" },
-    progress: { glyph: "○", bg: "#fdf0d4", fg: "#c07c10" },
-    due: { glyph: "!", bg: "#fde2dd", fg: "#c2371f" },
-  };
 
   // ── Derived "Next Up" tasks (replaces the single next-task card) ──
   const tasks: Array<{ icon: string; title: string; detail: string; tab: string }> = [];
-  if (balance > 0) tasks.push({ icon: "💰", title: "Review and pay invoice", detail: `${rZA(balance)}${nextPaymentDue ? ` due ${fmtShort(nextPaymentDue)}` : " outstanding"}`, tab: "Payments" });
-  if (roomsTotal > 0 && roomsBooked < roomsTotal) tasks.push({ icon: "🛏", title: "Assign accommodation", detail: `${roomsTotal - roomsBooked} room${roomsTotal - roomsBooked === 1 ? "" : "s"} left to assign`, tab: "Accommodation" });
-  if (invited === 0) tasks.push({ icon: "👥", title: "Start your guest list", detail: "Add guests to unlock RSVPs & rooming", tab: "Guests" });
-  else if (confirmed < invited) tasks.push({ icon: "👥", title: "Complete your guest list", detail: `${invited} invited · ${confirmed} confirmed`, tab: "Guests" });
-  if (timeline.length === 0) tasks.push({ icon: "🕐", title: "Build your wedding timeline", detail: "Plan your day hour by hour", tab: "Timeline" });
-  if (openChecklist.length > 0) tasks.push({ icon: "✓", title: "Tick off your checklist", detail: `${openChecklist.length} task${openChecklist.length === 1 ? "" : "s"} remaining`, tab: "Checklist" });
+  if (balance > 0) tasks.push({ icon: "dollar", title: "Review and pay invoice", detail: `${rZA(balance)}${nextPaymentDue ? ` due ${fmtShort(nextPaymentDue)}` : " outstanding"}`, tab: "Payments" });
+  if (roomsTotal > 0 && roomsBooked < roomsTotal) tasks.push({ icon: "bed", title: "Assign accommodation", detail: `${roomsTotal - roomsBooked} room${roomsTotal - roomsBooked === 1 ? "" : "s"} left to assign`, tab: "Accommodation" });
+  if (invited === 0) tasks.push({ icon: "users", title: "Start your guest list", detail: "Add guests to unlock RSVPs & rooming", tab: "Guests" });
+  else if (confirmed < invited) tasks.push({ icon: "users", title: "Complete your guest list", detail: `${invited} invited · ${confirmed} confirmed`, tab: "Guests" });
+  if (timeline.length === 0) tasks.push({ icon: "calendar", title: "Build your wedding timeline", detail: "Plan your day hour by hour", tab: "Timeline" });
+  if (openChecklist.length > 0) tasks.push({ icon: "clipboard", title: "Tick off your checklist", detail: `${openChecklist.length} task${openChecklist.length === 1 ? "" : "s"} remaining`, tab: "Checklist" });
   const topTasks = tasks.slice(0, 3);
 
   // ── Wedding summary rows ──
@@ -170,17 +185,18 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
             <div style={{ height: "100%", width: `${progressPct}%`, borderRadius: 999, background: POPPY, transition: "width 0.6s ease" }} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: narrow ? "repeat(3, 1fr)" : "repeat(6, 1fr)", gap: 10, marginTop: 18 }}>
-            {chips.map((c) => {
-              const b = chipBadge[c.state];
-              return (
-                <div key={c.label} style={{ textAlign: "center" }}>
-                  <div style={{ width: 46, height: 46, borderRadius: 999, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, background: c.state === "done" ? "#e8f1ea" : "#fbf1e7" }}>{c.icon}</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: INK, marginTop: 7 }}>{c.label}</div>
-                  <div style={{ fontSize: 11, color: INK2 }}>{c.sub}</div>
-                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 17, height: 17, borderRadius: 999, fontSize: 10, fontWeight: 800, marginTop: 5, background: b.bg, color: b.fg }}>{b.glyph}</span>
+            {chips.map((c) => (
+              <div key={c.label} style={{ textAlign: "center" }}>
+                <div style={{ width: 50, height: 50, borderRadius: 999, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center", color: INK, background: c.state === "done" ? "#e8f1ea" : "#fbf1e7" }}>
+                  {lineIcon(c.icon, 21)}
                 </div>
-              );
-            })}
+                <div style={{ fontSize: 12, fontWeight: 700, color: INK, marginTop: 7 }}>{c.label}</div>
+                <div style={{ fontSize: 11, color: INK2 }}>{c.sub}</div>
+                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 17, height: 17, borderRadius: 999, marginTop: 5, ...(c.state === "done" ? { background: "#1a7f4b", color: "#fff" } : c.state === "due" ? { background: "#c2371f", color: "#fff", fontSize: 11, fontWeight: 800 } : { background: "transparent", border: "2px solid #e8a33d" }) }}>
+                  {c.state === "done" ? lineIcon("check", 10) : c.state === "due" ? "!" : null}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -292,7 +308,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
           <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
             {topTasks.length ? topTasks.map((t) => (
               <button key={t.title} onClick={() => onNavigate(t.tab)} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", background: "#fff", border: `1px solid ${LINE}`, borderRadius: 12, padding: "11px 12px", cursor: "pointer" }}>
-                <span style={{ width: 36, height: 36, borderRadius: 999, background: "#fbf1e7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{t.icon}</span>
+                <span style={{ width: 36, height: 36, borderRadius: 999, background: "#fbf1e7", color: INK, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{lineIcon(t.icon, 17)}</span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: INK }}>{t.title}</span>
                   <span style={{ display: "block", fontSize: 11.5, color: INK2 }}>{t.detail}</span>
@@ -311,14 +327,14 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
           <div style={{ fontSize: 11.5, color: INK2 }}>At a glance</div>
           <div style={{ display: "grid", gap: 9, marginTop: 12, fontSize: 13 }}>
             {[
-              { icon: "👥", label: "Guests Invited", value: invited ? String(invited) : "—" },
-              { icon: "🛏", label: "Accommodation", value: roomsTotal ? `${roomsBooked} / ${roomsTotal} booked` : "—" },
-              { icon: "🏡", label: "Ceremony", value: ceremonyArea?.name ?? "Not chosen yet" },
-              { icon: "🥂", label: "Reception", value: receptionArea?.name ?? "Not chosen yet" },
-              { icon: "📅", label: "Weekend", value: weekendLabel },
+              { icon: "users", label: "Guests Invited", value: invited ? String(invited) : "—" },
+              { icon: "bed", label: "Accommodation", value: roomsTotal ? `${roomsBooked} / ${roomsTotal} booked` : "—" },
+              { icon: "home", label: "Ceremony", value: ceremonyArea?.name ?? "Not chosen yet" },
+              { icon: "glass", label: "Reception", value: receptionArea?.name ?? "Not chosen yet" },
+              { icon: "calendar", label: "Weekend", value: weekendLabel },
             ].map((r) => (
               <div key={r.label} style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                <span style={{ color: INK2 }}>{r.icon} {r.label}</span>
+                <span style={{ color: INK2, display: "inline-flex", alignItems: "center", gap: 7 }}>{lineIcon(r.icon, 15)} {r.label}</span>
                 <b style={{ color: INK, textAlign: "right" }}>{r.value}</b>
               </div>
             ))}
