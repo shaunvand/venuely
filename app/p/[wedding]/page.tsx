@@ -48,7 +48,11 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
   const theme = resolveTheme(venue.portal_theme);
   const isImg = (u: unknown) => /\.(jpe?g|png|webp|gif|avif|heic)(\?|$)/i.test(String(u));
   const gallery = (galRes.data ?? []).filter((g) => isImg(g.url)).map((g) => ({ url: String(g.url), category: (g.category as string) ?? "Other", label: (g.label as string) ?? "" }));
-  const cover = theme.coverUrl || gallery[0]?.url || null;
+  // Auto-cover skips floor-plan/layout images (Smart Import page-rasters arrive
+  // labelled but untagged) so a kitchen diagram never becomes the couple's hero.
+  const floorplanish = (g: { category: string; label: string }) =>
+    /floor\s*-?\s*plan|venue\s+layout|site\s*map|floorplan/i.test(`${g.category} ${g.label}`);
+  const cover = theme.coverUrl || gallery.find((g) => !floorplanish(g))?.url || gallery[0]?.url || null;
 
   // Venue spaces (areas) → couple portal "Our Venue" tab.
   const areaPriceMap: Record<string, Record<string, number>> = {};

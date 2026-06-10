@@ -34,16 +34,20 @@ export default async function YourVenuePage() {
 
   // Photos the owner marked as floor plans (interim category path) are pulled
   // out of the regular gallery so they only appear in the Floor Plans section.
-  const isFloorplanCategory = (c: string | null) =>
-    (c || "").trim().toLowerCase() === "floorplan";
+  // Smart Import's PDF page-images arrive untagged but labelled (e.g. "Floor
+  // Plan - Lodge Units"), so match on label too — otherwise a floor plan can
+  // become the default couple-portal hero.
+  const looksLikeFloorplan = (m: { category?: string | null; label?: string | null }) =>
+    (m.category || "").trim().toLowerCase() === "floorplan" ||
+    /floor\s*-?\s*plan|venue\s+layout|site\s*map|floorplan/i.test(String(m.label ?? ""));
 
   const clean = (media ?? [])
     .filter((m) => MEDIA_RE.test(String(m.url)))
-    .filter((m) => !isFloorplanCategory(m.category));
+    .filter((m) => !looksLikeFloorplan(m));
 
   const planMedia = [
     ...(floorplans ?? []),
-    ...(media ?? []).filter((m) => isFloorplanCategory(m.category)),
+    ...(media ?? []).filter((m) => looksLikeFloorplan(m)),
   ].filter((m) => IMAGE_RE.test(String(m.url)));
 
   // Portal design: chosen template + theme, falling back to the venue's existing

@@ -71,6 +71,28 @@ export function PortalDesigner({
     }
   }
 
+  // Pull an image straight off the venue's own website (og:image / hero) as an
+  // alternative to uploading — for the cover and the logo alike.
+  async function imageFromWebsite(apply: (url: string) => void, setBusy: (b: boolean) => void) {
+    if (!website) { setMsg("Add your website URL in Settings first."); return; }
+    setMsg(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/venue/site-image", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: website, venue_id: venueId }),
+      });
+      const j = await res.json();
+      if (res.ok && j.ok && j.url) { apply(j.url); setMsg("Image pulled from your website ✓ — replace it any time."); }
+      else setMsg(`Couldn't find a usable image on your site${j.error ? ` (${j.error})` : ""} — try uploading one.`);
+    } catch {
+      setMsg("Couldn't reach your website — try uploading instead.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // Saved state — the section becomes the full live preview with one button to
   // jump back into editing / pick another template. Editing collapses it again.
   if (minimized) {
@@ -242,6 +264,11 @@ export function PortalDesigner({
                 {uploading ? "Uploading…" : logoUrl ? "Replace" : "Upload logo"}
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLogo(f); }} />
               </label>
+              {website && (
+                <button type="button" disabled={uploading} onClick={() => imageFromWebsite(setLogoUrl, setUploading)} className="text-xs hover:underline" style={{ color: "var(--poppy)" }}>
+                  ✨ From website
+                </button>
+              )}
               {logoUrl && (
                 <button type="button" onClick={() => setLogoUrl(null)} className="text-xs hover:underline" style={{ color: "var(--ink-2)" }}>Remove</button>
               )}
@@ -274,11 +301,18 @@ export function PortalDesigner({
               </div>
             </button>
             <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadCover(f); e.target.value = ""; }} />
-            {coverUrl && (
-              <button type="button" onClick={() => setCoverUrl(null)} className="text-xs hover:underline mt-1" style={{ color: "var(--ink-2)" }}>
-                Remove cover (use first gallery photo)
-              </button>
-            )}
+            <div className="flex items-center gap-3 mt-1.5">
+              {website && (
+                <button type="button" disabled={coverUploading} onClick={() => imageFromWebsite(setCoverUrl, setCoverUploading)} className="text-xs hover:underline" style={{ color: "var(--poppy)" }}>
+                  ✨ Use a photo from my website
+                </button>
+              )}
+              {coverUrl && (
+                <button type="button" onClick={() => setCoverUrl(null)} className="text-xs hover:underline" style={{ color: "var(--ink-2)" }}>
+                  Remove cover (use first gallery photo)
+                </button>
+              )}
+            </div>
           </div>
 
           {msg && <p className="text-xs" style={{ color: msg.includes("✓") ? "#1f5d3e" : "var(--poppy)" }}>{msg}</p>}
@@ -349,8 +383,9 @@ function PortalPreview({
     ? { backgroundImage: `url(${coverUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
     : { background: `linear-gradient(120deg, ${primary}, ${accent})` };
 
+  // NB: no `title` attr here — the native tooltip doubled up with CoverEditHint.
   const coverProps = onEditCover
-    ? { onClick: onEditCover, role: "button" as const, tabIndex: 0, title: editLabel, className: "" }
+    ? { onClick: onEditCover, role: "button" as const, tabIndex: 0, className: "" }
     : {};
   const coverEditClass = onEditCover ? "group cursor-pointer" : "";
 
