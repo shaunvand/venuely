@@ -48,7 +48,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
 
   const { data: wedding } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, wedding_end_date, guest_count, status, total_budget, notes, wedding_state, wedding_state_updated_at, portal_password_hash, invoiced_at, invoice_total, couple_paid_at, platform_fee_owed, platform_fee_paid_at, deposit_due_at, balance_due_at, couple_email, area_selections")
+    .select("id, slug, couple_names, wedding_date, wedding_end_date, setup_date, breakdown_date, guest_count, status, total_budget, notes, wedding_state, wedding_state_updated_at, portal_password_hash, invoiced_at, invoice_total, couple_paid_at, platform_fee_owed, platform_fee_paid_at, deposit_due_at, balance_due_at, couple_email, area_selections")
     .eq("venue_id", venue.id)
     .eq("slug", slug)
     .single();
@@ -386,6 +386,9 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
         <div className="md:col-span-2 space-y-1"><label className="vy-label">Total budget (R)</label><input name="total_budget" type="number" step="0.01" defaultValue={wedding.total_budget ?? ""} className="vy-input" /></div>
         <div className="md:col-span-2 space-y-1"><label className="vy-label">Start date</label><input name="wedding_date" type="date" defaultValue={wedding.wedding_date ?? ""} className="vy-input" /></div>
         <div className="md:col-span-2 space-y-1"><label className="vy-label">End date <span style={{ color: "var(--ink-2)", fontWeight: 400 }}>(optional)</span></label><input name="wedding_end_date" type="date" defaultValue={wedding.wedding_end_date ?? ""} className="vy-input" /></div>
+        <div className="md:col-span-3 space-y-1"><label className="vy-label">Set-up date <span style={{ color: "var(--ink-2)", fontWeight: 400 }}>(optional)</span></label><input name="setup_date" type="date" defaultValue={(wedding as { setup_date?: string | null }).setup_date ?? ""} className="vy-input" /></div>
+        <div className="md:col-span-3 space-y-1"><label className="vy-label">Breakdown date <span style={{ color: "var(--ink-2)", fontWeight: 400 }}>(optional)</span></label><input name="breakdown_date" type="date" defaultValue={(wedding as { breakdown_date?: string | null }).breakdown_date ?? ""} className="vy-input" /></div>
+        <p className="md:col-span-6 text-xs -mt-1" style={{ color: "var(--ink-2)" }}>When your team sets up / breaks down — shown on the calendar timeline.</p>
         <div className="md:col-span-2 space-y-1"><label className="vy-label">Status</label>
           <select name="status" defaultValue={wedding.status} className="vy-select">
             <option value="inquiry">inquiry</option><option value="provisional">provisional</option>

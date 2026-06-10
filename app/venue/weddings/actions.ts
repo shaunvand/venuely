@@ -139,10 +139,16 @@ export async function updateWeddingBasics(weddingId: string, slug: string, formD
     formData.get("wedding_date") as string,
     formData.get("wedding_end_date") as string,
   );
+  // Set-up / breakdown days are venue-editable and independent of the wedding
+  // range — store the raw date or null (blank). Powers the calendar timeline.
+  const setupDate = (formData.get("setup_date") as string || "").trim() || null;
+  const breakdownDate = (formData.get("breakdown_date") as string || "").trim() || null;
   const patch: Record<string, unknown> = {
     couple_names: (formData.get("couple_names") as string)?.trim(),
     wedding_date: startDate,
     wedding_end_date: endDate,
+    setup_date: setupDate,
+    breakdown_date: breakdownDate,
     guest_count: guestStr ? Number(guestStr) : null,
     total_budget: budgetStr ? Number(budgetStr) : null,
     status: (formData.get("status") as string) || "inquiry",
@@ -151,6 +157,7 @@ export async function updateWeddingBasics(weddingId: string, slug: string, formD
   const { error } = await supabase.from("weddings").update(patch).eq("id", weddingId);
   if (error) throw new Error(error.message);
   revalidatePath(`/venue/weddings/${slug}`);
+  revalidatePath("/venue/calendar");
 }
 
 export async function setPortalPassword(weddingId: string, slug: string, formData: FormData) {
