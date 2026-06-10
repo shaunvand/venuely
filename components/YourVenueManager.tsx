@@ -101,6 +101,33 @@ export function YourVenueManager({
     }
   }
 
+  // Manual Google import — fallback shown only when the gallery is EMPTY (the
+  // automatic onboarding import didn't run or found nothing), so venues can retry.
+  async function importGoogle() {
+    setErr(null);
+    setBusy("Importing your Google photos…");
+    loading.show("Importing your Google photos…", {
+      messages: ["Finding your venue on Google…", "Downloading your photos…", "Labelling each photo…", "Almost there…"],
+    });
+    try {
+      const res = await fetch("/api/venue/places-photos", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ venue_id: venueId }),
+      });
+      const j = await res.json();
+      if (!res.ok) { loading.hide(); return setErr(j.error || "Google import failed"); }
+      setErr(j.added ? null : j.message || "No Google photos found for your venue.");
+      loading.complete(j.added ? `${j.added} photo${j.added === 1 ? "" : "s"} imported ✓` : "No photos found");
+      start(() => router.refresh());
+    } catch (e) {
+      loading.hide();
+      setErr(e instanceof Error ? e.message : "Google import failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function recategorise(id: string, cat: string) {
     await fetch("/api/venue/gallery", {
       method: "PATCH",
@@ -127,8 +154,27 @@ export function YourVenueManager({
   return (
     <div className="space-y-8">
       <div className="vy-card space-y-4">
-        {/* Add more photos — Google import now happens automatically at
-            onboarding, so Smart Import + manual upload are the ways to add more. */}
+        {/* Empty gallery → offer the Google import as a retry (the automatic
+            onboarding pull either didn't run for this venue or found nothing). */}
+        {items.length === 0 && (
+          <div className="flex flex-col items-center text-center gap-1.5 py-2 border-b" style={{ borderColor: "var(--line)" }}>
+            <button
+              type="button"
+              onClick={importGoogle}
+              disabled={!!busy || pending}
+              className="vy-btn vy-btn-primary text-base px-7 py-3"
+              style={{ borderRadius: "999px" }}
+              title="Pull your venue's own photos from Google Maps into the gallery"
+            >
+              📍 Import from Google
+            </button>
+            <span className="text-xs" style={{ color: "var(--ink-2)" }}>
+              No photos yet — pull your venue&apos;s real photos straight from Google Maps.
+            </span>
+          </div>
+        )}
+
+        {/* Add more photos — Smart Import + manual upload. */}
         <div className="flex flex-wrap items-end justify-center gap-4">
           <div className="space-y-1">
             <label className="vy-label">Location</label>
