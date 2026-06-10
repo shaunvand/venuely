@@ -227,23 +227,25 @@ function Tagline({ t }: { t: number }) {
 }
 
 export function VenuelyOpener({ trigger }: { trigger: "landing" | "welcome" }) {
-  const [show, setShow] = useState(false);
+  // Landing renders the overlay in the SERVER HTML (show=true from the first
+  // paint) so the website is never visible before the animation — the cream
+  // cover is there immediately and the sequence starts as soon as JS hydrates.
+  // Welcome stays hidden until its play-once gate decides.
+  const [show, setShow] = useState(trigger === "landing");
   const [t, setT] = useState(0);
   const [scale, setScale] = useState(0.5);
   const textRef = useRef<HTMLDivElement | null>(null);
   const [offset, setOffset] = useState(330);
 
-  // Landing: plays in full on EVERY visit (per the brand spec — no session gate,
-  // no reduced-motion downgrade). Welcome: plays once after onboarding
-  // (localStorage-gated; /venue?welcome=force replays it for previewing).
+  // Landing: plays in full on EVERY visit (no gates). Welcome: plays once after
+  // onboarding (localStorage-gated; /venue?welcome=force replays for previewing).
   useEffect(() => {
+    if (trigger !== "welcome") return;
     try {
-      if (trigger === "welcome") {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get("welcome") !== "force") {
-          if (localStorage.getItem("vy-welcome-opener-shown")) return;
-          localStorage.setItem("vy-welcome-opener-shown", "1");
-        }
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("welcome") !== "force") {
+        if (localStorage.getItem("vy-welcome-opener-shown")) return;
+        localStorage.setItem("vy-welcome-opener-shown", "1");
       }
     } catch { /* storage unavailable — still play */ }
     setShow(true);
@@ -302,8 +304,12 @@ export function VenuelyOpener({ trigger }: { trigger: "landing" | "welcome" }) {
         opacity: 1 - easeInOutCubic(fadeP),
         pointerEvents: "none",
         overflow: "hidden",
+        // Failsafe: the overlay is in the server HTML, so if JS never hydrates
+        // this CSS animation clears it after 8s instead of blanking the site.
+        animation: "vyOpenerFailsafe 0.6s ease 8s forwards",
       }}
     >
+      <style>{`@keyframes vyOpenerFailsafe { to { opacity: 0; visibility: hidden; } }`}</style>
       <div style={{ transform: `scale(${scale})`, transformOrigin: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 48, transform: `translate(${groupX}px, 0)` }}>
           <Badge t={t} />
