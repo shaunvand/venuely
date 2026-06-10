@@ -2,6 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, useTransition } from "react";
 import { undoImport } from "@/app/venue/_inventory/actions";
+import { SmartImportOverlay } from "@/components/SmartImportOverlay";
 
 export type BulkUploaderHandle = {
   commit: () => void;
@@ -99,6 +100,7 @@ const READING_MESSAGES = [
   "Detecting items…",
   "Categorising your catalogue…",
   "Sorting rentals & extras…",
+  "Adding areas…",
   "Allocating accommodation rooms…",
   "Matching your suppliers…",
   "Checking prices…",
@@ -461,6 +463,15 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
 
   return (
     <div className="vy-card space-y-4">
+      {/* Branded loading overlay: the lockup fills with coral as the import runs,
+          cycling status lines underneath; shimmer + fade-out on completion. */}
+      <SmartImportOverlay
+        active={phase === "reading" || phase === "finishing" || phase === "done"}
+        progress={progress}
+        message={phaseMsg || READING_MESSAGES[0]}
+        done={phase === "done"}
+        onCancel={phase === "reading" ? cancelParse : undefined}
+      />
       {/* 3-step header so users always know where they are */}
       <ol className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm" aria-label="Smart Import progress">
         {stepperSteps.map((s, i) => {
