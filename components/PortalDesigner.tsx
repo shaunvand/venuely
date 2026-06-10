@@ -37,7 +37,7 @@ export function PortalDesigner({
   const [msg, setMsg] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
-  const [minimized, setMinimized] = useState(initiallySaved);
+  const [saved, setSaved] = useState(initiallySaved);
   const [isPending, startTransition] = useTransition();
   const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -91,29 +91,6 @@ export function PortalDesigner({
     }
   }
 
-  // Saved state — the section becomes the full live preview with one button to
-  // jump back into editing / pick another template. Editing collapses it again.
-  if (minimized) {
-    return (
-      <section className="vy-card space-y-4">
-        <div className="flex items-baseline justify-between flex-wrap gap-2">
-          <div>
-            <div className="vy-eyebrow">Couple portal</div>
-            <h2 className="vy-h2 mt-1 flex items-center gap-2">
-              {venueName} Couple Portal
-              <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--leaf)", color: "#1f5d3e" }}>Saved ✓</span>
-            </h2>
-            <p className="text-sm mt-1" style={{ color: "var(--ink-2)" }}>Preview how your couples experience your venue.</p>
-          </div>
-          <button type="button" onClick={() => { setMsg(null); setMinimized(false); }} className="vy-btn vy-btn-secondary">
-            ✎ Edit or change template
-          </button>
-        </div>
-        <PortalPreview tokens={tokens} primary={primary} accent={accent} logoUrl={logoUrl} venueName={venueName} coverUrl={previewCover} onEditCover={() => { setMsg(null); setMinimized(false); }} />
-      </section>
-    );
-  }
-
   async function pullColours() {
     setPulling(true);
     setMsg(null);
@@ -159,7 +136,7 @@ export function PortalDesigner({
       try {
         await saveVenuePortalDesign({ template, primary, accent, logoUrl, coverUrl });
         setMsg("Design saved ✓");
-        setMinimized(true);
+        setSaved(true);
       } catch (e) {
         setMsg(e instanceof Error ? e.message : "Save failed");
       }
@@ -171,9 +148,12 @@ export function PortalDesigner({
       <div className="flex items-baseline justify-between flex-wrap gap-2">
         <div>
           <div className="vy-eyebrow">Couple portal</div>
-          <h2 className="vy-h2 mt-1">Design the dashboard couples receive</h2>
+          <h2 className="vy-h2 mt-1 flex items-center gap-2 flex-wrap">
+            {venueName} Couple Portal
+            {saved && <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--leaf)", color: "#1f5d3e" }}>Saved ✓</span>}
+          </h2>
           <p className="text-sm mt-1" style={{ color: "var(--ink-2)" }}>
-            Pick a template, set your brand colours and logo, and preview the portal each couple gets when you add their wedding.
+            Preview how your couples experience your venue — pick a template and set your brand below; it saves for every booking.
           </p>
         </div>
         <button onClick={save} disabled={isPending} className="vy-btn vy-btn-primary">
