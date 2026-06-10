@@ -368,7 +368,12 @@ export function CouplePortal({
         <div key={tab} className="anim-fade-up">
         {tab === "Overview" && (
           <div style={{ display: "grid", gap: 16 }}>
-            <CoupleOverview slug={slug} venue={venue} coupleNames={coupleNames} daysToGo={daysToGo} dateLabel={dateLabel} totalDue={totalDue} rooms={rooms} rentals={rentals} state={state} cover={cover} onNavigate={(t) => setTab(t as Tab)} />
+            <CoupleOverview
+              slug={slug} venue={venue} coupleNames={coupleNames} daysToGo={daysToGo} dateLabel={dateLabel} totalDue={totalDue}
+              rooms={rooms} rentals={rentals} state={state} cover={cover} onNavigate={(t) => setTab(t as Tab)}
+              weddingDate={weddingDate} weddingEndDate={weddingEndDate}
+              selectedAreas={areas.filter((a) => initialAreaSelections.some((s) => s.area_id === a.id)).map((a) => ({ name: a.name, kind: a.kind }))}
+            />
             {weddingDate && (
               <div style={card({ padding: 18 })}>
                 <div style={{ ...heading, fontSize: 17, marginBottom: 10 }}>Save the date</div>

@@ -37,9 +37,10 @@ type RoomItem = { id: string; name: string };
 type RentItem = { id: string };
 type WState = { rentalSelections?: Record<string, { sel?: boolean }>; roomAssignments?: Record<string, string[]>; sharedNote?: string };
 
-export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, totalDue, rooms, rentals, state, cover, onNavigate }: {
+export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, totalDue, rooms, rentals, state, cover, onNavigate, weddingDate = null, weddingEndDate = null, selectedAreas = [] }: {
   slug: string; venue: Venue; coupleNames: string; daysToGo: number | null; dateLabel: string; totalDue: number;
   rooms: RoomItem[]; rentals: RentItem[]; state: WState; cover: string | null; onNavigate: (tab: string) => void;
+  weddingDate?: string | null; weddingEndDate?: string | null; selectedAreas?: Array<{ name: string; kind: string }>;
 }) {
   const [guests, setGuests] = useState<Array<{ rsvp_status: string | null }>>([]);
   const [pay, setPay] = useState<{ invoiced: number; paid: number; balance: number; depositDue: string | null; balanceDue: string | null; payments: Array<{ id: string; amount: number; direction: string; kind: string | null; paid_at: string | null }> } | null>(null);
@@ -82,6 +83,49 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
 
   const docIcon = (m: string | null) => (m?.includes("pdf") ? "PDF" : m?.startsWith("image") ? "IMG" : "DOC");
 
+  // ── Wedding progress (6 signals, mirrors the venue-side engine) ──
+  const cateringDone = rentReserved > 0;
+  const checklistFrac = checklist.length ? tasksDone / checklist.length : 0;
+  const progressPct = Math.round(
+    ([weddingDate ? 1 : 0, roomsBooked > 0 ? 1 : 0, cateringDone ? 1 : 0, invited > 0 ? 1 : 0, checklistFrac, paid > 0 ? 1 : 0]
+      .reduce((s, x) => s + x, 0) / 6) * 100,
+  );
+  const balance = Math.max(0, invoiced - paid);
+  type ChipState = "done" | "progress" | "due";
+  const chips: Array<{ icon: string; label: string; sub: string; state: ChipState }> = [
+    { icon: "🏡", label: "Venue & Date", sub: weddingDate ? "Confirmed" : "To confirm", state: weddingDate ? "done" : "progress" },
+    { icon: "🛏", label: "Accommodation", sub: roomsBooked > 0 ? "Selected" : "To do", state: roomsBooked > 0 ? "done" : "progress" },
+    { icon: "🍴", label: "Catering", sub: cateringDone ? "Selected" : "To do", state: cateringDone ? "done" : "progress" },
+    { icon: "👥", label: "Guest List", sub: invited === 0 ? "To do" : confirmed >= invited ? "Complete" : "In progress", state: invited > 0 && confirmed >= invited ? "done" : "progress" },
+    { icon: "📅", label: "Timeline", sub: timeline.length >= 5 ? "Planned" : timeline.length > 0 ? "In progress" : "To do", state: timeline.length >= 5 ? "done" : "progress" },
+    { icon: "💰", label: "Payments", sub: balance > 0 ? "1 due" : paid > 0 ? "Up to date" : "None due", state: balance > 0 ? "due" : paid > 0 ? "done" : "progress" },
+  ];
+  const chipBadge: Record<ChipState, { glyph: string; bg: string; fg: string }> = {
+    done: { glyph: "✓", bg: "#dcefe2", fg: "#1a7f4b" },
+    progress: { glyph: "○", bg: "#fdf0d4", fg: "#c07c10" },
+    due: { glyph: "!", bg: "#fde2dd", fg: "#c2371f" },
+  };
+
+  // ── Derived "Next Up" tasks (replaces the single next-task card) ──
+  const tasks: Array<{ icon: string; title: string; detail: string; tab: string }> = [];
+  if (balance > 0) tasks.push({ icon: "💰", title: "Review and pay invoice", detail: `${rZA(balance)}${nextPaymentDue ? ` due ${fmtShort(nextPaymentDue)}` : " outstanding"}`, tab: "Payments" });
+  if (roomsTotal > 0 && roomsBooked < roomsTotal) tasks.push({ icon: "🛏", title: "Assign accommodation", detail: `${roomsTotal - roomsBooked} room${roomsTotal - roomsBooked === 1 ? "" : "s"} left to assign`, tab: "Accommodation" });
+  if (invited === 0) tasks.push({ icon: "👥", title: "Start your guest list", detail: "Add guests to unlock RSVPs & rooming", tab: "Guests" });
+  else if (confirmed < invited) tasks.push({ icon: "👥", title: "Complete your guest list", detail: `${invited} invited · ${confirmed} confirmed`, tab: "Guests" });
+  if (timeline.length === 0) tasks.push({ icon: "🕐", title: "Build your wedding timeline", detail: "Plan your day hour by hour", tab: "Timeline" });
+  if (openChecklist.length > 0) tasks.push({ icon: "✓", title: "Tick off your checklist", detail: `${openChecklist.length} task${openChecklist.length === 1 ? "" : "s"} remaining`, tab: "Checklist" });
+  const topTasks = tasks.slice(0, 3);
+
+  // ── Wedding summary rows ──
+  const findArea = (re: RegExp) => selectedAreas.find((a) => re.test(`${a.kind} ${a.name}`));
+  const ceremonyArea = findArea(/ceremon|chapel|forest|garden/i) ?? selectedAreas[0] ?? null;
+  const receptionArea = (findArea(/recept|hall|deck|barn/i) ?? selectedAreas.find((a) => a !== ceremonyArea)) ?? null;
+  const weekendLabel = weddingDate
+    ? weddingEndDate && weddingEndDate !== weddingDate
+      ? `${fmtShort(weddingDate)} – ${fmtShort(weddingEndDate)}`
+      : fmtShort(weddingDate)
+    : dateLabel;
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: narrow ? "minmax(0,1fr)" : "minmax(0,1fr) 320px", gap: 20, alignItems: "start" }}>
       {/* ── MAIN COLUMN ─────────────────────────────────────────── */}
@@ -106,6 +150,38 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
         <div style={{ ...card, padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", background: `linear-gradient(135deg, ${POPPY}, ${SAGE})`, border: "none", color: "#fff" }}>
           <div><div style={{ ...serif, fontSize: 18 }}>✨ Plan with AI</div><div style={{ fontSize: 12.5, opacity: 0.95 }}>Tell me your vibe and I&apos;ll set up your selections.</div></div>
           <button onClick={() => window.dispatchEvent(new Event("venuely:open-planner"))} style={{ background: "#fff", color: POPPY, border: "none", borderRadius: 999, padding: "9px 18px", fontWeight: 700, cursor: "pointer", fontSize: 13.5 }}>Start planning</button>
+        </div>
+
+        {/* Wedding progress — overall % + the six category chips */}
+        <div style={{ ...card, padding: "18px 20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ ...serif, fontSize: 19, color: INK }}>Wedding Progress</div>
+              <div style={{ fontSize: 12.5, color: INK2, marginTop: 2 }}>
+                {progressPct >= 75 ? "You're doing great! Keep ticking off those tasks." : progressPct >= 35 ? "Good start — keep ticking off those tasks." : "Let's get planning — start with the items below."}
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <span style={{ ...serif, fontSize: 28, color: INK }}>{progressPct}%</span>
+              <span style={{ fontSize: 12, color: INK2, marginLeft: 6 }}>Complete</span>
+            </div>
+          </div>
+          <div style={{ height: 8, borderRadius: 999, background: "#efe7e0", marginTop: 12, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${progressPct}%`, borderRadius: 999, background: POPPY, transition: "width 0.6s ease" }} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: narrow ? "repeat(3, 1fr)" : "repeat(6, 1fr)", gap: 10, marginTop: 18 }}>
+            {chips.map((c) => {
+              const b = chipBadge[c.state];
+              return (
+                <div key={c.label} style={{ textAlign: "center" }}>
+                  <div style={{ width: 46, height: 46, borderRadius: 999, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, background: c.state === "done" ? "#e8f1ea" : "#fbf1e7" }}>{c.icon}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: INK, marginTop: 7 }}>{c.label}</div>
+                  <div style={{ fontSize: 11, color: INK2 }}>{c.sub}</div>
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 17, height: 17, borderRadius: 999, fontSize: 10, fontWeight: 800, marginTop: 5, background: b.bg, color: b.fg }}>{b.glyph}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* 4 stat cards */}
@@ -204,24 +280,68 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
           <div style={{ ...serif, fontStyle: "italic", fontSize: 15, marginTop: 16, opacity: 0.95 }}>We can&apos;t wait to celebrate with you!</div>
         </div>
 
-        {/* Next task / payment */}
+        {/* Next Up — derived upcoming tasks */}
         <div style={{ ...card, padding: 16 }}>
-          <div style={eyebrow}>Next task</div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginTop: 8 }}>{nextPaymentDue ? "Payment due" : nextUp[0]?.title || "You're all caught up 🎉"}</div>
-          <div style={{ fontSize: 12.5, color: INK2 }}>{nextPaymentDue ? fmtDate(nextPaymentDue) : nextUp[0]?.due_date ? fmtDate(nextUp[0].due_date) : "Nothing due right now"}</div>
-          <button onClick={() => onNavigate(nextPaymentDue ? "Payments" : "Checklist")} style={{ marginTop: 12, width: "100%", background: POPPY, color: "#fff", border: "none", borderRadius: 999, padding: "10px", fontWeight: 700, cursor: "pointer", fontSize: 13.5 }}>{nextPaymentDue ? "View payment details" : "View tasks"}</button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <div>
+              <div style={{ ...serif, fontSize: 18, color: INK }}>Next Up</div>
+              <div style={{ fontSize: 11.5, color: INK2 }}>Your upcoming tasks</div>
+            </div>
+            <button onClick={() => onNavigate("Checklist")} style={{ background: "none", border: "none", color: POPPY, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>View all</button>
+          </div>
+          <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+            {topTasks.length ? topTasks.map((t) => (
+              <button key={t.title} onClick={() => onNavigate(t.tab)} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", background: "#fff", border: `1px solid ${LINE}`, borderRadius: 12, padding: "11px 12px", cursor: "pointer" }}>
+                <span style={{ width: 36, height: 36, borderRadius: 999, background: "#fbf1e7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{t.icon}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: INK }}>{t.title}</span>
+                  <span style={{ display: "block", fontSize: 11.5, color: INK2 }}>{t.detail}</span>
+                </span>
+                <span style={{ color: INK2 }}>›</span>
+              </button>
+            )) : (
+              <div style={{ fontSize: 12.5, color: INK2, padding: "6px 2px" }}>You&apos;re all caught up 🎉</div>
+            )}
+          </div>
         </div>
 
-        {/* Venue contact */}
+        {/* Wedding summary — at a glance */}
         <div style={{ ...card, padding: 16 }}>
-          <div style={eyebrow}>Venue contact</div>
-          <div style={{ ...serif, fontSize: 16, color: INK, marginTop: 6 }}>{venue.name}</div>
-          {venue.region && <div style={{ fontSize: 12, color: INK2 }}>{venue.region}</div>}
-          <div style={{ display: "grid", gap: 6, marginTop: 10, fontSize: 12.5, color: INK }}>
+          <div style={{ ...serif, fontSize: 18, color: INK }}>Wedding Summary</div>
+          <div style={{ fontSize: 11.5, color: INK2 }}>At a glance</div>
+          <div style={{ display: "grid", gap: 9, marginTop: 12, fontSize: 13 }}>
+            {[
+              { icon: "👥", label: "Guests Invited", value: invited ? String(invited) : "—" },
+              { icon: "🛏", label: "Accommodation", value: roomsTotal ? `${roomsBooked} / ${roomsTotal} booked` : "—" },
+              { icon: "🏡", label: "Ceremony", value: ceremonyArea?.name ?? "Not chosen yet" },
+              { icon: "🥂", label: "Reception", value: receptionArea?.name ?? "Not chosen yet" },
+              { icon: "📅", label: "Weekend", value: weekendLabel },
+            ].map((r) => (
+              <div key={r.label} style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                <span style={{ color: INK2 }}>{r.icon} {r.label}</span>
+                <b style={{ color: INK, textAlign: "right" }}>{r.value}</b>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => onNavigate("Our Venue")} style={{ marginTop: 13, width: "100%", background: "#fff", border: `1px solid ${LINE}`, color: INK, borderRadius: 999, padding: "9px", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>View Full Details</button>
+        </div>
+
+        {/* Need help? — message the venue team */}
+        <div style={{ ...card, padding: 16, background: "#fbf1e7", border: "none" }}>
+          <div style={{ ...serif, fontSize: 18, color: INK }}>Need help?</div>
+          <div style={{ fontSize: 12.5, color: INK2, marginTop: 3 }}>We&apos;re here for you every step of the way.</div>
+          <div style={{ display: "grid", gap: 6, marginTop: 10, fontSize: 12.5 }}>
             {venue.phone && <a href={`tel:${venue.phone}`} style={{ color: INK, textDecoration: "none" }}>📞 {venue.phone}</a>}
             {venue.email && <a href={`mailto:${venue.email}`} style={{ color: INK, textDecoration: "none", wordBreak: "break-all" }}>✉ {venue.email}</a>}
           </div>
-          {venue.email && <a href={`mailto:${venue.email}`} style={{ display: "block", textAlign: "center", marginTop: 12, border: `1px solid ${POPPY}`, color: POPPY, borderRadius: 999, padding: "8px", fontWeight: 600, fontSize: 13, textDecoration: "none" }}>Message {venue.name}</a>}
+          {(venue.email || venue.phone) && (
+            <a
+              href={venue.email ? `mailto:${venue.email}?subject=${encodeURIComponent(`Question from ${coupleNames || "your couple"}`)}` : `tel:${venue.phone}`}
+              style={{ display: "block", textAlign: "center", marginTop: 12, background: POPPY, color: "#fff", borderRadius: 999, padding: "10px", fontWeight: 700, fontSize: 13, textDecoration: "none" }}
+            >
+              Message your venue team
+            </a>
+          )}
         </div>
 
         {/* Payment summary */}
