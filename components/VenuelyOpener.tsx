@@ -50,9 +50,11 @@ const T = {
   word: [3.15, 4.45],
   shift: [3.15, 4.05],
   tag: [4.45, 5.65],
-  fade: [5.9, 6.55], // overlay → transparent
+  // Design handoff crops the piece at 5.88s ("crop it at 5.88 secs") — the web
+  // overlay starts its fade-to-transparent exactly there instead of holding.
+  fade: [5.88, 6.43],
 };
-const TOTAL = 6.7;
+const TOTAL = 6.5;
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 const easeOutBack = (t: number) => {
@@ -302,7 +304,7 @@ export function VenuelyOpener({ trigger }: { trigger: "landing" | "welcome" }) {
 
   const shiftP = easeInOutCubic(clamp((t - T.shift[0]) / (T.shift[1] - T.shift[0]), 0, 1));
   const groupX = offset * (1 - shiftP);
-  const idle = t > 5.8 ? Math.sin((t - 5.8) * 1.6) * 2.5 : 0;
+  // No idle float — the design is cropped at 5.88s, straight into the fade.
   const fadeP = clamp((t - T.fade[0]) / (T.fade[1] - T.fade[0]), 0, 1);
 
   return (
@@ -319,7 +321,7 @@ export function VenuelyOpener({ trigger }: { trigger: "landing" | "welcome" }) {
       }}
     >
       <div style={{ transform: `scale(${scale})`, transformOrigin: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 48, transform: `translate(${groupX}px, ${idle}px)` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 48, transform: `translate(${groupX}px, 0)` }}>
           <Badge t={t} />
           <div ref={textRef} style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
             <Wordmark t={t} />
