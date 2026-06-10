@@ -84,6 +84,7 @@ export function WeddingsTable({ rows }: { rows: WeddingRow[] }) {
         </div>
       </div>
 
+      <div className="overflow-x-auto">
       <table className="vy-table">
         <thead>
           <tr>
@@ -104,12 +105,12 @@ export function WeddingsTable({ rows }: { rows: WeddingRow[] }) {
               <td>{r.guests ?? "—"}</td>
               <td>
                 <span className="text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-full whitespace-nowrap" style={{ background: statusColor(r.status).bg, color: statusColor(r.status).text }}>
-                  {r.status}
+                  {r.status.replace(/_/g, " ")}
                 </span>
               </td>
               <td>
                 <div
-                  className="min-w-[120px]"
+                  className="min-w-[84px] max-w-[110px]"
                   title={r.missing.length ? `${HEALTH_LABEL[r.health]} — still to do: ${r.missing.join(", ")}` : "Everything in place"}
                 >
                   <div className="flex items-center gap-2">
@@ -122,7 +123,7 @@ export function WeddingsTable({ rows }: { rows: WeddingRow[] }) {
                 </div>
               </td>
               <td>
-                <span className="inline-flex items-center gap-1.5 font-mono text-xs text-stone-500 max-w-[220px]">
+                <span className="inline-flex items-center gap-1.5 font-mono text-xs text-stone-500 max-w-[150px]">
                   <span className="truncate" title={r.portalFull}>{r.portalShort}</span>
                   <button type="button" onClick={() => copy(r)} aria-label="Copy portal URL" className="press shrink-0" style={{ color: copiedId === r.id ? "#1f5d3e" : "var(--ink-2)" }}>
                     {copiedId === r.id ? "✓" : (
@@ -139,6 +140,7 @@ export function WeddingsTable({ rows }: { rows: WeddingRow[] }) {
           )}
         </tbody>
       </table>
+      </div>
 
       {pages > 1 && (
         <div className="flex items-center justify-center gap-1 py-3 border-t" style={{ borderColor: "var(--line)" }}>

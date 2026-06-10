@@ -71,11 +71,11 @@ export function WeddingRowActions({
   const itemCls = "w-full text-left px-3 py-2 text-xs hover:bg-[color:var(--cream)] disabled:opacity-50";
 
   return (
-    <div className="flex items-center justify-end gap-2 text-xs">
+    <div className="flex items-center justify-end gap-1.5 text-xs">
       <Link
         href={`/${slug}`}
         target="_blank"
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium border transition hover:bg-[color:var(--cream)]"
+        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-medium border transition hover:bg-[color:var(--cream)]"
         style={{ borderColor: "var(--poppy)", color: "var(--poppy)" }}
       >
         Open
@@ -83,7 +83,7 @@ export function WeddingRowActions({
       </Link>
       <Link
         href={`/venue/weddings/${slug}`}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium border border-stone-200 bg-white transition hover:bg-stone-50"
+        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-medium border border-stone-200 bg-white transition hover:bg-stone-50"
         style={{ color: "var(--ink)" }}
       >
         <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" aria-hidden><circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" strokeWidth="1.3" /><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6L11 5M5 11l-1.4 1.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
