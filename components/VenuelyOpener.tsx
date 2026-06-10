@@ -51,10 +51,10 @@ const T = {
   shift: [3.15, 4.05],
   tag: [4.45, 5.65],
   // Design handoff crops the piece at 5.88s ("crop it at 5.88 secs") — the web
-  // overlay starts its fade-to-transparent exactly there instead of holding.
-  fade: [5.88, 6.43],
+  // overlay then SLOW-fades into the website (~1.1s real time at playback speed).
+  fade: [5.88, 8.04],
 };
-const TOTAL = 6.5;
+const TOTAL = 8.1;
 // Playback speed: the design timeline is 5.88s, the site plays it in 3s max —
 // same choreography, clock runs ~1.96× so the lockup lands at 3.0s real time.
 const SPEED = 5.88 / 3;
