@@ -181,13 +181,20 @@ export function PortalDesigner({
         </button>
       </div>
 
-      <div className="grid lg:grid-cols-[320px_1fr] gap-6 items-start">
-        {/* ---- Controls ---- */}
-        <div className="space-y-5">
-          {/* Template picker */}
+      {/* ---- Preview first — exactly what couples get ---- */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="vy-label">What couples see</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--cream)", color: "var(--ink-2)" }}>updates as you edit</span>
+        </div>
+        <PortalPreview tokens={tokens} primary={primary} accent={accent} logoUrl={logoUrl} venueName={venueName} coverUrl={previewCover} onEditCover={pickCover} editLabel={coverUploading ? "Uploading…" : "Change cover photo"} />
+      </div>
+
+      <div className="space-y-6">
+          {/* Template picker — underneath the preview */}
           <div>
             <div className="vy-label mb-2">Template</div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {PORTAL_TEMPLATE_LIST.map((t) => {
                 const active = t.id === template;
                 return (
@@ -211,6 +218,8 @@ export function PortalDesigner({
             </div>
           </div>
 
+          {/* Brand: colours / logo / cover — side by side beneath the templates */}
+          <div className="grid md:grid-cols-3 gap-6 items-start">
           {/* Colours */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -312,18 +321,9 @@ export function PortalDesigner({
               )}
             </div>
           </div>
+          </div>
 
           {msg && <p className="text-xs" style={{ color: msg.includes("✓") ? "#1f5d3e" : "var(--poppy)" }}>{msg}</p>}
-        </div>
-
-        {/* ---- Preview ---- */}
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="vy-label">What couples see</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--cream)", color: "var(--ink-2)" }}>updates as you edit</span>
-          </div>
-          <PortalPreview tokens={tokens} primary={primary} accent={accent} logoUrl={logoUrl} venueName={venueName} coverUrl={previewCover} onEditCover={pickCover} editLabel={coverUploading ? "Uploading…" : "Change cover photo"} />
-        </div>
       </div>
     </section>
   );
