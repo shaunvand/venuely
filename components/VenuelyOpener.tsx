@@ -55,6 +55,9 @@ const T = {
   fade: [5.88, 6.43],
 };
 const TOTAL = 6.5;
+// Playback speed: the design timeline is 5.88s, the site plays it in 3s max —
+// same choreography, clock runs ~1.96× so the lockup lands at 3.0s real time.
+const SPEED = 5.88 / 3;
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 const easeOutBack = (t: number) => {
@@ -257,7 +260,7 @@ export function VenuelyOpener({ trigger }: { trigger: "landing" | "welcome" }) {
     let raf = 0;
     const start = performance.now();
     const step = (now: number) => {
-      const next = (now - start) / 1000;
+      const next = ((now - start) / 1000) * SPEED;
       if (next >= TOTAL) { setShow(false); return; }
       setT(next);
       raf = requestAnimationFrame(step);
@@ -306,7 +309,7 @@ export function VenuelyOpener({ trigger }: { trigger: "landing" | "welcome" }) {
         overflow: "hidden",
         // Failsafe: the overlay is in the server HTML, so if JS never hydrates
         // this CSS animation clears it after 8s instead of blanking the site.
-        animation: "vyOpenerFailsafe 0.6s ease 8s forwards",
+        animation: "vyOpenerFailsafe 0.6s ease 5s forwards",
       }}
     >
       <style>{`@keyframes vyOpenerFailsafe { to { opacity: 0; visibility: hidden; } }`}</style>
