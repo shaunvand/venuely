@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { platformFee } from "@/lib/billing/compute";
 import { buildWeddingCharges } from "@/lib/billing/charges";
+import { renderInvoiceEmailHtml, formatDateZA, type InvoiceLineItem, type InvoiceScheduleRow } from "@/lib/invoice/render";
+import { resolveInvoiceTheme } from "@/lib/invoice/templates";
 import { whatsappUrl } from "@/lib/whatsapp";
 
 // Normalise a (start, end) date-range form pair into the columns we store.
@@ -397,7 +399,8 @@ const rZA = (n: number) => `R${Math.round(Number(n) || 0).toLocaleString("en-ZA"
 type VenueBank = {
   name: string; contact_email: string | null; bank_name: string | null; bank_account_name: string | null;
   bank_account_number: string | null; bank_branch_code: string | null;
-  bank_swift: string | null; bank_iban: string | null; invoice_theme: { accent?: string } | null;
+  bank_swift: string | null; bank_iban: string | null; invoice_theme: { accent?: string; logoUrl?: string } | null;
+  invoice_template: string | null; branding_logo_url: string | null;
   platform_fee_rate: number | null;
 };
 
@@ -434,7 +437,7 @@ export async function approveSubmission(submissionId: string, weddingId: string,
   // RLS read confirms the venue admin owns this wedding + gives us the venue bank.
   const { data: wed } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, couple_email, venue:venues(name, contact_email, bank_name, bank_account_name, bank_account_number, bank_branch_code, bank_swift, bank_iban, invoice_theme, platform_fee_rate)")
+    .select("id, slug, venue_id, couple_names, wedding_date, couple_email, venue:venues(name, contact_email, bank_name, bank_account_name, bank_account_number, bank_branch_code, bank_swift, bank_iban, invoice_template, invoice_theme, branding_logo_url, platform_fee_rate)")
     .eq("id", weddingId)
     .single();
   if (!wed) throw new Error("Wedding not found");
@@ -457,27 +460,58 @@ export async function approveSubmission(submissionId: string, weddingId: string,
     .eq("wedding_id", weddingId);
 
   const origin = await publicOrigin();
-  const accent = (venue?.invoice_theme?.accent) || "#FA523C";
+  const accent = resolveInvoiceTheme(venue?.invoice_theme).accent;
   const couple = (wed as { couple_names: string }).couple_names;
+  const weddingDate = (wed as { wedding_date: string | null }).wedding_date;
   const ref = `INV-${String(weddingId).slice(0, 8).toUpperCase()}`;
 
-  // 1) Couple invoice — paid to the venue by EFT.
+  // 1) Couple invoice — paid to the venue by EFT, rendered with the venue's
+  // chosen invoice template + theme (the design previewed on the billing page).
   const coupleEmail = (wed as { couple_email: string | null }).couple_email;
   if (coupleEmail) {
-    const html = `
-      <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;border:1px solid #eee;border-radius:12px;overflow:hidden">
-        <div style="background:${accent};color:#fff;padding:20px 24px"><div style="font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:.9">${venue?.name ?? "Your venue"}</div><div style="font-size:24px;font-weight:700">Invoice</div></div>
-        <div style="padding:24px">
-          <p style="margin:0 0 4px">Hi ${couple},</p>
-          <p style="margin:0 0 16px;color:#57534e">Your selections have been confirmed. Please settle the total below by EFT directly to ${venue?.name ?? "the venue"}.</p>
-          <div style="display:flex;justify-content:space-between;background:#FFF6F0;border-radius:8px;padding:14px 16px;margin-bottom:16px">
-            <span style="font-weight:600">Total due</span><span style="font-weight:700;color:${accent}">${rZA(grandTotal)}</span>
-          </div>
-          <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:${accent};font-weight:700;margin-bottom:6px">Pay by EFT</div>
-          ${bankRows({ account_name: venue?.bank_account_name, bank: venue?.bank_name, account_number: venue?.bank_account_number, branch: venue?.bank_branch_code, swift: venue?.bank_swift, iban: venue?.bank_iban, reference: ref })}
-          <p style="margin:20px 0 0"><a href="${origin}/${slug}" style="display:inline-block;background:${accent};color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600">View your portal →</a></p>
-        </div>
-      </div>`;
+    // Rebuild the live charge lines (same builder markInvoiced just used for the
+    // totals) so the invoice shows what the total is made of. Falls back to a
+    // totals-only invoice if the rebuild fails.
+    let items: InvoiceLineItem[] = [];
+    let subtotal: number | null = null;
+    let deposit: InvoiceScheduleRow | null = null;
+    let balance: InvoiceScheduleRow | null = null;
+    let paidToDate: number | null = null;
+    try {
+      const { totals } = await buildWeddingCharges(supabase, (wed as { venue_id: string }).venue_id, weddingId);
+      items = totals.charges.map((c) => ({ description: c.label, qty: c.qty > 1 ? c.qty : null, amount: c.amount }));
+      subtotal = totals.subtotal;
+      const balanceDue = weddingDate
+        ? new Date(new Date(weddingDate).getTime() - totals.rules.balance_days_before * 86400000)
+        : null;
+      const balanceLabel = balanceDue ? `Due by ${formatDateZA(balanceDue)}` : null;
+      if (totals.payments_in > 0) {
+        paidToDate = totals.payments_in;
+        if (totals.balance_due > 0) balance = { amount: totals.balance_due, dueLabel: balanceLabel };
+      } else if (totals.deposit_amount > 0 && totals.deposit_amount < grandTotal) {
+        const pct = Math.round(totals.rules.deposit_pct * 100);
+        deposit = { label: `Deposit (${pct}%)`, amount: totals.deposit_amount, dueLabel: "Due on confirmation" };
+        balance = { amount: Math.max(0, grandTotal - totals.deposit_amount), dueLabel: balanceLabel };
+      }
+    } catch { /* totals-only invoice */ }
+
+    const html = renderInvoiceEmailHtml({
+      templateId: venue?.invoice_template,
+      theme: venue?.invoice_theme,
+      logoFallbackUrl: venue?.branding_logo_url,
+      venueName: venue?.name ?? "Your venue",
+      coupleNames: couple,
+      weddingDateLabel: weddingDate ? formatDateZA(weddingDate) : null,
+      invoiceRef: ref,
+      issueDateLabel: formatDateZA(new Date()),
+      items, subtotal, total: grandTotal, paidToDate, deposit, balance,
+      bank: {
+        accountName: venue?.bank_account_name, bankName: venue?.bank_name,
+        accountNumber: venue?.bank_account_number, branchCode: venue?.bank_branch_code,
+        swift: venue?.bank_swift, iban: venue?.bank_iban,
+      },
+      portalUrl: `${origin}/${slug}`,
+    });
     await sendResend(coupleEmail, `Your invoice from ${venue?.name ?? "your venue"}`, html);
   }
 
@@ -491,6 +525,7 @@ export async function approveSubmission(submissionId: string, weddingId: string,
     const html = `
       <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;border:1px solid #eee;border-radius:12px;overflow:hidden">
         <div style="background:#1c1917;color:#fff;padding:20px 24px"><div style="font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:.8">${p.invoice_from || "Venuely"}</div><div style="font-size:24px;font-weight:700">Commission invoice</div></div>
+        <div style="height:3px;background:${accent};font-size:0;line-height:3px">&nbsp;</div>
         <div style="padding:24px">
           <p style="margin:0 0 16px;color:#57534e">Commission on the confirmed booking for <strong>${couple}</strong> (invoiced ${rZA(grandTotal)}). This is deducted as your Venuely platform fee.</p>
           <div style="display:flex;justify-content:space-between;background:#FFF6F0;border-radius:8px;padding:14px 16px;margin-bottom:16px">

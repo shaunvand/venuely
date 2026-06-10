@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  INVOICE_TEMPLATE_LIST, resolveInvoiceTemplate,
+  INVOICE_TEMPLATE_LIST, resolveInvoiceTemplate, tintFromAccent,
   type InvoiceTemplateId, type InvoiceTokens,
 } from "@/lib/invoice/templates";
 import { saveVenueInvoiceDesign } from "@/app/venue/billing/actions";
@@ -189,10 +189,10 @@ function InvoicePreview({ tokens, accent, logoUrl, venueName, bank }: {
 
   return (
     <div className="rounded-xl overflow-hidden text-[11px]" style={{ border: "1px solid var(--line)", background: "#fff", fontFamily: tokens.bodyFont, color: "var(--ink)" }}>
-      {/* Header */}
+      {/* Header — the four template treatments, mirroring lib/invoice/render.ts */}
       {tokens.headerStyle === "band" ? (
         <div className="flex items-center justify-between px-5 py-4" style={{ background: accent, color: "#fff" }}>
-          <InvoiceLogo logoUrl={logoUrl} venueName={venueName} headingFont={tokens.headingFont} onBand={onBand} />
+          <InvoiceLogo logoUrl={logoUrl} venueName={venueName} headingFont={tokens.headingFont} onBand={onBand} headerStyle={tokens.headerStyle} bodyFont={tokens.bodyFont} accent={accent} />
           <div className="text-right">
             <div className="text-xl tracking-wide" style={heading}>INVOICE</div>
             <div className="opacity-90">#INV-2048 · 14 Dec 2025</div>
@@ -200,15 +200,23 @@ function InvoicePreview({ tokens, accent, logoUrl, venueName, bank }: {
         </div>
       ) : tokens.headerStyle === "split" ? (
         <div className="grid grid-cols-2 px-5 pt-5">
-          <div><InvoiceLogo logoUrl={logoUrl} venueName={venueName} headingFont={tokens.headingFont} onBand={onBand} /><div className="mt-1 text-[color:var(--ink-2)]">{venueName}</div></div>
+          <div><InvoiceLogo logoUrl={logoUrl} venueName={venueName} headingFont={tokens.headingFont} onBand={onBand} headerStyle={tokens.headerStyle} bodyFont={tokens.bodyFont} accent={accent} /><div className="mt-1 text-[color:var(--ink-2)]">{venueName}</div></div>
           <div className="text-right">
-            <div className="text-2xl italic" style={heading}>Invoice</div>
+            <div className="text-2xl italic" style={{ ...heading, color: tokens.accentOn === "total" ? undefined : accent }}>Invoice</div>
+            <div className="text-[color:var(--ink-2)]">#INV-2048 · 14 Dec 2025</div>
+          </div>
+        </div>
+      ) : tokens.headerStyle === "plain" ? (
+        <div className="px-6 pt-6 flex items-center justify-between">
+          <InvoiceLogo logoUrl={logoUrl} venueName={venueName} headingFont={tokens.headingFont} onBand={onBand} headerStyle={tokens.headerStyle} bodyFont={tokens.bodyFont} accent={accent} />
+          <div className="text-right">
+            <div className="text-xs uppercase" style={{ letterSpacing: "2px" }}>Invoice</div>
             <div className="text-[color:var(--ink-2)]">#INV-2048 · 14 Dec 2025</div>
           </div>
         </div>
       ) : (
         <div className="px-5 pt-5 flex items-center justify-between">
-          <InvoiceLogo logoUrl={logoUrl} venueName={venueName} headingFont={tokens.headingFont} onBand={onBand} />
+          <InvoiceLogo logoUrl={logoUrl} venueName={venueName} headingFont={tokens.headingFont} onBand={onBand} headerStyle={tokens.headerStyle} bodyFont={tokens.bodyFont} accent={accent} />
           <div className="text-right">
             <div className="text-xl" style={heading}>INVOICE</div>
             <div className="text-[color:var(--ink-2)]">#INV-2048 · 14 Dec 2025</div>
@@ -216,6 +224,7 @@ function InvoicePreview({ tokens, accent, logoUrl, venueName, bank }: {
         </div>
       )}
       {tokens.headerStyle === "rule" && <div className="mx-5 mt-3 h-0.5" style={{ background: accent }} />}
+      {tokens.headerStyle === "plain" && <div className="mx-6 mt-4 h-px" style={{ background: "var(--line)" }} />}
 
       {/* Bill to */}
       <div className="px-5 pt-4 flex justify-between gap-4">
@@ -234,7 +243,7 @@ function InvoicePreview({ tokens, accent, logoUrl, venueName, bank }: {
       <div className="px-5 pt-4">
         <table className="w-full border-collapse">
           <thead>
-            <tr style={tokens.accentOn === "all" ? { background: accent + "1f" } : undefined}>
+            <tr style={tokens.accentOn === "all" ? { background: tintFromAccent(accent, 0.12) } : undefined}>
               <th className="text-left py-1.5 font-semibold" style={{ borderBottom: `1px solid ${tokens.tableStyle === "minimal" ? "var(--line)" : accent}` }}>Description</th>
               <th className="text-right py-1.5 font-semibold w-10" style={{ borderBottom: `1px solid ${tokens.tableStyle === "minimal" ? "var(--line)" : accent}` }}>Qty</th>
               <th className="text-right py-1.5 font-semibold w-20" style={{ borderBottom: `1px solid ${tokens.tableStyle === "minimal" ? "var(--line)" : accent}` }}>Amount</th>
@@ -242,7 +251,7 @@ function InvoicePreview({ tokens, accent, logoUrl, venueName, bank }: {
           </thead>
           <tbody>
             {items.map((i, idx) => (
-              <tr key={i.desc} style={tokens.tableStyle === "striped" && idx % 2 ? { background: "var(--cream)" } : undefined}>
+              <tr key={i.desc} style={tokens.tableStyle === "striped" && idx % 2 ? { background: tintFromAccent(accent, 0.08) } : undefined}>
                 <td className="py-1.5" style={{ borderBottom: tokens.tableStyle === "lined" ? "1px solid var(--line)" : undefined }}>{i.desc}</td>
                 <td className="py-1.5 text-right" style={{ borderBottom: tokens.tableStyle === "lined" ? "1px solid var(--line)" : undefined }}>{i.qty}</td>
                 <td className="py-1.5 text-right" style={{ borderBottom: tokens.tableStyle === "lined" ? "1px solid var(--line)" : undefined }}>{rand(i.amount)}</td>
@@ -251,9 +260,17 @@ function InvoicePreview({ tokens, accent, logoUrl, venueName, bank }: {
           </tbody>
         </table>
         <div className="flex justify-end mt-2">
-          <div className="w-44">
+          <div className="w-52">
             <div className="flex justify-between py-1"><span className="text-[color:var(--ink-2)]">Subtotal</span><span>{rand(subtotal)}</span></div>
-            <div className="flex justify-between py-1.5 px-2 rounded font-semibold" style={{ background: accent, color: "#fff" }}>
+            <div className="flex justify-between py-1">
+              <span className="text-[color:var(--ink-2)]">Deposit (50%)<span className="block text-[9px]" style={{ color: "var(--ink-2)" }}>Due on confirmation</span></span>
+              <span>{rand(total * 0.5)}</span>
+            </div>
+            <div className="flex justify-between py-1">
+              <span className="text-[color:var(--ink-2)]">Balance due<span className="block text-[9px]" style={{ color: "var(--ink-2)" }}>Due by 15 Oct 2025</span></span>
+              <span>{rand(total * 0.5)}</span>
+            </div>
+            <div className="flex justify-between py-1.5 px-2 mt-1 rounded font-semibold" style={{ background: tokens.accentOn === "header" ? "#1c1917" : accent, color: "#fff" }}>
               <span>Total due</span><span>{rand(total)}</span>
             </div>
           </div>
@@ -261,8 +278,8 @@ function InvoicePreview({ tokens, accent, logoUrl, venueName, bank }: {
       </div>
 
       {/* Banking (EFT) */}
-      <div className="m-5 mt-4 p-3 rounded-lg" style={{ background: "var(--cream)" }}>
-        <div className="text-[9px] uppercase tracking-wider mb-1" style={{ color: accent, fontWeight: 700 }}>Pay by EFT</div>
+      <div className="mx-5 mt-4 p-3 rounded-lg" style={{ background: "var(--cream)" }}>
+        <div className="text-[9px] uppercase tracking-wider mb-1" style={{ color: tokens.accentOn === "total" ? "var(--ink)" : accent, fontWeight: 700 }}>Pay by EFT</div>
         {hasBank ? (
           <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
             <span className="text-[color:var(--ink-2)]">Account name</span><span className="text-right font-medium">{bank.bank_account_name || "—"}</span>
@@ -277,14 +294,32 @@ function InvoicePreview({ tokens, accent, logoUrl, venueName, bank }: {
           <div className="text-[color:var(--ink-2)]">Add your banking details above and they&apos;ll appear here for couples to pay you.</div>
         )}
       </div>
+
+      {/* Footer — matches the email's "Sent via Venuely" line */}
+      <div className="py-3 text-center text-[9px]" style={{ color: "#a8a29e" }}>Sent via Venuely</div>
     </div>
   );
 }
 
-function InvoiceLogo({ logoUrl, venueName, headingFont, onBand }: { logoUrl: string | null; venueName: string; headingFont: string; onBand: boolean }) {
+function InvoiceLogo({ logoUrl, venueName, headingFont, onBand, headerStyle, bodyFont, accent }: {
+  logoUrl: string | null; venueName: string; headingFont: string; onBand: boolean;
+  headerStyle: InvoiceTokens["headerStyle"]; bodyFont: string; accent: string;
+}) {
   if (logoUrl) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={logoUrl} alt="" className="h-9 max-w-[140px] object-contain" />;
+  }
+  // No logo — per-template fallbacks, mirroring lib/invoice/render.ts:
+  // split = venue initial in an accent circle; plain = small-caps venue name.
+  if (headerStyle === "split") {
+    return (
+      <span className="inline-flex w-9 h-9 rounded-full items-center justify-center text-sm font-bold" style={{ background: accent, color: "#fff", fontFamily: headingFont }}>
+        {(venueName.trim()[0] || "V").toUpperCase()}
+      </span>
+    );
+  }
+  if (headerStyle === "plain") {
+    return <span className="text-[10px] font-semibold uppercase" style={{ fontFamily: bodyFont, letterSpacing: "3px", color: "var(--ink)" }}>{venueName}</span>;
   }
   return <span className="text-lg font-semibold" style={{ fontFamily: headingFont, color: onBand ? "#fff" : "var(--ink)" }}>{venueName}</span>;
 }

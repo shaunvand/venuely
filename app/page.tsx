@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Reveal } from "@/components/Reveal";
 import { LogoMark } from "@/components/Logo";
+import { IntroSplash } from "@/components/IntroSplash";
 
 export default async function Home({
   searchParams,
@@ -23,6 +24,7 @@ export default async function Home({
 
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: "var(--cream)", color: "var(--ink)" }}>
+      <IntroSplash />
       <Nav signedIn={!!user} />
       <Hero />
       <Features />

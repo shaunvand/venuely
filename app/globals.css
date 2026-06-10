@@ -415,6 +415,76 @@ body {
   margin: 1.1rem 0 0.4rem 0.6rem;
 }
 
+/* ── Site-entry intro splash (components/IntroSplash.tsx) ──────────────
+   Beats: liquid droplet splash (gooey filter) 0–1.6s · V stroke-draw
+   0.35–1.25s · tile dot pop 1.05s · wordmark letters 1.15–1.9s · poppy
+   dot 1.62s · overlay exit 2.2–2.7s. JS unmounts at 2.75s. */
+.vy-intro-overlay {
+  animation: vy-intro-exit 0.5s ease-in 2.2s forwards;
+}
+@keyframes vy-intro-exit {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(1.04); }
+}
+
+/* Droplet: fired out of the core (goo stretches it off), shrinks to 0
+   as the liquid is re-absorbed. Direction/timing via per-element vars. */
+@keyframes vy-splash {
+  0%   { transform: translate(0, 0) scale(0.2); }
+  55%  { transform: translate(var(--dx), var(--dy)) scale(1); }
+  100% { transform: translate(calc(var(--dx) * 1.35), calc(var(--dy) * 1.35)) scale(0); }
+}
+.vy-drop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: vy-splash var(--dur, 1.4s) cubic-bezier(0.22, 1, 0.36, 1) var(--del, 0s) both;
+}
+
+/* Liquid core: gathers, overshoots, then settles in behind the tile. */
+@keyframes vy-goo-core {
+  0%   { transform: scale(0.4); }
+  45%  { transform: scale(1.12); }
+  100% { transform: scale(0.78); }
+}
+.vy-goo-core {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: vy-goo-core 1.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The mark itself: tile pops, V stroke-draws (shared draw-v keyframes,
+   dasharray 70 like .draw-v), tile dot pops after the stroke lands. */
+.vy-intro-tile {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.vy-intro-v {
+  stroke-dasharray: 70;
+  stroke-dashoffset: 70;
+  animation: draw-v 0.9s ease-out 0.35s both;
+}
+.vy-intro-vdot {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) 1.05s both;
+}
+
+/* Wordmark letters rise in (per-letter delay set inline, ~60ms stagger);
+   the trailing poppy dot reuses the pop keyframe instead. */
+@keyframes vy-letter-in {
+  from { opacity: 0; transform: translateY(0.55em); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.vy-intro-letter {
+  display: inline-block;
+  animation: vy-letter-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.vy-intro-worddot {
+  animation-name: pop;
+  animation-duration: 0.4s;
+}
+
 /* Keyboard focus ring — brand poppy, visible on every interactive element. */
 :where(a, button, summary, [role="button"]):focus-visible {
   outline: 2px solid var(--poppy);
@@ -433,6 +503,9 @@ body {
   }
   /* Render the splash mark fully drawn instead of mid-stroke. */
   .draw-v { stroke-dashoffset: 0 !important; }
+  /* Site-entry intro: the component already skips via matchMedia, but
+     hide the overlay outright as a CSS-level backstop. */
+  .vy-intro-overlay { display: none !important; }
   .hover-lift, .hover-grow, .press, .lift,
   .vy-card, .vy-stat, .vy-side-link, .vy-btn, .cta-scale {
     transition: none !important;

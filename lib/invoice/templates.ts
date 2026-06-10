@@ -56,3 +56,28 @@ export function resolveInvoiceTheme(raw: unknown): InvoiceTheme {
     logoUrl: typeof t.logoUrl === "string" && t.logoUrl ? t.logoUrl : null,
   };
 }
+
+// --- Shared helpers (email renderer + on-screen designer preview) -----------
+// Pure functions only — this module is imported by the client InvoiceDesigner,
+// so nothing server-only may live here.
+
+// Web-safe stacks for email clients (no webfonts there): Fraunces ≈ Georgia
+// serif, Satoshi ≈ Helvetica/Arial.
+export const EMAIL_SERIF = "Georgia, 'Times New Roman', serif";
+export const EMAIL_SANS = "Helvetica, Arial, sans-serif";
+export function emailFontStack(font: string): string {
+  return font.includes("Fraunces") ? EMAIL_SERIF : EMAIL_SANS;
+}
+
+// Blend the accent toward white by `ratio` (0..1) and return a SOLID hex —
+// the email-safe substitute for rgba()/8-digit-hex opacity. Used for striped
+// rows (~8%) and the accented table header (~12%) in BOTH the email renderer
+// and the designer preview, so the two stay visually identical.
+export function tintFromAccent(accent: string, ratio: number): string {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec((accent || "").trim());
+  if (!m) return "#f5f5f4";
+  const n = parseInt(m[1], 16);
+  const ch = (c: number) => Math.round(255 - (255 - c) * ratio);
+  const v = (ch((n >> 16) & 255) << 16) | (ch((n >> 8) & 255) << 8) | ch(n & 255);
+  return `#${v.toString(16).padStart(6, "0")}`;
+}
