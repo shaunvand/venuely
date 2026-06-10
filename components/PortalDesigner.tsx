@@ -102,10 +102,10 @@ export function PortalDesigner({
           <div>
             <div className="vy-eyebrow">Couple portal</div>
             <h2 className="vy-h2 mt-1 flex items-center gap-2">
-              {tokens.name} template
+              {venueName} Couple Portal
               <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--leaf)", color: "#1f5d3e" }}>Saved ✓</span>
             </h2>
-            <p className="text-sm mt-1" style={{ color: "var(--ink-2)" }}>This is how each couple&apos;s dashboard will look when you add their wedding.</p>
+            <p className="text-sm mt-1" style={{ color: "var(--ink-2)" }}>Preview how your couples experience your venue.</p>
           </div>
           <button type="button" onClick={() => { setMsg(null); setMinimized(false); }} className="vy-btn vy-btn-secondary">
             ✎ Edit or change template
