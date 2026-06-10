@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 // Horizontal phase Gantt for the visible month. One row per active wedding, with
-// up to three coloured bars per wedding — Set-up → Wedding Weekend → Breakdown —
-// laid out on a CSS grid whose columns are the days of the month. Client
-// component: holds the visible month in state so Today / ‹ / › navigate. No deps.
+// up to three bars per wedding — Set-up → Wedding Weekend → Breakdown — on a CSS
+// grid whose columns are the days of the month. Client component: holds the
+// visible month in state so Today / ‹ / › navigate. No deps. Styled to match the
+// reference mockup in Venuely colours.
 
 export type TimelineWedding = {
   id: string;
@@ -22,10 +23,6 @@ export type TimelineWedding = {
 };
 
 type Phase = "setup" | "weekend" | "breakdown";
-
-// Bar palette keyed by the wedding's status health, mapped to Venuely brand
-// colours. The Wedding Weekend bar uses the SOLID status colour; Set-up and
-// Breakdown shoulders use a lighter pre-tinted fill of the same hue.
 type BarTone = "confirmed" | "paid" | "attention" | "tentative" | "cancelled";
 
 const PHASE_LABEL: Record<Phase, string> = {
@@ -34,30 +31,29 @@ const PHASE_LABEL: Record<Phase, string> = {
   breakdown: "Breakdown",
 };
 
-// solid    → Wedding Weekend fill / solidText → its text colour
-// shoulder → Set-up & Breakdown fill / shoulderText → their text colour
-// dot      → legend swatch
+// Three fills per tone: solid (Wedding Weekend), mid (Set-up), faint (Breakdown).
+// onSolid = text on solid/mid, onFaint = text on the faint shoulder. dot = legend.
 type ToneStyle = {
   label: string;
   solid: string;
-  solidText: string;
-  shoulder: string;
-  shoulderText: string;
+  mid: string;
+  faint: string;
+  onSolid: string;
+  onFaint: string;
   dot: string;
-  border: string;
 };
 
 const TONE_STYLE: Record<BarTone, ToneStyle> = {
-  // sage green
-  confirmed: { label: "Confirmed", solid: "#8a9a86", solidText: "#fff", shoulder: "rgba(138,154,134,0.30)", shoulderText: "#3f4a3c", dot: "#8a9a86", border: "rgba(138,154,134,0.55)" },
-  // deeper leaf green
-  paid: { label: "Paid in Full", solid: "#BFDAD3", solidText: "#1f5d3e", shoulder: "rgba(191,218,211,0.45)", shoulderText: "#1f5d3e", dot: "#1f5d3e", border: "rgba(31,93,62,0.30)" },
-  // Venuely coral
-  attention: { label: "Needs Attention", solid: "#FA523C", solidText: "#fff", shoulder: "rgba(255,198,173,0.55)", shoulderText: "#9a2f1d", dot: "#FA523C", border: "rgba(250,82,60,0.45)" },
-  // warm neutral
-  tentative: { label: "Tentative", solid: "var(--cream)", solidText: "var(--ink-2)", shoulder: "rgba(255,246,240,0.9)", shoulderText: "var(--ink-2)", dot: "var(--bone)", border: "var(--line)" },
-  // muted grey, de-emphasised
-  cancelled: { label: "Cancelled", solid: "#ece9e7", solidText: "#8a8480", shoulder: "rgba(236,233,231,0.7)", shoulderText: "#a39e99", dot: "#d6d2cf", border: "var(--line)" },
+  // Confirmed → deep forest green (mockup's darkest bars)
+  confirmed: { label: "Confirmed", solid: "#3f6e54", mid: "#557f67", faint: "#d6e4da", onSolid: "#ffffff", onFaint: "#2f5a43", dot: "#3f6e54" },
+  // Paid in Full → medium sage green
+  paid: { label: "Paid in Full", solid: "#8fae8a", mid: "#a6c1a1", faint: "#dcebd8", onSolid: "#1d3f2c", onFaint: "#1f5d3e", dot: "#8fae8a" },
+  // Needs Attention → warm coral-peach (Venuely poppy family)
+  attention: { label: "Needs Attention", solid: "#eda579", mid: "#f3c0a1", faint: "#f9e0cf", onSolid: "#7d3f1d", onFaint: "#8a4a25", dot: "#ef8a5c" },
+  // Tentative → warm taupe/beige
+  tentative: { label: "Tentative", solid: "#d8c8ac", mid: "#e3d7c0", faint: "#eee5d4", onSolid: "#6b5d44", onFaint: "#6b5d44", dot: "#d2c2a4" },
+  // Cancelled → muted grey, de-emphasised
+  cancelled: { label: "Cancelled", solid: "#e4e0dc", mid: "#ece9e6", faint: "#f4f2f0", onSolid: "#8a8480", onFaint: "#a39e99", dot: "#d6d2cf" },
 };
 
 function toneFor(status: string | null, attention: boolean, paid: boolean): BarTone {
@@ -66,46 +62,30 @@ function toneFor(status: string | null, attention: boolean, paid: boolean): BarT
   if (attention) return "attention";
   if (paid || s === "completed") return "paid";
   if (s === "booked" || s === "confirmed") return "confirmed";
-  return "tentative"; // inquiry / provisional / unknown
+  return "tentative";
 }
 
 function initialsOf(name: string): string {
-  const parts = String(name ?? "")
-    .replace(/&|\band\b/gi, " ")
-    .split(/\s+/)
-    .filter(Boolean);
+  const parts = String(name ?? "").replace(/&|\band\b/gi, " ").split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-// Inclusive day index within the month for an ISO date, or null if outside.
 function dayIndex(iso: string | null | undefined, year: number, month0: number, daysInMonth: number): number | null {
   if (!iso) return null;
-  const s = String(iso).slice(0, 10);
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso).slice(0, 10));
   if (!m) return null;
-  const y = Number(m[1]);
-  const mo = Number(m[2]) - 1;
-  const d = Number(m[3]);
+  const y = Number(m[1]); const mo = Number(m[2]) - 1; const d = Number(m[3]);
   if (y !== year || mo !== month0) return null;
   if (d < 1 || d > daysInMonth) return null;
-  return d; // 1-based
+  return d;
 }
 
-// Clamp a [startIso, endIso] span to the visible month and return inclusive
-// 1-based day columns, or null if the span doesn't intersect the month at all.
-function spanColumns(
-  startIso: string | null | undefined,
-  endIso: string | null | undefined,
-  year: number,
-  month0: number,
-  daysInMonth: number,
-): { start: number; end: number } | null {
+function spanColumns(startIso: string | null | undefined, endIso: string | null | undefined, year: number, month0: number, daysInMonth: number): { start: number; end: number } | null {
   const sRaw = startIso ? String(startIso).slice(0, 10) : null;
   const eRaw = endIso ? String(endIso).slice(0, 10) : sRaw;
   if (!sRaw || !eRaw) return null;
-  // Month bounds as ISO for cheap string compare.
   const mm = String(month0 + 1).padStart(2, "0");
   const monthStart = `${year}-${mm}-01`;
   const monthEnd = `${year}-${mm}-${String(daysInMonth).padStart(2, "0")}`;
@@ -124,27 +104,23 @@ function addDaysIso(iso: string, delta: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-// Sun..Sat weekday letters (Date.getDay() order).
-const DOW = ["S", "M", "T", "W", "T", "F", "S"];
-
+const DOW = ["S", "M", "T", "W", "T", "F", "S"]; // Date.getDay() order
 const LEGEND: BarTone[] = ["confirmed", "attention", "paid", "tentative"];
 
 export function WeddingTimelineStrip({
   weddings,
   year,
   month0,
-  monthLabel: _monthLabel, // derived client-side from view; kept for compat
   cap = 6,
   attentionIds,
 }: {
   weddings: TimelineWedding[];
   year: number;
-  month0: number; // 0-based month
+  month0: number;
   monthLabel?: string;
   cap?: number;
   attentionIds?: Set<string>;
 }) {
-  // Visible month state (absolute month index from year 0 keeps arithmetic simple).
   const [viewIdx, setViewIdx] = useState(() => year * 12 + month0);
   const vYear = Math.floor(viewIdx / 12);
   const vMonth0 = ((viewIdx % 12) + 12) % 12;
@@ -160,7 +136,6 @@ export function WeddingTimelineStrip({
   const todayCol = dayIndex(todayIso, vYear, vMonth0, daysInMonth);
   const todayMonthIdx = today.getFullYear() * 12 + today.getMonth();
 
-  // Only weddings whose any phase intersects the visible month, soonest first.
   const visible = useMemo(
     () =>
       weddings
@@ -181,53 +156,24 @@ export function WeddingTimelineStrip({
   const shown = visible.slice(0, cap);
   const overflow = visible.length - shown.length;
 
-  // Grid template: a label column + one column per day.
-  const gridCols = `minmax(180px, 220px) repeat(${daysInMonth}, minmax(22px, 1fr))`;
-
-  const stepBtn =
-    "w-7 h-7 inline-flex items-center justify-center rounded-full border text-sm leading-none transition-colors hover:bg-[var(--cream)]";
+  const gridCols = `minmax(170px, 210px) repeat(${daysInMonth}, minmax(22px, 1fr))`;
+  const stepBtn = "w-8 h-8 inline-flex items-center justify-center rounded-lg border text-sm leading-none transition-colors hover:bg-[var(--cream)]";
 
   return (
     <section className="vy-card">
-      {/* Header row: title + control cluster */}
+      {/* Header: title + control cluster (‹ › · Today · Month) */}
       <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
         <div>
-          <h2 className="font-serif text-[1.4rem] leading-tight" style={{ color: "var(--ink)" }}>
-            Wedding timeline
-          </h2>
-          <p className="text-sm mt-0.5" style={{ color: "var(--ink-2)" }}>
-            Overview of bookings, set-up and breakdown.
-          </p>
+          <h2 className="font-serif text-[1.45rem] leading-tight" style={{ color: "var(--ink)" }}>Wedding timeline</h2>
+          <p className="text-sm mt-0.5" style={{ color: "var(--ink-2)" }}>Overview of bookings, set-up and breakdown.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setViewIdx(todayMonthIdx)}
-            className="px-3 h-7 inline-flex items-center rounded-full border text-xs font-medium transition-colors hover:bg-[var(--cream)]"
-            style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-          >
-            Today
-          </button>
-          <button
-            type="button"
-            aria-label="Previous month"
-            onClick={() => setViewIdx((i) => i - 1)}
-            className={stepBtn}
-            style={{ borderColor: "var(--line)", color: "var(--ink-2)" }}
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            aria-label="Next month"
-            onClick={() => setViewIdx((i) => i + 1)}
-            className={stepBtn}
-            style={{ borderColor: "var(--line)", color: "var(--ink-2)" }}
-          >
-            ›
-          </button>
-          <span className="font-serif text-sm min-w-[7.5rem] text-right" style={{ color: "var(--ink)" }}>
+          <button type="button" aria-label="Previous month" onClick={() => setViewIdx((i) => i - 1)} className={stepBtn} style={{ borderColor: "var(--line)", color: "var(--ink-2)" }}>‹</button>
+          <button type="button" aria-label="Next month" onClick={() => setViewIdx((i) => i + 1)} className={stepBtn} style={{ borderColor: "var(--line)", color: "var(--ink-2)" }}>›</button>
+          <button type="button" onClick={() => setViewIdx(todayMonthIdx)} className="px-3.5 h-8 inline-flex items-center rounded-lg border text-sm font-medium transition-colors hover:bg-[var(--cream)]" style={{ borderColor: "var(--line)", color: "var(--ink)" }}>Today</button>
+          <span className="px-3.5 h-8 inline-flex items-center gap-2 rounded-lg border font-serif text-sm" style={{ borderColor: "var(--line)", color: "var(--ink)" }}>
             {monthLabel}
+            <svg viewBox="0 0 12 12" className="w-2.5 h-2.5" aria-hidden><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </span>
         </div>
       </div>
@@ -236,48 +182,35 @@ export function WeddingTimelineStrip({
         <div className="vy-empty text-sm">No weddings fall in {monthLabel}.</div>
       ) : (
         <div className="overflow-x-auto -mx-1 px-1">
-          <div style={{ minWidth: 720 }}>
-            {/* Day axis: number above weekday letter, today highlighted */}
-            <div className="grid items-end gap-px mb-2" style={{ gridTemplateColumns: gridCols }}>
+          <div style={{ minWidth: 760 }}>
+            {/* Day axis: number above weekday letter, today softly circled */}
+            <div className="grid items-end gap-px mb-1.5" style={{ gridTemplateColumns: gridCols }}>
               <div />
               {Array.from({ length: daysInMonth }, (_, i) => {
                 const day = i + 1;
                 const dow = new Date(vYear, vMonth0, day).getDay();
                 const isToday = todayCol === day;
                 return (
-                  <div key={day} className="flex flex-col items-center leading-none gap-0.5">
+                  <div key={day} className="flex flex-col items-center leading-none gap-1">
                     <span
-                      className="text-[11px] tabular-nums inline-flex items-center justify-center"
-                      style={
-                        isToday
-                          ? {
-                              width: 20,
-                              height: 20,
-                              borderRadius: 9999,
-                              background: "var(--poppy)",
-                              color: "#fff",
-                              fontWeight: 700,
-                            }
-                          : { color: "var(--ink-2)", fontWeight: 500 }
-                      }
+                      className="text-[12px] tabular-nums inline-flex items-center justify-center"
+                      style={isToday ? { width: 22, height: 22, borderRadius: 9999, background: "var(--bone, #ECE6DD)", color: "var(--ink)", fontWeight: 700 } : { color: "var(--ink)", fontWeight: 600 }}
                     >
                       {day}
                     </span>
-                    <span className="text-[9px] uppercase" style={{ color: "var(--ink-2)", opacity: 0.6 }}>
-                      {DOW[dow]}
-                    </span>
+                    <span className="text-[9px] uppercase" style={{ color: "var(--ink-2)", opacity: 0.65 }}>{DOW[dow]}</span>
                   </div>
                 );
               })}
             </div>
 
-            {/* One row per wedding */}
-            <div className="space-y-2">
-              {shown.map((w) => {
+            {/* Rows */}
+            <div>
+              {shown.map((w, ri) => {
                 const paid = !!w.couple_paid_at;
                 const attention = attentionIds?.has(w.id) ?? false;
                 const tone = toneFor(w.status, attention, paid);
-                const style = TONE_STYLE[tone];
+                const st = TONE_STYLE[tone];
                 const dim = tone === "cancelled";
                 const wkEnd = w.wedding_end_date ?? w.wedding_date;
                 const setupEnd = w.wedding_date ? addDaysIso(w.wedding_date, -1) : null;
@@ -295,33 +228,20 @@ export function WeddingTimelineStrip({
                   <div
                     key={w.id}
                     className="grid items-center gap-px"
-                    style={{ gridTemplateColumns: gridCols, minHeight: 40, opacity: dim ? 0.6 : 1 }}
+                    style={{ gridTemplateColumns: gridCols, minHeight: 64, opacity: dim ? 0.6 : 1, borderTop: ri === 0 ? "none" : "1px solid var(--line)" }}
                   >
-                    {/* Label cell: avatar + name + guests */}
-                    <Link
-                      href={`/venue/weddings/${w.slug}`}
-                      className="flex items-center gap-2.5 pr-3 min-w-0 group"
-                      title={w.couple_names}
-                    >
-                      <span
-                        className="shrink-0 w-9 h-9 rounded-full inline-flex items-center justify-center text-[11px] font-semibold"
-                        style={{ background: style.shoulder, color: style.shoulderText, border: `1px solid ${style.border}` }}
-                      >
+                    {/* Label: avatar + name + guests */}
+                    <Link href={`/venue/weddings/${w.slug}`} className="flex items-center gap-3 pr-3 min-w-0 group" title={w.couple_names}>
+                      <span className="shrink-0 w-10 h-10 rounded-full inline-flex items-center justify-center text-[12px] font-semibold" style={{ background: "var(--cream)", color: "var(--poppy-deep)" }}>
                         {initialsOf(w.couple_names)}
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-[13px] font-medium truncate group-hover:underline" style={{ color: "var(--ink)" }}>
-                          {w.couple_names}
-                        </span>
-                        {w.guests != null && (
-                          <span className="block text-[11px] truncate" style={{ color: "var(--ink-2)" }}>
-                            {w.guests} guests
-                          </span>
-                        )}
+                        <span className="block text-[14px] font-semibold truncate group-hover:underline" style={{ color: "var(--ink)" }}>{w.couple_names}</span>
+                        {w.guests != null && <span className="block text-[12px] truncate" style={{ color: "var(--ink-2)" }}>{w.guests} guests</span>}
                       </span>
                     </Link>
 
-                    {/* Day track — today gets a faint vertical highlight band */}
+                    {/* Day track — today gets a faint peach vertical band */}
                     {Array.from({ length: daysInMonth }, (_, i) => {
                       const day = i + 1;
                       const dow = new Date(vYear, vMonth0, day).getDay();
@@ -329,15 +249,11 @@ export function WeddingTimelineStrip({
                       return (
                         <div
                           key={day}
-                          className="h-[34px] rounded-[4px]"
                           style={{
                             gridColumn: day + 1,
                             gridRow: 1,
-                            background: isToday
-                              ? "rgba(255,198,173,0.45)"
-                              : dow === 0 || dow === 6
-                              ? "rgba(28,25,23,0.03)"
-                              : "transparent",
+                            alignSelf: "stretch",
+                            background: isToday ? "rgba(255,198,173,0.4)" : dow === 0 || dow === 6 ? "rgba(28,25,23,0.025)" : "transparent",
                           }}
                         />
                       );
@@ -345,26 +261,17 @@ export function WeddingTimelineStrip({
 
                     {/* Phase bars */}
                     {bars.map((b) => {
-                      const isWeekend = b.phase === "weekend";
                       const span = b.cols.end - b.cols.start + 1;
+                      const fill = b.phase === "weekend" ? st.solid : b.phase === "setup" ? st.mid : st.faint;
+                      const text = b.phase === "breakdown" ? st.onFaint : st.onSolid;
                       return (
                         <div
                           key={b.phase}
-                          className="h-[24px] rounded-lg flex items-center justify-center px-2 overflow-hidden self-center"
-                          style={{
-                            gridColumn: `${b.cols.start + 1} / ${b.cols.end + 2}`,
-                            gridRow: 1,
-                            background: isWeekend ? style.solid : style.shoulder,
-                            color: isWeekend ? style.solidText : style.shoulderText,
-                            border: isWeekend ? "none" : `1px solid ${style.border}`,
-                          }}
+                          className="h-[32px] rounded-[10px] flex items-center justify-center px-2 overflow-hidden self-center"
+                          style={{ gridColumn: `${b.cols.start + 1} / ${b.cols.end + 2}`, gridRow: 1, background: fill, color: text }}
                           title={`${w.couple_names} · ${PHASE_LABEL[b.phase]}`}
                         >
-                          {span >= 2 && (
-                            <span className="text-[10px] font-medium truncate">
-                              {PHASE_LABEL[b.phase]}
-                            </span>
-                          )}
+                          {span >= 2 && <span className="text-[11px] font-medium truncate">{PHASE_LABEL[b.phase]}</span>}
                         </div>
                       );
                     })}
@@ -378,17 +285,15 @@ export function WeddingTimelineStrip({
 
       {overflow > 0 && (
         <div className="mt-3 text-xs">
-          <Link href="/venue/weddings" className="hover:underline" style={{ color: "var(--poppy)" }}>
-            +{overflow} more wedding{overflow === 1 ? "" : "s"} this month →
-          </Link>
+          <Link href="/venue/weddings" className="hover:underline" style={{ color: "var(--poppy)" }}>+{overflow} more wedding{overflow === 1 ? "" : "s"} this month →</Link>
         </div>
       )}
 
       {/* Legend */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 pt-4 text-xs" style={{ color: "var(--ink-2)", borderTop: "1px solid var(--line)" }}>
+      <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-5 pt-4 text-xs" style={{ color: "var(--ink-2)", borderTop: "1px solid var(--line)" }}>
         {LEGEND.map((t) => (
-          <span key={t} className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ background: TONE_STYLE[t].dot, border: `1px solid ${TONE_STYLE[t].border}` }} />
+          <span key={t} className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: TONE_STYLE[t].dot }} />
             {TONE_STYLE[t].label}
           </span>
         ))}
