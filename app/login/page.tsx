@@ -134,10 +134,15 @@ function LoginForm() {
         </div>
 
         {mode === "password" && (
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--ink-2)" }}><LockIcon /></span>
-            <input type="password" required placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} className="vy-input" style={{ paddingLeft: "2.5rem", paddingTop: "0.7rem", paddingBottom: "0.7rem" }} />
-          </div>
+          <>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--ink-2)" }}><LockIcon /></span>
+              <input type="password" required placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} className="vy-input" style={{ paddingLeft: "2.5rem", paddingTop: "0.7rem", paddingBottom: "0.7rem" }} />
+            </div>
+            <p className="text-right text-sm -mt-1">
+              <Link href="/forgot-password" className="font-medium" style={{ color: "var(--ink-2)" }}>Forgot password?</Link>
+            </p>
+          </>
         )}
 
         <button type="submit" disabled={loading} className="vy-btn vy-btn-primary w-full justify-center" style={{ padding: "0.8rem 1rem", fontSize: "0.95rem" }}>

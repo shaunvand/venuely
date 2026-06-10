@@ -139,13 +139,17 @@ function SignupForm() {
           {alreadyRegistered && (
             <p className="text-sm mt-4" style={{ color: "#a3210e" }}>
               You already have an account —{" "}
-              <Link href="/login" className="font-semibold underline" style={{ color: "var(--poppy)" }}>sign in instead</Link>.
+              <Link href="/login" className="font-semibold underline" style={{ color: "var(--poppy)" }}>sign in instead</Link>
+              {" "}or{" "}
+              <Link href="/forgot-password" className="font-semibold underline" style={{ color: "var(--poppy)" }}>reset your password</Link>.
             </p>
           )}
 
           <p className="text-sm mt-4" style={{ color: "var(--ink-2)" }}>
             Already have a Venuely account?{" "}
             <Link href="/login" className="font-semibold" style={{ color: "var(--poppy)" }}>Sign in</Link>
+            {" "}·{" "}
+            <Link href="/forgot-password" className="font-semibold" style={{ color: "var(--poppy)" }}>Forgot password?</Link>
           </p>
         </form>
 
