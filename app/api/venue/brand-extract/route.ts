@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { assertSafeUrl, safeFetch } from "@/lib/security/guards";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -45,16 +46,16 @@ export async function POST(req: NextRequest) {
 
     let parsed: URL;
     try { parsed = new URL(target); } catch { return NextResponse.json({ error: "Invalid website URL." }, { status: 400 }); }
-    if (!/^https?:$/.test(parsed.protocol)) return NextResponse.json({ error: "Unsupported URL." }, { status: 400 });
+    // SSRF guard: http/https to a public host only (also re-validated per redirect hop below).
+    try { assertSafeUrl(parsed); } catch { return NextResponse.json({ error: "Unsupported URL." }, { status: 400 }); }
 
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 12000);
     let html = "";
     try {
-      const res = await fetch(parsed.toString(), {
+      const res = await safeFetch(parsed, {
         signal: ctrl.signal,
         headers: { "User-Agent": "VenuelyBrandBot/1.0 (+https://venuely.co.za)" },
-        redirect: "follow",
       });
       if (!res.ok) return NextResponse.json({ error: `Couldn't load the site (${res.status}).` }, { status: 502 });
       html = (await res.text()).slice(0, 600_000);

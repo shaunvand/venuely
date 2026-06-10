@@ -80,11 +80,11 @@ function Blob({ className = "", color }: { className?: string; color: string }) 
 
 function Nav({ signedIn }: { signedIn: boolean }) {
   const links = [
-    { label: "Features", href: "#features", caret: true },
-    { label: "Solutions", href: "#for-couples", caret: true },
-    { label: "Pricing", href: "#pricing", caret: false },
-    { label: "Resources", href: "#faq", caret: true },
-    { label: "About", href: "#footer", caret: false },
+    { label: "Features", href: "#features" },
+    { label: "Solutions", href: "#for-couples" },
+    { label: "Pricing", href: "#pricing" },
+    { label: "Resources", href: "#faq" },
+    { label: "About", href: "#footer" },
   ];
   return (
     <header className="sticky top-0 z-30 backdrop-blur-sm" style={{ background: "rgba(255,246,240,0.85)" }}>
@@ -103,9 +103,8 @@ function Nav({ signedIn }: { signedIn: boolean }) {
         </Link>
         <nav className="hidden md:flex items-center gap-8 text-sm" style={{ color: "var(--ink)" }}>
           {links.map((l) => (
-            <a key={l.label} href={l.href} className="flex items-center gap-1 hover:opacity-60 transition-opacity">
+            <a key={l.label} href={l.href} className="hover:opacity-60 transition-opacity">
               {l.label}
-              {l.caret && <span className="text-[9px] opacity-50">▼</span>}
             </a>
           ))}
         </nav>
@@ -115,7 +114,7 @@ function Nav({ signedIn }: { signedIn: boolean }) {
           </Link>
           <Link
             href="/signup"
-            className="px-5 py-2.5 rounded-lg font-medium text-white transition-all hover:scale-[1.03] active:scale-[0.98]"
+            className="cta-scale px-5 py-2.5 rounded-lg font-medium text-white transition-all hover:scale-[1.03] active:scale-[0.98]"
             style={{ background: "var(--poppy)" }}
           >
             Get Started
@@ -272,7 +271,7 @@ function Hero() {
         <div className="mt-9 flex flex-wrap items-center gap-4">
           <Link
             href="/signup"
-            className="px-7 py-3.5 rounded-lg font-medium text-white transition-all hover:scale-[1.03] active:scale-[0.98]"
+            className="cta-scale px-7 py-3.5 rounded-lg font-medium text-white transition-all hover:scale-[1.03] active:scale-[0.98]"
             style={{ background: "var(--poppy)" }}
           >
             Get Started for Free
@@ -299,20 +298,17 @@ function Hero() {
 /* ── Trusted-by strip ───────────────────────────────────────────────── */
 
 function TrustedBy() {
-  const venues = ["THE GLASSHOUSE", "RIVERSTONE ESTATE", "OAK & IVY VENUE", "THE GATHERING", "Serenity"];
   return (
     <section className="relative border-y" style={{ borderColor: "var(--line)", background: "var(--cream)" }}>
       <div className="max-w-7xl mx-auto px-6 lg:px-10 py-14 text-center">
         <p className="text-xs uppercase tracking-[0.32em] mb-2" style={{ color: "var(--sage)" }}>
-          Trusted by
+          Why Venuely
         </p>
         <h3 className="font-serif text-2xl sm:text-3xl mb-8" style={{ fontWeight: 900 }}>
-          Wedding venues across South Africa
+          Built with real South African wedding venues
         </h3>
-        <div className="flex flex-wrap items-center justify-center gap-x-14 gap-y-5 font-serif text-lg" style={{ color: "var(--sage)" }}>
-          {venues.map((v) => (
-            <span key={v} className="tracking-[0.15em]">{v}</span>
-          ))}
+        <div className="flex justify-center">
+          <TrustChips />
         </div>
       </div>
     </section>
@@ -541,7 +537,7 @@ function ForCouples() {
               <span className="ml-3 text-[11px]" style={{ color: "var(--ink-2)" }}>browser</span>
             </div>
             <div className="px-4 py-2 text-xs border-b" style={{ borderColor: "var(--line)", color: "var(--ink-2)" }}>
-              venuely.co.za/<span style={{ color: "var(--poppy)" }}>your-venue</span>/<span style={{ color: "var(--poppy)" }}>smith-jones</span>
+              venuely.co.za/<span style={{ color: "var(--poppy)" }}>smith-jones</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] min-h-[340px]">
               <div className="p-3 space-y-1 border-r text-[11px]" style={{ borderColor: "var(--line)" }}>
@@ -689,7 +685,7 @@ function Pricing() {
           <div className="text-center mt-9">
             <Link
               href="/signup"
-              className="inline-block px-8 py-3.5 rounded-lg font-medium text-white transition-all hover:scale-[1.03]"
+              className="cta-scale inline-block px-8 py-3.5 rounded-lg font-medium text-white transition-all hover:scale-[1.03]"
               style={{ background: "var(--poppy)" }}
             >
               Get started — free
@@ -871,7 +867,7 @@ function FinalCTA() {
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
           <Link
             href="/signup"
-            className="px-8 py-4 rounded-lg font-medium text-white transition-all hover:scale-[1.03] active:scale-[0.98] text-base"
+            className="cta-scale px-8 py-4 rounded-lg font-medium text-white transition-all hover:scale-[1.03] active:scale-[0.98] text-base"
             style={{ background: "var(--poppy)" }}
           >
             Sign up for free

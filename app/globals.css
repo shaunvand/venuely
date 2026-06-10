@@ -84,6 +84,10 @@ body {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(400%); }
 }
+@keyframes draw-v {
+  from { stroke-dashoffset: 70; }
+  to   { stroke-dashoffset: 0; }
+}
 
 .anim-fade-up { animation: fade-up 0.7s ease-out both; }
 .anim-fade-in { animation: fade-in 0.9s ease-out both; }
@@ -107,6 +111,27 @@ body {
 .logo-arch {
   stroke-dasharray: 200;
   animation: draw-arch 1.4s ease-out forwards;
+}
+
+/* Branded splash — "V." monogram stroke-draw (path) + delayed dot pop. */
+.draw-v {
+  stroke-dasharray: 70;
+  stroke-dashoffset: 70;
+  animation: draw-v 0.9s ease-out forwards;
+}
+.draw-v-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both;
+}
+
+/* Loading skeleton — shimmering bone block, radius matches vy-card. */
+.vy-skeleton {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: linear-gradient(90deg, var(--bone) 25%, #fff 50%, var(--bone) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
 }
 
 .text-shimmer {
@@ -390,20 +415,32 @@ body {
   margin: 1.1rem 0 0.4rem 0.6rem;
 }
 
+/* Keyboard focus ring — brand poppy, visible on every interactive element. */
+:where(a, button, summary, [role="button"]):focus-visible {
+  outline: 2px solid var(--poppy);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .anim-fade-up, .anim-fade-in, .anim-drift, .logo-arch, .text-shimmer, .reveal,
-  .anim-rise, .anim-scale-in, .anim-pop, .anim-float, .vy-stagger > * {
+  .anim-rise, .anim-scale-in, .anim-pop, .anim-float, .vy-stagger > *,
+  .draw-v, .draw-v-dot, .vy-skeleton {
     animation: none !important;
     transition: none !important;
     opacity: 1 !important;
     transform: none !important;
   }
+  /* Render the splash mark fully drawn instead of mid-stroke. */
+  .draw-v { stroke-dashoffset: 0 !important; }
   .hover-lift, .hover-grow, .press, .lift,
-  .vy-card, .vy-stat, .vy-side-link, .vy-btn {
+  .vy-card, .vy-stat, .vy-side-link, .vy-btn, .cta-scale {
     transition: none !important;
   }
   .hover-lift:hover, .hover-grow:hover, .lift:hover,
-  .vy-stat:hover, .vy-side-link:hover, .vy-btn:active, .press:active {
+  .vy-stat:hover, .vy-side-link:hover, .vy-btn:active, .press:active,
+  .cta-scale:hover, .cta-scale:active {
     transform: none !important;
+    scale: none !important; /* Tailwind 4 scale-* utilities use the `scale` property */
   }
 }

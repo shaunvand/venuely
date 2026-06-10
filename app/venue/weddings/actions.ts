@@ -2,19 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import { createHash, randomBytes } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
-import { loadRules, computeTotals, applyMarkup, platformFee, type Charge, type Payment, type Computed } from "@/lib/billing/compute";
+import { platformFee } from "@/lib/billing/compute";
+import { buildWeddingCharges } from "@/lib/billing/charges";
 import { whatsappUrl } from "@/lib/whatsapp";
-
-type WeddingState = {
-  rentalSelections?: Record<string, { sel?: boolean; qty?: number; mg?: boolean; wed?: boolean; fb?: boolean }>;
-  catalogueSelections?: Record<string, { sel?: boolean; mg?: boolean; wed?: boolean; fb?: boolean }>;
-  roomAssignments?: Record<string, string[]>;
-  suppliers?: Array<{ id: number; name: string; category?: string; status?: string; price?: string; fromVendorId?: string }>;
-};
 
 // Normalise a (start, end) date-range form pair into the columns we store.
 // - blank start  → both null (date TBD)
@@ -31,145 +25,6 @@ function normaliseDateRange(
   if (end && end < start) [start, end] = [end, start];
   if (end && end === start) end = null;
   return { startDate: start, endDate: end };
-}
-
-function parseMoney(s: string | undefined | null): number {
-  if (!s) return 0;
-  const n = Number(String(s).replace(/[^\d.\-]/g, ""));
-  return Number.isFinite(n) ? n : 0;
-}
-
-// Rebuild a wedding's live charges the same way the venue/couple proforma does
-// (see app/venue/weddings/[slug]/page.tsx). Used to recompute the platform fee
-// authoritatively at invoice time rather than trusting client-bound totals.
-async function buildWeddingCharges(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  venueId: string,
-  weddingId: string,
-): Promise<{ grandTotal: number; feeRate: number; totals: Computed }> {
-  const { data: wedding } = await supabase
-    .from("weddings")
-    .select("id, guest_count, wedding_state, area_selections")
-    .eq("id", weddingId)
-    .single();
-  if (!wedding) throw new Error("Wedding not found");
-
-  const { data: venue } = await supabase
-    .from("venues")
-    .select("platform_fee_rate")
-    .eq("id", venueId)
-    .single();
-  const feeRate = Number((venue as { platform_fee_rate?: number } | null)?.platform_fee_rate ?? 0.005);
-
-  const state = (wedding.wedding_state ?? {}) as WeddingState;
-  const rules = await loadRules(supabase, venueId);
-
-  const [rentalsRes, cataRes, accomRes, vendorsRes, areasRes, areaPricingRes, paymentsRes, chargesRes] = await Promise.all([
-    supabase.from("rental_items").select("id, name, price, commission_value, commission_type, item_code, cost_treatment").eq("venue_id", venueId),
-    supabase.from("catalogue_items").select("id, name, price, commission_value, commission_type, cost_treatment").eq("venue_id", venueId),
-    supabase.from("accommodation_rooms").select("id, name, price_per_night, commission_value, commission_type, cost_treatment").eq("venue_id", venueId),
-    supabase.from("vendor_partners").select("id, name, vendor_type, price_from, commission_value, commission_type, cost_treatment").eq("venue_id", venueId),
-    supabase.from("venue_areas").select("id, name, slug, area_kind").eq("venue_id", venueId).eq("active", true),
-    supabase.from("area_pricing").select("area_id, day_type, price"),
-    supabase.from("payment_ledger").select("id, amount, direction, kind, paid_at").eq("wedding_id", weddingId),
-    supabase.from("wedding_charges").select("id, kind, label, qty, unit_price, amount, is_refundable, day_type").eq("wedding_id", weddingId),
-  ]);
-
-  const rentalMap = new Map((rentalsRes.data ?? []).map((r) => [r.id, r]));
-  const cataMap = new Map((cataRes.data ?? []).map((c) => [c.id, c]));
-  const accomMap = new Map((accomRes.data ?? []).map((r) => [r.id, r]));
-  const vendorMap = new Map((vendorsRes.data ?? []).map((v) => [v.id, v]));
-  const areas = areasRes.data ?? [];
-  const areaPriceMap: Record<string, Record<string, number>> = {};
-  (areaPricingRes.data ?? []).forEach((p) => {
-    areaPriceMap[p.area_id] = areaPriceMap[p.area_id] || {};
-    areaPriceMap[p.area_id][p.day_type] = Number(p.price);
-  });
-
-  const charges: Charge[] = [];
-
-  // Rentals
-  for (const [code, v] of Object.entries(state.rentalSelections ?? {})) {
-    if (!v.sel) continue;
-    const item = rentalMap.get(code); if (!item) continue;
-    const dayCount = [v.mg, v.wed, v.fb].filter(Boolean).length || 1;
-    const qty = v.qty ?? 1;
-    const baseUnit = Number(item.price);
-    const unit = applyMarkup(baseUnit, item.commission_value, item.commission_type);
-    const included = (item as { cost_treatment?: string }).cost_treatment === "included";
-    const units = qty * dayCount;
-    charges.push({ kind: "rental", label: item.name, qty: units, unit_price: unit, amount: included ? 0 : unit * units, base_amount: included ? 0 : baseUnit * units, is_refundable: false });
-  }
-
-  // Catalogue (per-head)
-  const guestCount = wedding.guest_count ?? 0;
-  for (const [code, v] of Object.entries(state.catalogueSelections ?? {})) {
-    if (!v.sel && !v.mg && !v.wed && !v.fb) continue;
-    const item = cataMap.get(code); if (!item) continue;
-    const dayCount = [v.mg, v.wed, v.fb].filter(Boolean).length || 1;
-    const baseUnit = Number(item.price);
-    const unit = applyMarkup(baseUnit, item.commission_value, item.commission_type);
-    const included = (item as { cost_treatment?: string }).cost_treatment === "included";
-    const units = dayCount * guestCount;
-    charges.push({ kind: "catalogue", label: item.name, qty: units, unit_price: unit, amount: included ? 0 : unit * units, base_amount: included ? 0 : baseUnit * units, is_refundable: false });
-  }
-
-  // Accommodation
-  for (const [roomId, names] of Object.entries(state.roomAssignments ?? {})) {
-    const room = accomMap.get(roomId); if (!room || !names.length) continue;
-    const baseUnit = Number(room.price_per_night);
-    const unit = applyMarkup(baseUnit, room.commission_value, room.commission_type);
-    const included = (room as { cost_treatment?: string }).cost_treatment === "included";
-    charges.push({ kind: "accommodation", label: room.name, qty: 1, unit_price: unit, amount: included ? 0 : unit, base_amount: included ? 0 : baseUnit, is_refundable: false });
-  }
-
-  // Vendor partners selected
-  (state.suppliers ?? []).forEach((s) => {
-    if (s.status !== "booked" && !parseMoney(s.price)) return;
-    const v = s.fromVendorId ? vendorMap.get(s.fromVendorId) : null;
-    const fallback = v ? applyMarkup(Number(v.price_from ?? 0), v.commission_value, v.commission_type) : 0;
-    const cost = parseMoney(s.price) || fallback;
-    const included = v && (v as { cost_treatment?: string }).cost_treatment === "included";
-    // Base = the supplier's price_from before markup when this is a known partner
-    // priced off its catalogue entry. A manually keyed price (parseMoney) carries
-    // no separable commission, so its base equals the charged amount.
-    const baseCost = v && !parseMoney(s.price) ? Number(v.price_from ?? 0) : cost;
-    if (cost > 0) charges.push({ kind: "vendor", label: s.name, qty: 1, unit_price: cost, amount: included ? 0 : cost, base_amount: included ? 0 : baseCost, is_refundable: false });
-  });
-
-  // Areas (paid extras only)
-  const selectedAreas = (wedding.area_selections ?? []) as Array<{ area_id: string; day_type: string }>;
-  selectedAreas.forEach((sel) => {
-    const a = areas.find((x) => x.id === sel.area_id);
-    const price = areaPriceMap[sel.area_id]?.[sel.day_type] ?? 0;
-    if (a && price > 0) charges.push({ kind: "area", label: a.name, qty: 1, unit_price: price, amount: price, is_refundable: false });
-  });
-
-  // Manual charges (from wedding_charges table)
-  (chargesRes.data ?? []).forEach((c) => {
-    charges.push({
-      id: c.id,
-      kind: c.kind as Charge["kind"],
-      label: c.label,
-      qty: Number(c.qty),
-      unit_price: Number(c.unit_price),
-      amount: Number(c.amount),
-      is_refundable: c.is_refundable,
-      day_type: c.day_type,
-    });
-  });
-
-  // Breakage deposit (rule)
-  if (rules.breakage_deposit > 0) {
-    charges.push({ kind: "breakage", label: "Refundable breakage deposit", qty: 1, unit_price: rules.breakage_deposit, amount: rules.breakage_deposit, is_refundable: true });
-  }
-
-  const payments = (paymentsRes.data ?? []).map((p) => ({
-    id: p.id, amount: Number(p.amount), direction: p.direction as "in" | "out", kind: p.kind, paid_at: p.paid_at,
-  })) as Payment[];
-
-  const totals = computeTotals(rules, charges, payments);
-  return { grandTotal: totals.grand_total, feeRate, totals };
 }
 
 // Lightweight salted hash. The base salt comes from a server-only env var
@@ -218,7 +73,14 @@ async function uniqueSlug(supabase: Awaited<ReturnType<typeof createClient>>, ba
   }
 }
 
-export async function createWedding(venueId: string, _venueSlug: string, formData: FormData) {
+// Insert the weddings row and return its identity directly (no redirect).
+// Used by createWedding below and by enquiries/actions.ts::convertEnquiry, which
+// needs the new wedding id to link enquiry.wedding_id without guessing.
+// RLS on weddings (venue membership) is the authorisation gate here.
+export async function createWeddingRecord(
+  venueId: string,
+  formData: FormData,
+): Promise<{ id: string; slug: string }> {
   const supabase = await createClient();
   const couples = (formData.get("couple_names") as string).trim();
   const explicit = (formData.get("slug") as string || "").trim();
@@ -245,12 +107,17 @@ export async function createWedding(venueId: string, _venueSlug: string, formDat
       status: statusStr,
       portal_password_hash: passwordStr ? hashPassword(passwordStr) : null,
     })
-    .select("slug")
+    .select("id, slug")
     .single();
 
-  if (error) throw new Error(`Could not create wedding: ${error.message}`);
+  if (error || !data) throw new Error(`Could not create wedding: ${error?.message ?? "no row returned"}`);
+  return { id: data.id as string, slug: data.slug as string };
+}
+
+export async function createWedding(venueId: string, _venueSlug: string, formData: FormData) {
+  const { slug } = await createWeddingRecord(venueId, formData);
   revalidatePath("/venue/weddings");
-  if (data) redirect(`/venue/weddings/${data.slug}`);
+  redirect(`/venue/weddings/${slug}`);
 }
 
 // Permanently delete a wedding (e.g. cancelled). FK cascades remove the couple's
@@ -480,11 +347,13 @@ export async function markInvoiced(weddingId: string, slug: string, _total?: num
   const { data: wed } = await supabase.from("weddings").select("venue_id").eq("id", weddingId).single();
   if (!wed?.venue_id) throw new Error("Wedding not found");
 
-  const { grandTotal, feeRate, totals } = await buildWeddingCharges(supabase, wed.venue_id as string, weddingId);
+  const { grandTotal, feeRate, feeActive, totals } = await buildWeddingCharges(supabase, wed.venue_id as string, weddingId);
   // invoice_total snapshots what the couple pays (the gross grand_total), but the
-  // platform fee is rate × platform_fee_base (= grand_total − venue commission).
-  // Venuely never taxes the venue's commission; the venue keeps 100% of it.
-  const fee = platformFee(totals, feeRate);
+  // platform fee is venue.platform_fee_rate × platform_fee_base (= grand_total −
+  // venue commission). Venuely never taxes the venue's commission; the venue keeps
+  // 100% of it. When venue.platform_fee_active is false the fee is waived (0) but
+  // the invoice is still recorded.
+  const fee = feeActive ? platformFee(totals, feeRate) : 0;
 
   const { error } = await supabase.from("weddings").update({
     invoiced_at: new Date().toISOString(),
@@ -529,6 +398,7 @@ type VenueBank = {
   name: string; contact_email: string | null; bank_name: string | null; bank_account_name: string | null;
   bank_account_number: string | null; bank_branch_code: string | null;
   bank_swift: string | null; bank_iban: string | null; invoice_theme: { accent?: string } | null;
+  platform_fee_rate: number | null;
 };
 
 function bankRows(b: {
@@ -555,29 +425,36 @@ async function sendResend(to: string, subject: string, html: string): Promise<vo
   } catch { /* non-fatal */ }
 }
 
-// Approve a couple's submission: compute + persist the invoice (and 0.5% platform
-// fee), email the couple their EFT invoice (paid to the VENUE), and email the
-// venue their commission invoice (paid to VENUELY).
+// Approve a couple's submission: compute + persist the invoice (and the platform
+// fee at venue.platform_fee_rate), email the couple their EFT invoice (paid to
+// the VENUE), and email the venue their commission invoice (paid to VENUELY).
 export async function approveSubmission(submissionId: string, weddingId: string, slug: string) {
   const supabase = await createClient();
 
   // RLS read confirms the venue admin owns this wedding + gives us the venue bank.
   const { data: wed } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, couple_email, venue:venues(name, contact_email, bank_name, bank_account_name, bank_account_number, bank_branch_code, bank_swift, bank_iban, invoice_theme)")
+    .select("id, slug, couple_names, wedding_date, couple_email, venue:venues(name, contact_email, bank_name, bank_account_name, bank_account_number, bank_branch_code, bank_swift, bank_iban, invoice_theme, platform_fee_rate)")
     .eq("id", weddingId)
     .single();
   if (!wed) throw new Error("Wedding not found");
   const venue = (wed as unknown as { venue: VenueBank | null }).venue;
 
-  // Compute + persist invoice_total + 0.5% platform_fee_owed.
+  // Compute + persist invoice_total + platform_fee_owed (venue.platform_fee_rate;
+  // 0 when the venue's platform_fee_active is off — see markInvoiced).
   await markInvoiced(weddingId, slug);
   const { data: fresh } = await supabase.from("weddings").select("invoice_total, platform_fee_owed").eq("id", weddingId).single();
   const grandTotal = Number(fresh?.invoice_total ?? 0);
   const commission = Number(fresh?.platform_fee_owed ?? 0);
 
+  // Service-role write is tenant-scoped to the ownership-verified wedding above:
+  // a forged submissionId belonging to another venue's wedding will match 0 rows.
   const admin = adminClient();
-  await admin.from("submissions").update({ status: "approved", reviewed_at: new Date().toISOString() }).eq("id", submissionId);
+  await admin
+    .from("submissions")
+    .update({ status: "approved", reviewed_at: new Date().toISOString() })
+    .eq("id", submissionId)
+    .eq("wedding_id", weddingId);
 
   const origin = await publicOrigin();
   const accent = (venue?.invoice_theme?.accent) || "#FA523C";
@@ -604,8 +481,9 @@ export async function approveSubmission(submissionId: string, weddingId: string,
     await sendResend(coupleEmail, `Your invoice from ${venue?.name ?? "your venue"}`, html);
   }
 
-  // 2) Commission invoice — venue pays Venuely 0.5% by EFT.
+  // 2) Commission invoice — venue pays Venuely its platform_fee_rate by EFT.
   const venueEmail = venue?.contact_email;
+  const feePct = +((Number(venue?.platform_fee_rate ?? 0.005)) * 100).toFixed(2);
   if (venueEmail && commission > 0) {
     const { data: ps } = await admin.from("platform_settings").select("*").eq("id", 1).single();
     const p = (ps ?? {}) as Record<string, string | null>;
@@ -616,7 +494,7 @@ export async function approveSubmission(submissionId: string, weddingId: string,
         <div style="padding:24px">
           <p style="margin:0 0 16px;color:#57534e">Commission on the confirmed booking for <strong>${couple}</strong> (invoiced ${rZA(grandTotal)}). This is deducted as your Venuely platform fee.</p>
           <div style="display:flex;justify-content:space-between;background:#FFF6F0;border-radius:8px;padding:14px 16px;margin-bottom:16px">
-            <span style="font-weight:600">Commission due (0.5%)</span><span style="font-weight:700">${rZA(commission)}</span>
+            <span style="font-weight:600">Commission due (${feePct}%)</span><span style="font-weight:700">${rZA(commission)}</span>
           </div>
           <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#FA523C;font-weight:700;margin-bottom:6px">Pay Venuely by EFT</div>
           ${bankRows({ account_name: p.account_name, bank: p.bank_name, account_number: p.account_number, branch: p.branch_code, swift: p.swift, iban: p.iban, reference: cref })}
@@ -629,15 +507,43 @@ export async function approveSubmission(submissionId: string, weddingId: string,
 }
 
 // Authoritative current total for a wedding's saved selections — same calc the
-// venue proforma uses. Admin client so the (anonymous) couple portal can read it.
-export async function getWeddingTotals(weddingId: string): Promise<{ grandTotal: number }> {
-  const sb = adminClient() as unknown as Awaited<ReturnType<typeof createClient>>;
-  const { data: wed } = await sb.from("weddings").select("venue_id").eq("id", weddingId).single();
-  if (!wed?.venue_id) return { grandTotal: 0 };
+// venue proforma uses. Admin client so the (anonymous) couple portal can read it,
+// but ONLY after the caller passes the same gate the Paystack checkout route uses:
+//   (a) the vy_portal_<weddingId> cookie matches this wedding's password hash, OR
+//   (b) a signed-in Supabase user who is a venue member, wedding member, or owner.
+// Unauthorized callers get null — this is an exported "use server" action, so it
+// is directly invokable and must never leak totals for arbitrary wedding ids.
+export async function getWeddingTotals(weddingId: string): Promise<{ grandTotal: number } | null> {
+  const sb = adminClient();
+  const { data: wed } = await sb
+    .from("weddings")
+    .select("id, venue_id, portal_password_hash")
+    .eq("id", weddingId)
+    .single();
+  if (!wed?.venue_id) return null;
+
+  let authorised = false;
+  if (wed.portal_password_hash) {
+    const cookieValue = (await cookies()).get(`vy_portal_${wed.id}`)?.value;
+    if (cookieValue === wed.portal_password_hash) authorised = true;
+  }
+  if (!authorised) {
+    // RLS-scoped client only to read the caller's own auth identity + memberships.
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const [{ data: vm }, { data: wm }, { data: profile }] = await Promise.all([
+      supabase.from("venue_members").select("venue_id").eq("user_id", user.id).eq("venue_id", wed.venue_id).maybeSingle(),
+      supabase.from("wedding_members").select("wedding_id").eq("user_id", user.id).eq("wedding_id", wed.id).maybeSingle(),
+      supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+    ]);
+    if (!(vm || wm || profile?.role === "owner")) return null;
+  }
+
   try {
     const { grandTotal } = await buildWeddingCharges(sb, wed.venue_id as string, weddingId);
     return { grandTotal };
   } catch {
-    return { grandTotal: 0 };
+    return null;
   }
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/security/guards";
 
 export const runtime = "nodejs";
 
@@ -95,6 +96,10 @@ async function searchUnsplash(key: string, q: string): Promise<ImageResult[]> {
 
 export async function POST(req: NextRequest) {
   try {
+    // No venue_id involved — a signed-in user is enough to use image search.
+    const gate = await requireUser();
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+
     const { query } = await req.json();
     const q = String(query || "").trim();
     if (!q) return NextResponse.json({ error: "Missing query" }, { status: 400 });

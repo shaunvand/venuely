@@ -10,6 +10,7 @@ export default function CheckEmailPage() {
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
   const [firstName, setFirstName] = useState<string>("");
+  const [venueInvite, setVenueInvite] = useState<string | null>(null);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [resendMsg, setResendMsg] = useState<string | null>(null);
 
@@ -21,6 +22,10 @@ export default function CheckEmailPage() {
     if (e) setEmail(e);
     const n = params.get("name");
     if (n) setFirstName(n.trim().split(" ")[0]);
+    // Team-invite token from signup — must ride along on any resent confirmation
+    // email so /auth/callback can redeem it.
+    const v = params.get("venue_invite");
+    if (v) setVenueInvite(v);
   }, []);
 
   // Auto-advance to the dashboard the moment the email gets confirmed.
@@ -56,10 +61,12 @@ export default function CheckEmailPage() {
     setResendState("sending");
     setResendMsg(null);
     const supabase = createClient();
+    let callbackUrl = `${window.location.origin}/auth/callback?next=/dashboard`;
+    if (venueInvite) callbackUrl += `&venue_invite=${encodeURIComponent(venueInvite)}`;
     const { error } = await supabase.auth.resend({
       type: "signup",
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard` },
+      options: { emailRedirectTo: callbackUrl },
     });
     if (error) {
       setResendState("error");

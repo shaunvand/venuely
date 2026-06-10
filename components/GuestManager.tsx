@@ -122,19 +122,20 @@ export function GuestManager({ slug, primary, accent, heading, cardRadius, rooms
         <div style={card({ overflow: "hidden" })}>
           {guests.map((g, i) => (
             <div key={g.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "10px 14px", borderTop: i ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
-              <input style={{ ...input, flex: "2 1 160px", border: "none", fontWeight: 600 }} value={g.full_name} onChange={(e) => patch(g.id, { full_name: e.target.value })} />
+              {/* Text fields commit on blur (one PATCH per edit), not per keystroke. */}
+              <input style={{ ...input, flex: "2 1 160px", border: "none", fontWeight: 600 }} defaultValue={g.full_name} onBlur={(e) => { if (e.target.value !== g.full_name) patch(g.id, { full_name: e.target.value }); }} />
               <select value={g.rsvp_status ?? "pending"} onChange={(e) => patch(g.id, { rsvp_status: e.target.value })} style={{ ...input, color: RSVP.find((r) => r.v === (g.rsvp_status ?? "pending"))?.color }}>
                 {RSVP.map((r) => <option key={r.v} value={r.v}>{r.label}</option>)}
               </select>
-              <input style={{ ...input, flex: "1 1 110px" }} placeholder="Dietary" value={g.dietary ?? ""} onChange={(e) => patch(g.id, { dietary: e.target.value })} />
-              <input style={{ ...input, width: 70 }} placeholder="Table" value={g.table_number ?? ""} onChange={(e) => patch(g.id, { table_number: e.target.value === "" ? null : Number(e.target.value) })} />
+              <input style={{ ...input, flex: "1 1 110px" }} placeholder="Dietary" defaultValue={g.dietary ?? ""} onBlur={(e) => { if (e.target.value !== (g.dietary ?? "")) patch(g.id, { dietary: e.target.value }); }} />
+              <input style={{ ...input, width: 70 }} placeholder="Table" defaultValue={g.table_number ?? ""} onBlur={(e) => { const next = e.target.value === "" ? null : Number(e.target.value); if (next !== (g.table_number ?? null)) patch(g.id, { table_number: next }); }} />
               {rooms.length > 0 && (
                 <select value={g.room_id ?? ""} onChange={(e) => patch(g.id, { room_id: e.target.value || null })} title="Accommodation" style={{ ...input, maxWidth: 130 }}>
                   <option value="">No room</option>
                   {rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               )}
-              <input style={{ ...input, flex: "1 1 120px" }} placeholder="Accessibility" value={g.accessibility_needs ?? ""} onChange={(e) => patch(g.id, { accessibility_needs: e.target.value })} />
+              <input style={{ ...input, flex: "1 1 120px" }} placeholder="Accessibility" defaultValue={g.accessibility_needs ?? ""} onBlur={(e) => { if (e.target.value !== (g.accessibility_needs ?? "")) patch(g.id, { accessibility_needs: e.target.value }); }} />
               {g.is_child && <span style={{ fontSize: 10, background: `${accent}40`, color: "#5a4", padding: "2px 8px", borderRadius: 999 }}>Child</span>}
               <button onClick={() => remove(g.id)} title="Remove" style={{ marginLeft: "auto", border: "none", background: "transparent", color: "#b42318", cursor: "pointer", fontSize: 13 }}>✕</button>
             </div>

@@ -1,11 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
-import fs from "node:fs";
-import path from "node:path";
 import { createHash } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
-import { applyMarkup } from "@/lib/billing/compute";
-import { resolveTheme as resolvePortalTheme, resolveTemplate as resolvePortalTemplate } from "@/lib/portal/templates";
 
 // Salted hash. Folds in the per-wedding portal_salt when present so a rotated
 // salt invalidates old cookies. Must stay in lock-step with the helper in
@@ -101,53 +97,6 @@ const RESERVED = new Set([
   "_next", "robots.txt", "sitemap.xml", "brand", "docs", "logout", "booking",
 ]);
 
-let _templateCache: string | null = null;
-function readTemplate(): string {
-  if (_templateCache) return _templateCache;
-  const p = path.join(process.cwd(), "templates", "wedding-portal.html");
-  _templateCache = fs.readFileSync(p, "utf8");
-  return _templateCache;
-}
-
-type Commish = { commission_value?: number | null; commission_type?: string | null };
-type Catalogue = { id: string; category: string; name: string; description: string | null; sort_order: number; image_url: string | null };
-type Rental    = { id: string; category: string; name: string; description: string | null; price: number; stock_total: number; sort_order: number; image_url: string | null } & Commish;
-type Room      = { id: string; name: string; room_type: string | null; sleeps: number; description: string | null; sort_order: number; price_per_night: number; floor_plan_url: string | null; hero_image_url: string | null; image_url: string | null } & Commish;
-
-// applyMarkup imported from @/lib/billing/compute — single source of truth
-
-// Translate venue inventory (Supabase rows) into the shape the static app.js expects.
-function shapeForApp(
-  catalogue: Catalogue[],
-  rentals: Rental[],
-  rooms: Room[],
-) {
-  return {
-    CATALOGUE_ITEMS: catalogue.map((c) => ({
-      code: c.id, name: c.name, desc: c.description ?? "", cat: c.category, type: "included",
-      img: c.image_url ?? null,
-    })),
-    CATALOGUE_CATS: [...new Set(catalogue.map((c) => c.category))],
-    RENTAL_ITEMS: rentals.map((r) => ({
-      code: r.id, name: r.name, desc: r.description ?? "", cat: r.category,
-      rate: applyMarkup(Number(r.price), r.commission_value, r.commission_type),
-      rateType: r.stock_total > 1 ? "perUnit" : "flat",
-      maxQty: r.stock_total, repl: 0,
-      img: r.image_url ?? null,
-    })),
-    RENTAL_CATS: [...new Set(rentals.map((r) => r.category))],
-    ACCOMMODATION: rooms.map((r) => ({
-      id: r.id, name: r.name, type: r.room_type ?? "Room",
-      sleeps: r.sleeps, bedrooms: 1,
-      description: r.description ?? "",
-      amenities: [],
-      pricePerNight: applyMarkup(Number(r.price_per_night), r.commission_value, r.commission_type),
-      floorPlan: r.floor_plan_url ?? null,
-      img: r.hero_image_url ?? r.image_url ?? null,
-    })),
-  };
-}
-
 export async function GET(
   request: NextRequest,
   ctx: { params: Promise<{ wedding: string }> }
@@ -155,21 +104,20 @@ export async function GET(
   const { wedding: rawSlug } = await ctx.params;
   if (RESERVED.has(rawSlug)) return new NextResponse("Not found", { status: 404 });
 
-  // Service-role for the wedding lookup + venue inventory: an anonymous couple has
-  // no session and weddings/inventory RLS would hide the row. The password/auth
-  // gate below is the real authorisation check.
+  // Service-role for the wedding lookup: an anonymous couple has no session and
+  // weddings RLS would hide the row. The password/auth gate below is the real
+  // authorisation check.
   const supabase = admin() ?? (await createClient());
 
   // Fetch the wedding (no auth required to look up — auth/password gate below).
   const { data: wedding } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, wedding_state, portal_password_hash, portal_salt, venue:venues(id, name, slug, description, directions, website, included_items, contact_email, contact_phone, google_maps_url, portal_template, portal_theme, branding_logo_url)")
+    .select("id, slug, couple_names, portal_password_hash, portal_salt")
     .eq("slug", rawSlug)
     .maybeSingle();
   if (!wedding) return new NextResponse("Wedding portal not found.", { status: 404 });
 
   const expectedHash = (wedding as unknown as { portal_password_hash: string | null }).portal_password_hash;
-  const portalSalt = (wedding as unknown as { portal_salt: string | null }).portal_salt;
 
   // Access logic:
   //  - If a portal password is set → that password is the gate; no Supabase Auth needed.
@@ -181,30 +129,8 @@ export async function GET(
       // Already authenticated via cookie — log the open. (No-op without service key.)
       await logAccess(wedding.id, "password");
     } else {
-      // Backward-compatible ?p= grant (older links). The preferred path is the
-      // POST handler below; GET ?p= is kept so existing emails/QRs still work.
-      const supplied = request.nextUrl.searchParams.get("p");
-      if (supplied) {
-        if (tooManyAttempts(rawSlug)) {
-          return new NextResponse(passwordGateHtml(rawSlug, wedding.couple_names, "Too many attempts — wait a few minutes and try again."), {
-            status: 429, headers: { "Content-Type": "text/html; charset=utf-8" },
-          });
-        }
-        // Use the per-wedding salt when present, else the legacy base salt.
-        if (hashPassword(supplied, portalSalt) === expectedHash) {
-          clearAttempts(rawSlug);
-          await logAccess(wedding.id, "password");
-          const res = NextResponse.redirect(`${publicOrigin(request)}/p/${rawSlug}`);
-          res.cookies.set(cookieName, expectedHash, {
-            httpOnly: true, sameSite: "lax", secure: true,
-            maxAge: 60 * 60 * 24 * 30, path: "/", // site-wide so it reaches /api/paystack/checkout; cookie name is wedding-scoped (vy_portal_<id>)
-          });
-          return res;
-        }
-        recordAttempt(rawSlug);
-      }
-      const err = supplied ? "Incorrect password — try again." : undefined;
-      return new NextResponse(passwordGateHtml(rawSlug, wedding.couple_names, err), {
+      // Password entry happens only via the POST form below — no ?p= query grant.
+      return new NextResponse(passwordGateHtml(rawSlug, wedding.couple_names), {
         status: 200, headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
@@ -220,15 +146,12 @@ export async function GET(
     await logAccess(wedding.id, "member");
   }
 
-  // Access granted → serve the new templated couple portal (/p/<slug>). The
-  // legacy static-HTML build below is retained but no longer reached.
+  // Access granted → the templated couple portal lives at /p/<slug>.
   return NextResponse.redirect(`${publicOrigin(request)}/p/${rawSlug}`);
-
 }
 
-// Preferred password-gate path: the unlock form POSTs here. On success we set
-// the cookie and 303-redirect to the GET portal (cookie now matches). On
-// failure we re-render the gate. Keeps the GET ?p= path working for old links.
+// Password-gate path: the unlock form POSTs here. On success we set the cookie
+// and 303-redirect to /p/<slug>. On failure we re-render the gate.
 export async function POST(
   request: NextRequest,
   ctx: { params: Promise<{ wedding: string }> }
@@ -236,9 +159,9 @@ export async function POST(
   const { wedding: rawSlug } = await ctx.params;
   if (RESERVED.has(rawSlug)) return new NextResponse("Not found", { status: 404 });
 
-  // Service-role for the wedding lookup + venue inventory: an anonymous couple has
-  // no session and weddings/inventory RLS would hide the row. The password/auth
-  // gate below is the real authorisation check.
+  // Service-role for the wedding lookup: an anonymous couple has no session and
+  // weddings RLS would hide the row. The password gate below is the real
+  // authorisation check.
   const supabase = admin() ?? (await createClient());
   const { data: wedding } = await supabase
     .from("weddings")

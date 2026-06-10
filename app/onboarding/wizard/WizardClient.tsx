@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { SetupVenueForm } from "@/components/SetupVenueForm";
+import type { SetupVenueState } from "@/app/onboarding/setup-venue/actions";
 import { BulkUploader, type BulkUploaderHandle } from "@/components/BulkUploader";
 import { LogoMark } from "@/components/Logo";
 
@@ -154,7 +155,7 @@ export function WizardClient({
   initialStep: number;
   venue: WizardVenue | null;
   mapsKey: string | null;
-  setupAction: (formData: FormData) => void;
+  setupAction: (prevState: SetupVenueState, formData: FormData) => Promise<SetupVenueState>;
   setup: WizardSetup | null;
   previewHref: string | null;
   justCreated?: boolean;
@@ -194,9 +195,16 @@ export function WizardClient({
               </div>
             </div>
           </div>
-          <Link href="/venue" className="text-sm hover:underline whitespace-nowrap" style={{ color: "var(--ink-2)" }}>
-            Save &amp; finish later →
-          </Link>
+          {venue ? (
+            <Link href="/venue" className="text-sm hover:underline whitespace-nowrap" style={{ color: "var(--ink-2)" }}>
+              Save &amp; finish later →
+            </Link>
+          ) : (
+            // No venue yet → /venue would just bounce them back here; don't offer it.
+            <span className="text-sm whitespace-nowrap" style={{ color: "var(--ink-2)" }}>
+              Finish step 1 to unlock your dashboard
+            </span>
+          )}
         </header>
 
         <div className="grid lg:grid-cols-[220px_1fr] gap-8">
@@ -265,8 +273,9 @@ export function WizardClient({
             </ol>
           </nav>
 
-          {/* Step content */}
-          <section className="min-w-0">
+          {/* Step content — key on the step so each change remounts and replays the
+              entrance animation. */}
+          <section key={step} className="min-w-0 anim-rise">
             {step === 1 && (
               <StepBasics venue={venue} mapsKey={mapsKey} setupAction={setupAction} justCreated={justCreated} onContinue={() => setStep(2)} />
             )}
@@ -320,7 +329,7 @@ function StepBasics({
 }: {
   venue: WizardVenue | null;
   mapsKey: string | null;
-  setupAction: (formData: FormData) => void;
+  setupAction: (prevState: SetupVenueState, formData: FormData) => Promise<SetupVenueState>;
   justCreated: boolean;
   onContinue: () => void;
 }) {
@@ -357,9 +366,10 @@ function StepBasics({
     );
   }
 
-  // No venue yet — embed the existing setup form. On a successful create it runs the
-  // setupVenue server action which redirects to /venue (its only supported behaviour);
-  // from the dashboard the user is deep-linked back into the wizard to keep importing.
+  // No venue yet — embed the existing setup form. On a successful create the setupVenue
+  // server action redirects back here to /onboarding/wizard?step=1&created=1, where the
+  // ?created=1 flag flashes a confirmation and auto-advances into Step 2 (Import).
+  // Expected failures come back as { error } and render inline in the form.
   return (
     <StepShell
       eyebrow="Step 1 of 4 · Basics"

@@ -17,6 +17,7 @@ import { PortalLinkCard } from "@/components/PortalLinkCard";
 import { SendPortalInvite } from "@/components/SendPortalInvite";
 import { WeddingDocuments } from "@/components/WeddingDocuments";
 import { loadRules, computeTotals, applyMarkup, platformFee, type Charge, type Payment } from "@/lib/billing/compute";
+import { nightsBetween, nightsLabel } from "@/lib/billing/charges";
 import { whatsappUrl, bookingNotificationMessage } from "@/lib/whatsapp";
 
 type WeddingState = {
@@ -164,7 +165,9 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     });
   }
 
-  // Accommodation
+  // Accommodation — per night × the wedding's night count (multi-day weddings
+  // span wedding_date → wedding_end_date; single-day stays 1 night).
+  const nights = nightsBetween(wedding.wedding_date, wedding.wedding_end_date);
   for (const [roomId, names] of Object.entries(state.roomAssignments ?? {})) {
     const room = accomMap.get(roomId); if (!room || !names.length) continue;
     const baseUnit = Number(room.price_per_night);
@@ -172,11 +175,11 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     const included = (room as { cost_treatment?: string }).cost_treatment === "included";
     charges.push({
       kind: "accommodation",
-      label: `${room.name} (${names.length} guests, 1 night)${included ? " (included)" : ""}`,
-      qty: 1,
+      label: `${room.name} (${names.length} guests, ${nightsLabel(nights)})${included ? " (included)" : ""}`,
+      qty: nights,
       unit_price: unit,
-      amount: included ? 0 : unit,
-      base_amount: included ? 0 : baseUnit,
+      amount: included ? 0 : unit * nights,
+      base_amount: included ? 0 : baseUnit * nights,
       is_refundable: false,
     });
   }
@@ -342,7 +345,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
           </div>
           <h2 className="vy-h2">Couple submitted their selections</h2>
           <p className="text-sm" style={{ color: "var(--ink-2)" }}>
-            Review the proforma above, then approve to email the couple their EFT invoice and record your 0.5% Venuely commission.
+            Review the proforma above, then approve to email the couple their EFT invoice and record your {+(platformFeeRate * 100).toFixed(2)}% Venuely commission.
           </p>
           <div className="space-y-2">
             {pendingSubmissions.map((s) => (

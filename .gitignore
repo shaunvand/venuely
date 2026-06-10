@@ -42,3 +42,4 @@ next-env.d.ts
 
 # Local DB backups (may contain PII) + scratch
 backups/
+__pycache__/

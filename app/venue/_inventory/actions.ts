@@ -14,14 +14,16 @@ async function client() {
 export async function bulkDelete(type: InventoryType, ids: string[]) {
   if (!ids.length) return;
   const supabase = await client();
-  await supabase.from(INVENTORY_TABLES[type]).delete().in("id", ids);
+  const { error } = await supabase.from(INVENTORY_TABLES[type]).delete().in("id", ids);
+  if (error) throw new Error(error.message);
   revalidatePath(INVENTORY_PATHS[type]);
 }
 
 export async function bulkSetActive(type: InventoryType, ids: string[], active: boolean) {
   if (!ids.length) return;
   const supabase = await client();
-  await supabase.from(INVENTORY_TABLES[type]).update({ active }).in("id", ids);
+  const { error } = await supabase.from(INVENTORY_TABLES[type]).update({ active }).in("id", ids);
+  if (error) throw new Error(error.message);
   revalidatePath(INVENTORY_PATHS[type]);
 }
 
@@ -31,25 +33,28 @@ export async function bulkSetPrice(type: InventoryType, ids: string[], price: nu
   const col = type === "accommodation" ? "price_per_night"
     : (type === "catalogue" || type === "rentals") ? "price"
     : "price_from";
-  await supabase.from(INVENTORY_TABLES[type]).update({ [col]: price }).in("id", ids);
+  const { error } = await supabase.from(INVENTORY_TABLES[type]).update({ [col]: price }).in("id", ids);
+  if (error) throw new Error(error.message);
   revalidatePath(INVENTORY_PATHS[type]);
 }
 
 export async function bulkSetCommission(type: InventoryType, ids: string[], value: number, commissionType: "fixed" | "percent") {
   if (!ids.length || !Number.isFinite(value)) return;
   const supabase = await client();
-  await supabase.from(INVENTORY_TABLES[type])
+  const { error } = await supabase.from(INVENTORY_TABLES[type])
     .update({ commission_value: value, commission_type: commissionType })
     .in("id", ids);
+  if (error) throw new Error(error.message);
   revalidatePath(INVENTORY_PATHS[type]);
 }
 
 export async function bulkSetCostTreatment(type: InventoryType, ids: string[], treatment: "included" | "extra") {
   if (!ids.length) return;
   const supabase = await client();
-  await supabase.from(INVENTORY_TABLES[type])
+  const { error } = await supabase.from(INVENTORY_TABLES[type])
     .update({ cost_treatment: treatment })
     .in("id", ids);
+  if (error) throw new Error(error.message);
   revalidatePath(INVENTORY_PATHS[type]);
 }
 
@@ -60,7 +65,8 @@ export async function updateItem(type: InventoryType, id: string, patch: Record<
     if (v === undefined) continue;
     safe[k] = v;
   }
-  await supabase.from(INVENTORY_TABLES[type]).update(safe).eq("id", id);
+  const { error } = await supabase.from(INVENTORY_TABLES[type]).update(safe).eq("id", id);
+  if (error) throw new Error(error.message);
   revalidatePath(INVENTORY_PATHS[type]);
 }
 
@@ -87,7 +93,8 @@ export async function undoImport(venueId: string, batchId: string) {
       .eq("import_batch_id", batchId)
       .eq("venue_id", venueId)
       .select("id");
-    if (!error && data) deleted += data.length;
+    if (error) throw new Error(error.message);
+    if (data) deleted += data.length;
   }
   for (const path of new Set(Object.values(INVENTORY_PATHS))) revalidatePath(path);
   return { deleted };

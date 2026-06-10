@@ -1,6 +1,13 @@
 import Link from "next/link";
 
-type Booking = { slug: string; couple_names: string; wedding_date: string; wedding_end_date?: string | null };
+type Booking = { slug: string; couple_names: string; wedding_date: string; wedding_end_date?: string | null; status?: string | null };
+
+// Cancelled/lost weddings still render on the calendar (history) but never count
+// toward double-booking clashes.
+function isCancelledStatus(status: string | null | undefined): boolean {
+  const s = (status ?? "").toLowerCase();
+  return s === "cancelled" || s === "lost";
+}
 
 // Expand a booking's wedding_date..wedding_end_date span into one ISO key per
 // day so multi-day weddings light up every day they cover. A null/absent end
@@ -121,10 +128,17 @@ export function BookingsCalendar({
     return cells;
   }
 
-  // A clash = more than one DISTINCT wedding on the same date.
+  // All distinct couples on a date — drives the single/multiple cell colour.
   function distinctCouples(c: Cell): number {
     const set = new Set<string>();
     c.bookings.forEach((b) => set.add(b.couple_names));
+    return set.size;
+  }
+
+  // A clash = more than one DISTINCT non-cancelled wedding on the same date.
+  function distinctActiveCouples(c: Cell): number {
+    const set = new Set<string>();
+    c.bookings.forEach((b) => { if (!isCancelledStatus(b.status)) set.add(b.couple_names); });
     return set.size;
   }
 
@@ -178,13 +192,14 @@ export function BookingsCalendar({
                   if (!c) return <div key={`${m.label}-e-${i}`} />;
                   const count = c.bookings.length;
                   const couples = distinctCouples(c);
-                  const clash = couples > 1;
+                  const activeCouples = distinctActiveCouples(c);
+                  const clash = activeCouples > 1;
                   const roomCount = c.rooms.length;
                   const holdQty = c.holds.reduce((s, h) => s + (Number(h.quantity) || 0), 0);
 
                   // Build a rich tooltip describing everything happening that day.
                   const tipLines: string[] = [];
-                  if (count > 0) tipLines.push(...c.bookings.map((b) => `Wedding: ${b.couple_names}`));
+                  if (count > 0) tipLines.push(...c.bookings.map((b) => `Wedding: ${b.couple_names}${isCancelledStatus(b.status) ? " (cancelled)" : ""}`));
                   if (clash) tipLines.push("⚠ Double-booking — more than one wedding this date");
                   if (roomCount > 0) {
                     tipLines.push(
@@ -223,12 +238,12 @@ export function BookingsCalendar({
                       title={tooltip || undefined}
                     >
                       {c.day}
-                      {couples > 1 && (
+                      {clash && (
                         <span
                           className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center"
                           style={{ background: "#b91c1c", color: "#fff" }}
                         >
-                          {couples}
+                          {activeCouples}
                         </span>
                       )}
                       {/* Overlay markers along the bottom of the day cell. */}

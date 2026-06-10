@@ -17,29 +17,32 @@ export async function addTable(formData: FormData) {
   const venue = await getCurrentVenue();
   const label = (formData.get("label") as string)?.trim();
   if (!label) throw new Error("Label required");
-  await db().from("venue_tables").insert({
+  const { error } = await db().from("venue_tables").insert({
     venue_id: venue.id,
     label,
     shape: (formData.get("shape") as string) || "round",
     seats: Math.max(1, Number(formData.get("seats") || 8)),
     quantity: Math.max(1, Number(formData.get("quantity") || 1)),
   });
+  if (error) throw new Error(error.message);
   revalidatePath("/venue/seating");
 }
 
 export async function updateTable(id: string, formData: FormData) {
   const venue = await getCurrentVenue();
-  await db().from("venue_tables").update({
+  const { error } = await db().from("venue_tables").update({
     label: (formData.get("label") as string)?.trim() || "Table",
     shape: (formData.get("shape") as string) || "round",
     seats: Math.max(1, Number(formData.get("seats") || 8)),
     quantity: Math.max(1, Number(formData.get("quantity") || 1)),
   }).eq("id", id).eq("venue_id", venue.id);
+  if (error) throw new Error(error.message);
   revalidatePath("/venue/seating");
 }
 
 export async function deleteTable(id: string) {
   const venue = await getCurrentVenue();
-  await db().from("venue_tables").delete().eq("id", id).eq("venue_id", venue.id);
+  const { error } = await db().from("venue_tables").delete().eq("id", id).eq("venue_id", venue.id);
+  if (error) throw new Error(error.message);
   revalidatePath("/venue/seating");
 }

@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
+// Platform default for venues.platform_fee_rate (fraction) — per-venue overrides
+// live on /admin/billing; this is only used for the headline copy.
+const DEFAULT_PLATFORM_FEE_RATE = 0.005;
+
 type WeddingRow = {
   id: string;
   slug: string;
@@ -106,7 +110,7 @@ export default async function OwnerDashboard() {
           >
             <div className="font-medium">Billing →</div>
             <div className="text-sm text-gray-600 mt-1">
-              0.5% platform fee on wedding spend per venue. Live tally of collected vs outstanding.
+              {+(DEFAULT_PLATFORM_FEE_RATE * 100).toFixed(2)}% platform fee on wedding spend per venue. Live tally of collected vs outstanding.
             </div>
           </Link>
         </div>

@@ -55,10 +55,13 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8 anim-fade-in"
       style={{ background: "rgba(28,25,23,0.55)" }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Get ${venueName} set up`}
         className="relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl my-auto"
         style={{ border: "1px solid var(--line)" }}
       >

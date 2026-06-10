@@ -1,21 +1,16 @@
-"use server";
+// Shared proforma builder — rebuilds a wedding's live charges (couple-selection
+// auto lines + manual wedding_charges + breakage) exactly the way the venue
+// proforma page does, then computes totals. Single source of truth used by:
+//   - app/venue/weddings/actions.ts (markInvoiced / approveSubmission / getWeddingTotals)
+//   - app/api/paystack/checkout/route.ts (charge the couple the real outstanding amount)
+// Pure data module (no "use server") so both server actions and route handlers
+// can import it.
 
-// Owner-triggered payment-reminder sends. No scheduler — the venue admin taps a
-// button on a wedding's proforma to email the couple their deposit / balance
-// reminder. Amounts are recomputed server-side from the wedding's live charges
-// (never trusted from the client), the same way markInvoiced does it, then the
-// couple_email (captured at invite time, wave 3) is emailed via lib/notifications.
-// Everything is env-gated: with no RESEND_API_KEY the action is a clean no-op.
-
-import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentVenue } from "@/lib/venue/current";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   loadRules, computeTotals, applyMarkup,
   type Charge, type Payment, type Computed,
 } from "@/lib/billing/compute";
-import { sendEmail, depositReminder, balanceReminder } from "@/lib/notifications";
-import { nightsBetween, nightsLabel } from "@/lib/billing/charges";
 
 type WeddingState = {
   rentalSelections?: Record<string, { sel?: boolean; qty?: number; mg?: boolean; wed?: boolean; fb?: boolean }>;
@@ -30,44 +25,62 @@ function parseMoney(s: string | undefined | null): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-type LoadedWedding = {
-  id: string;
-  slug: string;
-  couple_names: string;
-  wedding_date: string | null;
-  couple_email: string | null;
-  deposit_due_at: string | null;
-  balance_due_at: string | null;
-  venueName: string;
+// Number of accommodation nights for a wedding: the days between start and end
+// date when a multi-day range is set, otherwise 1 (single-day weddings keep the
+// historical one-night behaviour).
+export function nightsBetween(start: string | null | undefined, end: string | null | undefined): number {
+  if (!start || !end) return 1;
+  const a = new Date(String(start).slice(0, 10)).getTime();
+  const b = new Date(String(end).slice(0, 10)).getTime();
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return 1;
+  return Math.max(1, Math.round((b - a) / 86400000));
+}
+
+export function nightsLabel(nights: number): string {
+  return `${nights} night${nights === 1 ? "" : "s"}`;
+}
+
+export type BuiltWeddingCharges = {
+  grandTotal: number;
+  /** venues.platform_fee_rate as a fraction (e.g. 0.005 = 0.5%). */
+  feeRate: number;
+  /** venues.platform_fee_active — when false the platform fee is waived (treat as 0). */
+  feeActive: boolean;
+  totals: Computed;
 };
 
-// Load a wedding (scoped to the caller's current venue for authz — RLS also
-// enforces this) and recompute its live proforma totals. Mirrors the charge
-// build in app/venue/weddings/[slug]/page.tsx + actions.ts::buildWeddingCharges
-// so deposit_amount / balance_due are authoritative.
-async function loadWeddingTotals(
+// Rebuild a wedding's live charges the same way the venue/couple proforma does
+// (see app/venue/weddings/[slug]/page.tsx). Used to recompute the platform fee
+// authoritatively at invoice/checkout time rather than trusting client-bound totals.
+export async function buildWeddingCharges(
+  supabase: SupabaseClient,
+  venueId: string,
   weddingId: string,
-): Promise<{ wedding: LoadedWedding; totals: Computed } | null> {
-  const venue = await getCurrentVenue();
-  const supabase = await createClient();
-
+): Promise<BuiltWeddingCharges> {
   const { data: wedding } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, wedding_end_date, couple_email, guest_count, wedding_state, area_selections, deposit_due_at, balance_due_at")
+    .select("id, guest_count, wedding_state, area_selections, wedding_date, wedding_end_date")
     .eq("id", weddingId)
-    .eq("venue_id", venue.id)
-    .maybeSingle();
-  if (!wedding) return null;
+    .single();
+  if (!wedding) throw new Error("Wedding not found");
+
+  const { data: venue } = await supabase
+    .from("venues")
+    .select("platform_fee_rate, platform_fee_active")
+    .eq("id", venueId)
+    .single();
+  const feeRate = Number((venue as { platform_fee_rate?: number } | null)?.platform_fee_rate ?? 0.005);
+  const feeActive = (venue as { platform_fee_active?: boolean } | null)?.platform_fee_active ?? true;
 
   const state = (wedding.wedding_state ?? {}) as WeddingState;
-  const rules = await loadRules(supabase, venue.id);
+  const rules = await loadRules(supabase, venueId);
 
   const [rentalsRes, cataRes, accomRes, vendorsRes, areasRes, areaPricingRes, paymentsRes, chargesRes] = await Promise.all([
-    supabase.from("rental_items").select("id, name, price, commission_value, commission_type, item_code, cost_treatment").eq("venue_id", venue.id),
-    supabase.from("catalogue_items").select("id, name, price, commission_value, commission_type, cost_treatment").eq("venue_id", venue.id),
-    supabase.from("accommodation_rooms").select("id, name, price_per_night, commission_value, commission_type, cost_treatment").eq("venue_id", venue.id),
-    supabase.from("vendor_partners").select("id, name, vendor_type, price_from, commission_value, commission_type, cost_treatment").eq("venue_id", venue.id),
-    supabase.from("venue_areas").select("id, name, slug, area_kind").eq("venue_id", venue.id).eq("active", true),
+    supabase.from("rental_items").select("id, name, price, commission_value, commission_type, item_code, cost_treatment").eq("venue_id", venueId),
+    supabase.from("catalogue_items").select("id, name, price, commission_value, commission_type, cost_treatment").eq("venue_id", venueId),
+    supabase.from("accommodation_rooms").select("id, name, price_per_night, commission_value, commission_type, cost_treatment").eq("venue_id", venueId),
+    supabase.from("vendor_partners").select("id, name, vendor_type, price_from, commission_value, commission_type, cost_treatment").eq("venue_id", venueId),
+    supabase.from("venue_areas").select("id, name, slug, area_kind").eq("venue_id", venueId).eq("active", true),
     supabase.from("area_pricing").select("area_id, day_type, price"),
     supabase.from("payment_ledger").select("id, amount, direction, kind, paid_at").eq("wedding_id", weddingId),
     supabase.from("wedding_charges").select("id, kind, label, qty, unit_price, amount, is_refundable, day_type").eq("wedding_id", weddingId),
@@ -112,8 +125,8 @@ async function loadWeddingTotals(
     charges.push({ kind: "catalogue", label: item.name, qty: units, unit_price: unit, amount: included ? 0 : unit * units, base_amount: included ? 0 : baseUnit * units, is_refundable: false });
   }
 
-  // Accommodation — per night × the wedding's night count (single-day = 1 night).
-  const nights = nightsBetween(wedding.wedding_date, (wedding as { wedding_end_date?: string | null }).wedding_end_date);
+  // Accommodation — priced per night × the wedding's night count.
+  const nights = nightsBetween(wedding.wedding_date as string | null, wedding.wedding_end_date as string | null);
   for (const [roomId, names] of Object.entries(state.roomAssignments ?? {})) {
     const room = accomMap.get(roomId); if (!room || !names.length) continue;
     const baseUnit = Number(room.price_per_night);
@@ -129,6 +142,9 @@ async function loadWeddingTotals(
     const fallback = v ? applyMarkup(Number(v.price_from ?? 0), v.commission_value, v.commission_type) : 0;
     const cost = parseMoney(s.price) || fallback;
     const included = v && (v as { cost_treatment?: string }).cost_treatment === "included";
+    // Base = the supplier's price_from before markup when this is a known partner
+    // priced off its catalogue entry. A manually keyed price (parseMoney) carries
+    // no separable commission, so its base equals the charged amount.
     const baseCost = v && !parseMoney(s.price) ? Number(v.price_from ?? 0) : cost;
     if (cost > 0) charges.push({ kind: "vendor", label: s.name, qty: 1, unit_price: cost, amount: included ? 0 : cost, base_amount: included ? 0 : baseCost, is_refundable: false });
   });
@@ -165,70 +181,5 @@ async function loadWeddingTotals(
   })) as Payment[];
 
   const totals = computeTotals(rules, charges, payments);
-
-  return {
-    wedding: {
-      id: wedding.id,
-      slug: wedding.slug,
-      couple_names: wedding.couple_names,
-      wedding_date: wedding.wedding_date ?? null,
-      couple_email: (wedding as { couple_email?: string | null }).couple_email ?? null,
-      deposit_due_at: (wedding as { deposit_due_at?: string | null }).deposit_due_at ?? null,
-      balance_due_at: (wedding as { balance_due_at?: string | null }).balance_due_at ?? null,
-      venueName: venue.name,
-    },
-    totals,
-  };
-}
-
-export type ReminderResult = {
-  ok: boolean;
-  sent: boolean;
-  amount: number;
-  reason?: "not_found" | "nothing_due" | "no_email" | "email_not_configured" | "send_failed";
-};
-
-export async function sendDepositReminder(weddingId: string, slug: string): Promise<ReminderResult> {
-  const loaded = await loadWeddingTotals(weddingId);
-  if (!loaded) return { ok: false, sent: false, amount: 0, reason: "not_found" };
-
-  const { wedding, totals } = loaded;
-  const amount = totals.deposit_amount;
-  if (amount <= 0) return { ok: true, sent: false, amount, reason: "nothing_due" };
-
-  const msg = depositReminder(
-    { couple_names: wedding.couple_names, wedding_date: wedding.wedding_date, venueName: wedding.venueName },
-    amount,
-    wedding.deposit_due_at,
-  );
-
-  // Env-gated email. No key / no couple_email → clean no-op with a reason.
-  if (!process.env.RESEND_API_KEY) return { ok: true, sent: false, amount, reason: "email_not_configured" };
-  if (!wedding.couple_email) return { ok: true, sent: false, amount, reason: "no_email" };
-
-  const res = await sendEmail(wedding.couple_email, msg.subject, msg.html);
-  revalidatePath(`/venue/weddings/${slug}`);
-  return { ok: true, sent: res.sent, amount, reason: res.sent ? undefined : "send_failed" };
-}
-
-export async function sendBalanceReminder(weddingId: string, slug: string): Promise<ReminderResult> {
-  const loaded = await loadWeddingTotals(weddingId);
-  if (!loaded) return { ok: false, sent: false, amount: 0, reason: "not_found" };
-
-  const { wedding, totals } = loaded;
-  const amount = totals.balance_due;
-  if (amount <= 0) return { ok: true, sent: false, amount, reason: "nothing_due" };
-
-  const msg = balanceReminder(
-    { couple_names: wedding.couple_names, wedding_date: wedding.wedding_date, venueName: wedding.venueName },
-    amount,
-    wedding.balance_due_at,
-  );
-
-  if (!process.env.RESEND_API_KEY) return { ok: true, sent: false, amount, reason: "email_not_configured" };
-  if (!wedding.couple_email) return { ok: true, sent: false, amount, reason: "no_email" };
-
-  const res = await sendEmail(wedding.couple_email, msg.subject, msg.html);
-  revalidatePath(`/venue/weddings/${slug}`);
-  return { ok: true, sent: res.sent, amount, reason: res.sent ? undefined : "send_failed" };
+  return { grandTotal: totals.grand_total, feeRate, feeActive, totals };
 }

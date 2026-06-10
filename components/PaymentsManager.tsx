@@ -144,7 +144,7 @@ export function PaymentsManager({ slug, primary, accent, heading, cardRadius }: 
               })}
             </div>
 
-            <p style={{ fontSize: 12, color: "#a0a0a0", margin: 0 }}>Set your banking details, edit the reminder email, choose a frequency and turn on auto-reminders in the <b>Reminders</b> tab.</p>
+            <p style={{ fontSize: 12, color: "#a0a0a0", margin: 0 }}>Set your banking details, edit the reminder email, choose a frequency and turn on auto-reminders in the <b>Reminders</b> section of the <b>Invites</b> tab.</p>
           </>
         )}
       </div>

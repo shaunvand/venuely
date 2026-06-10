@@ -18,10 +18,14 @@ export function SaveButton({ label = "Save changes", savedLabel = "Saved ✓", c
     prev.current = pending;
   }, [pending]);
 
+  const state = pending ? "saving" : justSaved ? "saved" : "idle";
   return (
-    <button type="submit" className={className} disabled={pending} aria-live="polite"
+    <button type="submit" className={`${className} transition-colors duration-300`} disabled={pending} aria-live="polite"
       style={justSaved ? { background: "#1a7f4b", borderColor: "#1a7f4b", color: "#fff" } : undefined}>
-      {pending ? "Saving…" : justSaved ? savedLabel : label}
+      {/* key on state so the label cross-fades instead of snapping */}
+      <span key={state} className="anim-fade-in">
+        {pending ? "Saving…" : justSaved ? savedLabel : label}
+      </span>
     </button>
   );
 }

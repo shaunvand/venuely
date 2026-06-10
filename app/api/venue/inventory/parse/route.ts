@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import Anthropic from "@anthropic-ai/sdk";
 import { INVENTORY_FIELDS, type InventoryType } from "@/lib/inventory/schemas";
+import { requireUser } from "@/lib/security/guards";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -17,6 +18,10 @@ function toNum(v: unknown): number | null {
 
 export async function POST(req: NextRequest) {
   try {
+    // No venue_id in this payload — gate on a signed-in user.
+    const gate = await requireUser();
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+
     const form = await req.formData();
     const file = form.get("file") as File | null;
     const type = (form.get("type") as string || "") as InventoryType;

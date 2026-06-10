@@ -39,7 +39,8 @@ export async function deleteAreaImage(mediaId: string) {
   // Confirm the owning area is visible to this user before deleting.
   const { data: area } = await supabase.from("venue_areas").select("id").eq("id", m.owner_id as string).single();
   if (!area) throw new Error("Forbidden");
-  await sb.from("media_assets").delete().eq("id", mediaId);
+  const { error } = await sb.from("media_assets").delete().eq("id", mediaId);
+  if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
 }
 
@@ -60,30 +61,33 @@ export async function addArea(venueId: string, formData: FormData) {
     .select("id")
     .single();
   if (error) throw new Error(error.message);
-  // A single "Hire fee" applies to every day type; otherwise use any per-day-type values given.
+  // An explicit per-day-type price wins; the single "Hire fee" fills in any day types left blank.
   const hire = Number(formData.get("price_hire") || 0);
-  const wedding = hire || Number(formData.get("price_wedding") || 0);
-  const mg = hire || Number(formData.get("price_mg") || 0);
-  const farewell = hire || Number(formData.get("price_farewell") || 0);
+  const wedding = Number(formData.get("price_wedding") || 0) || hire;
+  const mg = Number(formData.get("price_mg") || 0) || hire;
+  const farewell = Number(formData.get("price_farewell") || 0) || hire;
   if (data) {
-    await supabase.from("area_pricing").insert([
+    const { error: priceError } = await supabase.from("area_pricing").insert([
       { area_id: data.id, day_type: "wedding", price: wedding },
       { area_id: data.id, day_type: "mg", price: mg },
       { area_id: data.id, day_type: "farewell", price: farewell },
     ]);
+    if (priceError) throw new Error(priceError.message);
   }
   revalidatePath("/venue/areas");
 }
 
 export async function deleteArea(areaId: string) {
   const supabase = await createClient();
-  await supabase.from("venue_areas").delete().eq("id", areaId);
+  const { error } = await supabase.from("venue_areas").delete().eq("id", areaId);
+  if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
 }
 
 export async function toggleAreaActive(areaId: string, active: boolean) {
   const supabase = await createClient();
-  await supabase.from("venue_areas").update({ active }).eq("id", areaId);
+  const { error } = await supabase.from("venue_areas").update({ active }).eq("id", areaId);
+  if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
 }
 
@@ -108,6 +112,7 @@ export async function updateArea(areaId: string, formData: FormData) {
 export async function updateAreaPrice(areaId: string, dayType: string, formData: FormData) {
   const supabase = await createClient();
   const price = Number(formData.get("price") || 0);
-  await supabase.from("area_pricing").upsert({ area_id: areaId, day_type: dayType, price }, { onConflict: "area_id,day_type" });
+  const { error } = await supabase.from("area_pricing").upsert({ area_id: areaId, day_type: dayType, price }, { onConflict: "area_id,day_type" });
+  if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
 }

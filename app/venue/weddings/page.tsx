@@ -3,6 +3,7 @@ import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
 import { createWedding, setPortalPassword, markCouplePaid, deleteWedding } from "./actions";
 import { WeddingRowActions } from "@/components/WeddingRowActions";
+import { SaveButton } from "@/components/SaveButton";
 import { statusColor } from "@/lib/wedding/status";
 
 export default async function VenueWeddings({
@@ -27,7 +28,7 @@ export default async function VenueWeddings({
     .order("wedding_date", { ascending: false });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 anim-fade-up">
       <header>
         <div className="vy-eyebrow">Customers</div>
         <h1 className="vy-h1 mt-1">Weddings at {venue.name}</h1>
@@ -77,7 +78,7 @@ export default async function VenueWeddings({
           <input name="portal_password" type="text" placeholder="Leave blank for Supabase login access" className="vy-input" autoComplete="off" />
         </div>
         <div className="md:col-span-2 flex items-end justify-end">
-          <button className="vy-btn vy-btn-primary w-full md:w-auto">+ Add wedding</button>
+          <SaveButton label="+ Add wedding" savedLabel="Added ✓" className="vy-btn vy-btn-primary w-full md:w-auto" />
         </div>
       </form>
 

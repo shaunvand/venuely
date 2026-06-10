@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { requireUser, assertSafeUrl, safeFetch } from "@/lib/security/guards";
 
 export const runtime = "nodejs";
 // Homepage fetch (≤15s) + bounded sub-page crawl (≤12s) + Claude extraction needs
@@ -108,15 +109,21 @@ function collectSubLinks(html: string, base: URL, re: RegExp): string[] {
 
 export async function POST(req: NextRequest) {
   try {
+    // No venue_id in this payload — gate on a signed-in user.
+    const gate = await requireUser();
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+
     const { url } = await req.json();
     if (!url || typeof url !== "string") {
       return NextResponse.json({ error: "Missing url" }, { status: 400 });
     }
     const target = url.startsWith("http") ? url : `https://${url}`;
     let parsed: URL;
-    try { parsed = new URL(target); } catch { return NextResponse.json({ error: "Invalid URL" }, { status: 400 }); }
+    try { parsed = assertSafeUrl(target); } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Invalid URL" }, { status: 400 });
+    }
 
-    const res = await fetch(parsed.toString(), {
+    const res = await safeFetch(parsed, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; VenuelyImportBot/1.0)" },
       signal: AbortSignal.timeout(15000),
     });
@@ -137,7 +144,9 @@ export async function POST(req: NextRequest) {
       if (Date.now() - crawlStarted > crawlBudgetMs) break;
       const remaining = crawlBudgetMs - (Date.now() - crawlStarted);
       try {
-        const r = await fetch(link, {
+        // Sub-links are same-origin but a redirect could still bounce elsewhere —
+        // safeFetch re-validates every hop.
+        const r = await safeFetch(link, {
           headers: { "User-Agent": "Mozilla/5.0 (compatible; VenuelyImportBot/1.0)" },
           signal: AbortSignal.timeout(Math.max(2000, Math.min(6000, remaining))),
         });
@@ -149,7 +158,7 @@ export async function POST(req: NextRequest) {
     const text = sections.join("\n").slice(0, 40000);
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
+    if (!apiKey) return NextResponse.json({ error: "AI not configured (ANTHROPIC_API_KEY)." }, { status: 503 });
     const client = new Anthropic({ apiKey });
 
     const system = `You extract structured venue data from a wedding/event venue's website HTML.

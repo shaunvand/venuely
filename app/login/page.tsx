@@ -54,11 +54,17 @@ function TrustBar() {
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const redirect = params.get("redirect") || "/dashboard";
+  // Only honour same-origin path redirects ("/foo", not "//evil.com" or "https://…").
+  const rawRedirect = params.get("redirect") || "/dashboard";
+  const redirect = /^\/(?!\/)/.test(rawRedirect) ? rawRedirect : "/dashboard";
   const [mode, setMode] = useState<"password" | "magic">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [msg, setMsg] = useState<{ tone: "error" | "info"; text: string } | null>(null);
+  const [msg, setMsg] = useState<{ tone: "error" | "info"; text: string } | null>(() =>
+    params.get("error") === "callback_failed"
+      ? { tone: "error", text: "That link expired or was already used — sign in or request a new one." }
+      : null
+  );
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -70,15 +76,33 @@ function LoginForm() {
     if (mode === "magic") {
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}` },
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
+          // Login must never mint a new (venue-less) user — that's signup's job.
+          shouldCreateUser: false,
+        },
       });
-      setMsg(error ? { tone: "error", text: error.message } : { tone: "info", text: "Check your inbox for the magic link." });
+      if (error) {
+        // With shouldCreateUser:false, Supabase rejects unknown emails with a
+        // "Signups not allowed…" / user-not-found style error.
+        const noAccount = /signups? not allowed|user not found|otp_disabled/i.test(`${error.message} ${error.code ?? ""}`);
+        setMsg({ tone: "error", text: noAccount ? "No account found for that email — sign up first." : error.message });
+      } else {
+        setMsg({ tone: "info", text: "Check your inbox for the magic link." });
+      }
+      setLoading(false);
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setMsg({ tone: "error", text: error.message });
-      else { router.push(redirect); router.refresh(); }
+      if (error) {
+        setMsg({ tone: "error", text: error.message });
+        setLoading(false);
+      } else {
+        // Keep the button disabled while we navigate — don't re-enable and invite
+        // a double submit during the route transition.
+        router.push(redirect);
+        router.refresh();
+      }
     }
-    setLoading(false);
   }
 
   const seg = (active: boolean): React.CSSProperties =>

@@ -27,7 +27,9 @@ export async function computeSetupSteps(supabase: SupabaseClient, venue: VenueRo
     supabase.from("catalogue_items").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
     supabase.from("rental_items").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
     supabase.from("accommodation_rooms").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
-    supabase.from("payments").select("*, wedding:weddings!inner(venue_id)", { count: "exact", head: true }).eq("wedding.venue_id", venue.id),
+    // Real receipts live in payment_ledger (the old `payments` table is dead —
+    // nothing writes to it), so the "Track payments" step keys off that.
+    supabase.from("payment_ledger").select("*, wedding:weddings!inner(venue_id)", { count: "exact", head: true }).eq("wedding.venue_id", venue.id),
     supabase.from("vendor_partners").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),
     supabase.from("media_assets").select("*", { count: "exact", head: true }).eq("venue_id", venue.id).eq("owner_type", "venue"),
     supabase.from("venue_areas").select("*", { count: "exact", head: true }).eq("venue_id", venue.id),

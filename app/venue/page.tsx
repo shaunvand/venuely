@@ -39,6 +39,13 @@ function fmtRand(n: number): string {
   return `R${Math.round(n).toLocaleString("en-ZA")}`;
 }
 
+// Cancelled/lost weddings stay in the data (history, calendar pills) but never
+// count as upcoming bookings or money owed.
+function isCancelledStatus(status: string | null | undefined): boolean {
+  const s = (status ?? "").toLowerCase();
+  return s === "cancelled" || s === "lost";
+}
+
 // -----------------------------------------------------------------------------
 // wedding_state is the single source of truth couples actually edit (the static
 // /{slug} portal hydrates from it). The old relational tables (guests, suppliers,
@@ -93,15 +100,16 @@ export default async function VenueOverview() {
   const { data: { user } } = await supabase.auth.getUser();
   const firstName = String((user?.user_metadata as { full_name?: string } | undefined)?.full_name ?? "").trim().split(" ")[0];
   const { doneCount, totalCount, pct, counts, hasImported } = await computeSetupSteps(supabase, venue);
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  // "Today" in Africa/Johannesburg (UTC+2, no DST) so date-only comparisons don't
+  // drift overnight when the server clock runs in UTC.
+  const todayIso = new Date(Date.now() + 2 * 3600 * 1000).toISOString().slice(0, 10);
+  const in30 = new Date(Date.now() + 2 * 3600 * 1000 + 30 * 86400000).toISOString().slice(0, 10);
 
   const [
-    { data: upcoming },
     { data: recentWeddings },
     { data: allWeddings },
     { data: stateRows },
-    { data: paySum },
+    { data: ledgerRaw },
     { data: rentalRows },
     { data: roomRows },
     { data: vendorRows },
@@ -110,13 +118,14 @@ export default async function VenueOverview() {
     { data: cataCatRows },
     { data: rentalCatRows },
   ] = await Promise.all([
-    supabase.from("weddings").select("id, slug, couple_names, wedding_date").eq("venue_id", venue.id).gte("wedding_date", todayIso).order("wedding_date").limit(5),
     supabase.from("weddings").select("id, slug, couple_names, wedding_date").eq("venue_id", venue.id).order("created_at", { ascending: false }).limit(5),
-    supabase.from("weddings").select("slug, couple_names, wedding_date, wedding_end_date, status").eq("venue_id", venue.id),
+    supabase.from("weddings").select("id, slug, couple_names, wedding_date, wedding_end_date, status, invoice_total, invoiced_at, deposit_due_at, balance_due_at").eq("venue_id", venue.id),
     // Couple-edited portal state — the single source of truth. We aggregate these
     // blobs for the engagement counts instead of the dead relational tables.
     supabase.from("weddings").select("wedding_state, wedding_state_updated_at").eq("venue_id", venue.id),
-    supabase.from("payments").select("amount, status, due_date, paid_date, wedding:weddings!inner(id, slug, couple_names, venue_id)").eq("wedding.venue_id", venue.id),
+    // Real receipts live in payment_ledger (the old `payments` table is dead —
+    // nothing writes to it). Venue-scoped via the wedding join.
+    supabase.from("payment_ledger").select("amount, direction, paid_at, wedding:weddings!inner(id, venue_id)").eq("wedding.venue_id", venue.id),
     supabase.from("rental_items").select("price, commission_value, commission_type, active, stock_total").eq("venue_id", venue.id),
     supabase.from("accommodation_rooms").select("price_per_night, commission_value, commission_type, active").eq("venue_id", venue.id),
     supabase.from("vendor_partners").select("price_from, commission_value, commission_type, active").eq("venue_id", venue.id),
@@ -125,6 +134,27 @@ export default async function VenueOverview() {
     supabase.from("catalogue_items").select("category").eq("venue_id", venue.id),
     supabase.from("rental_items").select("category").eq("venue_id", venue.id),
   ]);
+
+  type WeddingRow = {
+    id: string;
+    slug: string;
+    couple_names: string;
+    wedding_date: string;
+    wedding_end_date: string | null;
+    status: string | null;
+    invoice_total: number | string | null;
+    invoiced_at: string | null;
+    deposit_due_at: string | null;
+    balance_due_at: string | null;
+  };
+  const weddingsAll = (allWeddings ?? []) as WeddingRow[];
+  const activeWeddings = weddingsAll.filter((w) => !isCancelledStatus(w.status));
+  // Upcoming = any active wedding still running today or later. Multi-day weddings
+  // stay upcoming until their END date passes: coalesce(wedding_end_date, wedding_date) >= today.
+  const upcomingAll = activeWeddings
+    .filter((w) => w.wedding_date && String(w.wedding_end_date ?? w.wedding_date).slice(0, 10) >= todayIso)
+    .sort((a, b) => String(a.wedding_date).localeCompare(String(b.wedding_date)));
+  const upcoming = upcomingAll.slice(0, 5);
 
   // Marketplace snapshot — listing counts per type + how many distinct product
   // categories the venue has populated across catalogue + rentals.
@@ -192,32 +222,51 @@ export default async function VenueOverview() {
     .sort()
     .pop() ?? null;
 
-  type Pay = { amount: number | string; status: string | null; due_date: string | null; paid_date: string | null; wedding: { id: string; slug: string; couple_names: string } | null };
-  const payments = (paySum ?? []).map((p) => {
-    const w = (p as { wedding?: unknown }).wedding;
-    const single = Array.isArray(w) ? (w[0] ?? null) : (w ?? null);
-    return { ...p, wedding: single } as Pay;
+  // Money facts: collected = signed payment_ledger receipts (in − out); invoiced =
+  // the weddings' invoice_total snapshots (set by "Mark invoiced"); outstanding =
+  // per-wedding invoice minus what that wedding has actually paid. Cancelled/lost
+  // weddings never count as owed.
+  type LedgerRow = { amount: number | string; direction: string | null; paid_at: string | null; wedding: { id: string } | { id: string }[] | null };
+  const ledger = (ledgerRaw ?? []) as unknown as LedgerRow[];
+  const signedAmount = (r: LedgerRow) => (r.direction === "out" ? -1 : 1) * Number(r.amount || 0);
+  const collected = ledger.reduce((s, r) => s + signedAmount(r), 0);
+  const paidByWedding = new Map<string, number>();
+  ledger.forEach((r) => {
+    const w = Array.isArray(r.wedding) ? (r.wedding[0] ?? null) : r.wedding;
+    if (!w?.id) return;
+    paidByWedding.set(w.id, (paidByWedding.get(w.id) ?? 0) + signedAmount(r));
   });
-  const collected = payments.filter((p) => p.status === "paid").reduce((s, p) => s + Number(p.amount || 0), 0);
-  const invoiced = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
-  const outstanding = invoiced - collected;
-  const overdue = payments.filter((p) => p.status !== "paid" && p.due_date && p.due_date < todayIso);
-  const overdueTotal = overdue.reduce((s, p) => s + Number(p.amount || 0), 0);
+
+  const invoicedWeddings = activeWeddings.filter((w) => w.invoiced_at && Number(w.invoice_total ?? 0) > 0);
+  const invoiced = invoicedWeddings.reduce((s, w) => s + Number(w.invoice_total ?? 0), 0);
+  // Per-wedding balance still owed. Which deadline applies: the deposit deadline
+  // until anything has been paid, then the balance deadline.
+  const balances = invoicedWeddings
+    .map((w) => {
+      const paid = paidByWedding.get(w.id) ?? 0;
+      const due = (paid <= 0 ? w.deposit_due_at ?? w.balance_due_at : w.balance_due_at ?? w.deposit_due_at) ?? null;
+      return { wedding: w, due: due ? String(due).slice(0, 10) : null, outstanding: Math.max(0, Number(w.invoice_total ?? 0) - paid) };
+    })
+    .filter((b) => b.outstanding > 0);
+  const outstanding = balances.reduce((s, b) => s + b.outstanding, 0);
+  const overdue = balances.filter((b) => b.due && b.due < todayIso);
+  const overdueTotal = overdue.reduce((s, b) => s + b.outstanding, 0);
 
   // "Next up" — a single, prioritised feed of what the venue needs to action:
   // couple submissions to review, overdue + soon-due payments, then imminent
   // weddings. Consolidates the old standalone "Action needed" card.
-  const in14 = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
-  const dueSoon = payments.filter((p) => p.status !== "paid" && p.due_date && p.due_date >= todayIso && p.due_date <= in14);
-  const within14 = (upcoming ?? []).filter((w) => w.wedding_date && w.wedding_date <= in14);
+  const in14 = new Date(Date.now() + 2 * 3600 * 1000 + 14 * 86400000).toISOString().slice(0, 10);
+  const dueSoon = balances.filter((b) => b.due && b.due >= todayIso && b.due <= in14);
+  const within14 = upcomingAll.filter((w) => w.wedding_date && String(w.wedding_date).slice(0, 10) <= in14);
   type NextItem = { id: string; name: string; detail: string; action: string; href: string; primary?: boolean };
   const nextUp: NextItem[] = [];
   pendingSubs.forEach((s) => {
+    if (!s.wedding?.slug) return; // orphaned submission — no wedding page to link to
     const total = Number((s.totals as { grandTotal?: number } | null)?.grandTotal ?? 0);
-    nextUp.push({ id: `sub-${s.id}`, name: s.wedding?.couple_names ?? "Wedding", detail: `Submitted their selections${total > 0 ? ` · ${fmtRand(total)}` : ""}`, action: "Review & invoice", href: `/venue/weddings/${s.wedding?.slug ?? ""}`, primary: true });
+    nextUp.push({ id: `sub-${s.id}`, name: s.wedding.couple_names ?? "Wedding", detail: `Submitted their selections${total > 0 ? ` · ${fmtRand(total)}` : ""}`, action: "Review & invoice", href: `/venue/weddings/${s.wedding.slug}`, primary: true });
   });
-  overdue.forEach((p) => nextUp.push({ id: `od-${p.wedding?.slug}-${p.due_date}`, name: p.wedding?.couple_names ?? "Wedding", detail: `Payment overdue · was due ${p.due_date}`, action: `${fmtRand(Number(p.amount))} due`, href: p.wedding ? `/venue/weddings/${p.wedding.slug}` : "/venue/payments" }));
-  dueSoon.forEach((p) => nextUp.push({ id: `ds-${p.wedding?.slug}-${p.due_date}`, name: p.wedding?.couple_names ?? "Wedding", detail: `Payment due ${p.due_date}`, action: `${fmtRand(Number(p.amount))} due`, href: p.wedding ? `/venue/weddings/${p.wedding.slug}` : "/venue/payments" }));
+  overdue.forEach((b) => nextUp.push({ id: `od-${b.wedding.slug}-${b.due}`, name: b.wedding.couple_names ?? "Wedding", detail: `Payment overdue · was due ${b.due}`, action: `${fmtRand(b.outstanding)} due`, href: b.wedding.slug ? `/venue/weddings/${b.wedding.slug}` : "/venue/payments" }));
+  dueSoon.forEach((b) => nextUp.push({ id: `ds-${b.wedding.slug}-${b.due}`, name: b.wedding.couple_names ?? "Wedding", detail: `Payment due ${b.due}`, action: `${fmtRand(b.outstanding)} due`, href: b.wedding.slug ? `/venue/weddings/${b.wedding.slug}` : "/venue/payments" }));
   within14.forEach((w) => { const days = Math.max(0, Math.round((new Date(w.wedding_date).getTime() - Date.now()) / 86400000)); nextUp.push({ id: `wd-${w.slug}`, name: w.couple_names, detail: days <= 0 ? "Wedding is today 🎉" : `Wedding in ${days} day${days === 1 ? "" : "s"}`, action: "Open", href: `/venue/weddings/${w.slug}` }); });
 
   // Commission potential — what the venue earns at full utilisation across all active items.
@@ -238,14 +287,17 @@ export default async function VenueOverview() {
       collected: 0,
     });
   }
-  payments.forEach((p) => {
-    const dateStr = p.paid_date || p.due_date;
-    if (!dateStr) return;
-    const k = dateStr.slice(0, 7);
+  // Collected lands in the month the money arrived (payment_ledger.paid_at);
+  // invoiced lands in the month the wedding was marked invoiced (invoiced_at).
+  ledger.forEach((r) => {
+    const k = String(r.paid_at ?? "").slice(0, 7);
     const b = monthBuckets.find((m) => m.key === k);
-    if (!b) return;
-    b.invoiced += Number(p.amount || 0);
-    if (p.status === "paid") b.collected += Number(p.amount || 0);
+    if (b) b.collected += signedAmount(r);
+  });
+  invoicedWeddings.forEach((w) => {
+    const k = String(w.invoiced_at ?? "").slice(0, 7);
+    const b = monthBuckets.find((m) => m.key === k);
+    if (b) b.invoiced += Number(w.invoice_total ?? 0);
   });
   const maxBar = Math.max(1, ...monthBuckets.map((b) => Math.max(b.invoiced, b.collected)));
 
@@ -259,7 +311,7 @@ export default async function VenueOverview() {
       count: 0,
     });
   }
-  (allWeddings ?? []).forEach((w) => {
+  activeWeddings.forEach((w) => {
     if (!w.wedding_date) return;
     const k = String(w.wedding_date).slice(0, 7);
     const b = bookingBuckets.find((m) => m.key === k);
@@ -268,7 +320,7 @@ export default async function VenueOverview() {
   const maxBookings = Math.max(1, ...bookingBuckets.map((b) => b.count));
 
   // Notifications.
-  const within30 = (upcoming ?? []).filter((w) => w.wedding_date && w.wedding_date <= in30);
+  const within30 = upcomingAll.filter((w) => w.wedding_date && String(w.wedding_date).slice(0, 10) <= in30);
   const lowStockRentals = (rentalRows ?? []).filter((r) => Number((r as { stock_total?: number }).stock_total ?? 0) > 0 && Number((r as { stock_total?: number }).stock_total ?? 0) <= 2 && r.active !== false);
   // Overdue payments + imminent weddings now live in the "Next up" feed; Notifications
   // keeps the broader setup / commission / stock alerts so the two don't duplicate.
@@ -307,7 +359,7 @@ export default async function VenueOverview() {
   const showWelcome = pct < 100 && !hasImported;
 
   const stats = [
-    { label: "Upcoming weddings", value: (upcoming?.length ?? 0).toString(), sub: `${counts.weddings} total`, href: "/venue/weddings", accent: "var(--poppy)" },
+    { label: "Upcoming weddings", value: upcomingAll.length.toString(), sub: `${counts.weddings} total`, href: "/venue/weddings", accent: "var(--poppy)" },
     { label: "Commission potential", value: fmtRand(commissionTotal), sub: "across active items", href: "/venue/rentals", accent: "var(--sage)" },
     { label: "Payments collected", value: fmtRand(collected), sub: `of ${fmtRand(invoiced)} invoiced`, href: "/venue/payments", accent: "var(--poppy)" },
     { label: "Outstanding", value: fmtRand(outstanding), sub: overdue.length ? `${overdue.length} overdue` : "All paid up", href: "/venue/payments", accent: overdue.length ? "var(--poppy)" : "var(--sage)" },
@@ -315,7 +367,9 @@ export default async function VenueOverview() {
     { label: "Catalogue + rentals", value: (counts.catalogue + counts.rentals).toString(), sub: `${counts.catalogue} included · ${counts.rentals} extras`, href: "/venue/catalogue", accent: "var(--sage)" },
   ];
 
-  const payRatio = invoiced ? collected / invoiced : 0;
+  // Clamp: collected can legitimately exceed invoiced (deposits taken before the
+  // wedding is formally invoiced), which would overflow the donut arc.
+  const payRatio = invoiced ? Math.min(1, collected / invoiced) : 0;
   const donutCirc = 2 * Math.PI * 36;
 
   return (
@@ -381,7 +435,7 @@ export default async function VenueOverview() {
       {/* Enlarged calendar across the top — bookings, multi-day spans, and a live
           availability check driven by selecting dates. */}
       <OverviewCalendar
-        bookings={(allWeddings ?? []) as { slug: string; couple_names: string; wedding_date: string; wedding_end_date: string | null; status: string | null }[]}
+        bookings={weddingsAll}
         rooms={activeRooms}
         roomOccupancy={roomOccupancy}
       />
@@ -548,7 +602,7 @@ export default async function VenueOverview() {
         {/* Bookings */}
         <section className="vy-card">
           <div className="vy-eyebrow">Bookings · next 6 months</div>
-          <h2 className="vy-h2 mt-1 mb-4">{(allWeddings ?? []).filter((w) => w.wedding_date >= todayIso).length} upcoming</h2>
+          <h2 className="vy-h2 mt-1 mb-4">{upcomingAll.length} upcoming</h2>
           <div className="flex items-end gap-2 h-32">
             {bookingBuckets.map((b) => (
               <div key={b.key} className="flex-1 flex flex-col items-center gap-1.5">
@@ -595,7 +649,7 @@ export default async function VenueOverview() {
           <h2 className="vy-h2">Upcoming weddings</h2>
           <Link href="/venue/weddings" className="text-sm hover:underline" style={{ color: "var(--poppy)" }}>View all →</Link>
         </div>
-        {upcoming && upcoming.length > 0 ? (
+        {upcoming.length > 0 ? (
           <div className="vy-card divide-y" style={{ padding: 0 }}>
             {upcoming.map((w) => {
               const days = Math.round((new Date(w.wedding_date).getTime() - now.getTime()) / 86400000);
@@ -629,7 +683,7 @@ export default async function VenueOverview() {
       </section>
 
       {/* Recently added */}
-      {recentWeddings && recentWeddings.length > 0 && counts.weddings > (upcoming?.length ?? 0) && (
+      {recentWeddings && recentWeddings.length > 0 && counts.weddings > upcoming.length && (
         <section>
           <h2 className="vy-h2 mb-3">Recently added</h2>
           <div className="grid sm:grid-cols-2 gap-3">

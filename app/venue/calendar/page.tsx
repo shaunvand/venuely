@@ -13,6 +13,34 @@ function fmtDate(iso: string): string {
   return d.toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 }
 
+// Cancelled/lost weddings still show on the agenda but never count as a clash.
+function isCancelledStatus(status: string | null | undefined): boolean {
+  const s = (status ?? "").toLowerCase();
+  return s === "cancelled" || s === "lost";
+}
+
+// Expand an inclusive wedding_date..wedding_end_date span into one ISO date per
+// day, so multi-day weddings register on every day they cover. Null/inverted end
+// collapses to the start day; capped to keep bad data from runaway expansion.
+function eachDate(startISO: string, endISO?: string | null): string[] {
+  const start = String(startISO).slice(0, 10);
+  if (!start) return [];
+  const endRaw = endISO ? String(endISO).slice(0, 10) : "";
+  if (!endRaw || endRaw <= start) return [start];
+  const s = new Date(`${start}T00:00:00Z`);
+  const e = new Date(`${endRaw}T00:00:00Z`);
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return [start];
+  const out: string[] = [];
+  const cursor = new Date(s);
+  let guard = 0;
+  while (cursor <= e && guard < 120) {
+    out.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    guard++;
+  }
+  return out;
+}
+
 export default async function VenueCalendar() {
   // Venue layout already gates, but make the page's contract explicit.
   await requireRole(["venue_admin", "owner"]);
@@ -29,6 +57,7 @@ export default async function VenueCalendar() {
   type DayAgg = {
     date: string;
     couples: Set<string>;
+    activeCouples: Set<string>; // excludes cancelled/lost — drives clash detection
     weddingSlugs: Map<string, string>; // couple_names → slug
     roomNights: number;
     holdQty: number;
@@ -37,15 +66,20 @@ export default async function VenueCalendar() {
   function ensure(date: string): DayAgg {
     let d = days.get(date);
     if (!d) {
-      d = { date, couples: new Set(), weddingSlugs: new Map(), roomNights: 0, holdQty: 0 };
+      d = { date, couples: new Set(), activeCouples: new Set(), weddingSlugs: new Map(), roomNights: 0, holdQty: 0 };
       days.set(date, d);
     }
     return d;
   }
   for (const w of weddings) {
-    const d = ensure(w.wedding_date);
-    d.couples.add(w.couple_names);
-    d.weddingSlugs.set(w.couple_names, w.slug);
+    // Multi-day weddings occupy every day from wedding_date through
+    // wedding_end_date (inclusive), so collisions mid-span are caught too.
+    for (const date of eachDate(w.wedding_date, w.wedding_end_date)) {
+      const d = ensure(date);
+      d.couples.add(w.couple_names);
+      d.weddingSlugs.set(w.couple_names, w.slug);
+      if (!isCancelledStatus(w.status)) d.activeCouples.add(w.couple_names);
+    }
   }
   for (const b of bookings) ensure(b.date).roomNights += 1;
   for (const h of holds) ensure(h.weekend_of).holdQty += Number(h.quantity) || 0;
@@ -55,7 +89,7 @@ export default async function VenueCalendar() {
     .filter((d) => d.date >= todayIso)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  const clashes = agenda.filter((d) => d.couples.size > 1);
+  const clashes = agenda.filter((d) => d.activeCouples.size > 1);
 
   // Map for the calendar overlays.
   const roomNights = bookings.map((b) => ({
@@ -90,7 +124,7 @@ export default async function VenueCalendar() {
           <ul className="mt-1 space-y-0.5">
             {clashes.map((d) => (
               <li key={d.date}>
-                <span className="font-medium">{fmtDate(d.date)}</span> — {Array.from(d.couples).join(", ")}
+                <span className="font-medium">{fmtDate(d.date)}</span> — {Array.from(d.activeCouples).join(", ")}
               </li>
             ))}
           </ul>
@@ -107,7 +141,7 @@ export default async function VenueCalendar() {
       )}
 
       <BookingsCalendar
-        bookings={weddings.map((w) => ({ slug: w.slug, couple_names: w.couple_names, wedding_date: w.wedding_date, wedding_end_date: w.wedding_end_date }))}
+        bookings={weddings.map((w) => ({ slug: w.slug, couple_names: w.couple_names, wedding_date: w.wedding_date, wedding_end_date: w.wedding_end_date, status: w.status }))}
         months={6}
         roomNights={roomNights}
         rentalHolds={rentalHolds}
@@ -128,7 +162,7 @@ export default async function VenueCalendar() {
         ) : (
           <ul className="divide-y" style={{ borderColor: "var(--line)" }}>
             {agenda.map((d) => {
-              const clash = d.couples.size > 1;
+              const clash = d.activeCouples.size > 1;
               return (
                 <li key={d.date} className="py-3 flex flex-wrap items-center gap-x-4 gap-y-1">
                   <div className="w-44 shrink-0 text-sm font-medium">{fmtDate(d.date)}</div>
@@ -138,7 +172,7 @@ export default async function VenueCalendar() {
                         key={slug}
                         href={`/venue/weddings/${slug}`}
                         className="vy-tag vy-tag-soft hover:underline"
-                        style={clash ? { borderColor: "#fca5a5", color: "#991b1b" } : undefined}
+                        style={clash && d.activeCouples.has(name) ? { borderColor: "#fca5a5", color: "#991b1b" } : undefined}
                       >
                         {name}
                       </Link>

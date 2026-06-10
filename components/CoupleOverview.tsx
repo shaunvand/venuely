@@ -46,7 +46,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
   const [timeline, setTimeline] = useState<Array<{ id: string; start_time: string | null; title: string; location: string | null }>>([]);
   const [checklist, setChecklist] = useState<Array<{ id: string; title: string; due_date: string | null; done: boolean | null }>>([]);
   const [docs, setDocs] = useState<Array<{ id: string; label: string | null; mime_type: string | null; url: string | null }>>([]);
-  const [narrow, setNarrow] = useState(false);
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" ? window.matchMedia("(max-width: 979px)").matches : false);
   useEffect(() => {
     const check = () => setNarrow(window.innerWidth < 980);
     check(); window.addEventListener("resize", check);
@@ -73,7 +73,12 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
   const openChecklist = checklist.filter((c) => !c.done);
   const tasksDone = checklist.length - openChecklist.length;
   const nextUp = [...openChecklist].sort((a, b) => (a.due_date && b.due_date ? String(a.due_date).localeCompare(String(b.due_date)) : 0)).slice(0, 3);
-  const nextPaymentDue = pay?.depositDue && (pay.paid < (pay.invoiced || 0)) ? pay.depositDue : pay?.balanceDue || null;
+  // "Deposit due" only while the deposit itself is unpaid (no deposit recorded in
+  // the ledger — the deposit amount isn't exposed, so a kind:"deposit" payment is
+  // the signal); after that, the balance date while anything is still outstanding.
+  const balanceOutstanding = (pay?.invoiced || 0) > 0 && (pay?.paid || 0) < (pay?.invoiced || 0);
+  const depositPaid = (pay?.payments ?? []).some((p) => p.direction === "in" && p.kind === "deposit");
+  const nextPaymentDue = !balanceOutstanding ? null : (pay?.depositDue && !depositPaid ? pay.depositDue : pay?.balanceDue || null);
 
   const docIcon = (m: string | null) => (m?.includes("pdf") ? "PDF" : m?.startsWith("image") ? "IMG" : "DOC");
 
@@ -178,7 +183,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
           </div>
 
           <div style={{ ...card, padding: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}><span style={eyebrow}>📄 Documents</span><button onClick={() => onNavigate("Payments")} style={{ background: "none", border: "none", color: POPPY, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>View all →</button></div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}><span style={eyebrow}>📄 Documents</span><button onClick={() => onNavigate("Documents")} style={{ background: "none", border: "none", color: POPPY, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>View all →</button></div>
             {docs.length === 0 ? <div style={{ color: INK2, fontSize: 13 }}>No documents yet.</div> : docs.slice(0, 5).map((d) => (
               <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${LINE}` }}>
                 <span style={{ fontSize: 13, color: INK, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.label || "Document"}</span>
@@ -204,7 +209,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
           <div style={eyebrow}>Next task</div>
           <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginTop: 8 }}>{nextPaymentDue ? "Payment due" : nextUp[0]?.title || "You're all caught up 🎉"}</div>
           <div style={{ fontSize: 12.5, color: INK2 }}>{nextPaymentDue ? fmtDate(nextPaymentDue) : nextUp[0]?.due_date ? fmtDate(nextUp[0].due_date) : "Nothing due right now"}</div>
-          <button onClick={() => onNavigate(nextPaymentDue ? "Payments" : "Checklist")} style={{ marginTop: 12, width: "100%", background: POPPY, color: "#fff", border: "none", borderRadius: 999, padding: "10px", fontWeight: 700, cursor: "pointer", fontSize: 13.5 }}>{nextPaymentDue ? "Make payment" : "View tasks"}</button>
+          <button onClick={() => onNavigate(nextPaymentDue ? "Payments" : "Checklist")} style={{ marginTop: 12, width: "100%", background: POPPY, color: "#fff", border: "none", borderRadius: 999, padding: "10px", fontWeight: 700, cursor: "pointer", fontSize: 13.5 }}>{nextPaymentDue ? "View payment details" : "View tasks"}</button>
         </div>
 
         {/* Venue contact */}

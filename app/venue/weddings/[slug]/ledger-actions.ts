@@ -7,7 +7,7 @@ export async function addPayment(weddingId: string, slug: string, formData: Form
   const supabase = await createClient();
   const amount = Number(formData.get("amount"));
   if (!Number.isFinite(amount) || amount <= 0) throw new Error("Invalid amount");
-  await supabase.from("payment_ledger").insert({
+  const { error } = await supabase.from("payment_ledger").insert({
     wedding_id: weddingId,
     amount,
     direction: (formData.get("direction") as string) || "in",
@@ -17,12 +17,14 @@ export async function addPayment(weddingId: string, slug: string, formData: Form
     paid_at: (formData.get("paid_at") as string) || new Date().toISOString(),
     notes: (formData.get("notes") as string) || null,
   });
+  if (error) throw new Error(error.message);
   revalidatePath(`/venue/weddings/${slug}`);
 }
 
 export async function deletePayment(paymentId: string, slug: string) {
   const supabase = await createClient();
-  await supabase.from("payment_ledger").delete().eq("id", paymentId);
+  const { error } = await supabase.from("payment_ledger").delete().eq("id", paymentId);
+  if (error) throw new Error(error.message);
   revalidatePath(`/venue/weddings/${slug}`);
 }
 
@@ -30,7 +32,7 @@ export async function addCharge(weddingId: string, slug: string, formData: FormD
   const supabase = await createClient();
   const qty = Number(formData.get("qty") || 1);
   const unitPrice = Number(formData.get("unit_price") || 0);
-  await supabase.from("wedding_charges").insert({
+  const { error } = await supabase.from("wedding_charges").insert({
     wedding_id: weddingId,
     kind: (formData.get("kind") as string) || "custom",
     label: (formData.get("label") as string) || "Custom charge",
@@ -38,11 +40,13 @@ export async function addCharge(weddingId: string, slug: string, formData: FormD
     is_refundable: formData.get("is_refundable") === "on",
     is_auto: false,
   });
+  if (error) throw new Error(error.message);
   revalidatePath(`/venue/weddings/${slug}`);
 }
 
 export async function deleteCharge(chargeId: string, slug: string) {
   const supabase = await createClient();
-  await supabase.from("wedding_charges").delete().eq("id", chargeId);
+  const { error } = await supabase.from("wedding_charges").delete().eq("id", chargeId);
+  if (error) throw new Error(error.message);
   revalidatePath(`/venue/weddings/${slug}`);
 }

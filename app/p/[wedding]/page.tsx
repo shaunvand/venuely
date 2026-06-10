@@ -92,7 +92,7 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
       dateLabel={dateLabel}
       weddingDate={wedding.wedding_date ? String(wedding.wedding_date).slice(0, 10) : null}
       weddingEndDate={wedding.wedding_end_date ? String(wedding.wedding_end_date).slice(0, 10) : null}
-      totalDue={totals.grandTotal}
+      totalDue={totals?.grandTotal ?? 0}
       initialState={state}
       catalogue={catalogue}
       rentals={rentals}

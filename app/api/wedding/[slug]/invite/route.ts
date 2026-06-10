@@ -42,6 +42,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
 
   let sent = 0;
   const results: Array<{ id: string; name: string; emailed: boolean; whatsapp: string | null; link: string }> = [];
+  const invitedIds: string[] = [];
 
   for (const g of guests) {
     const link = `${origin}/rsvp/${g.rsvp_token}`;
@@ -61,11 +62,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
       if (r.sent) sent++;
     }
     const waText = `Hi ${g.full_name.split(" ")[0]}! You're invited to ${couple}'s wedding${dateLabel ? ` on ${dateLabel}` : ""}. Please RSVP here: ${link}`;
-    results.push({ id: g.id, name: g.full_name, emailed, whatsapp: whatsappUrl(g.phone, waText), link });
+    const whatsapp = whatsappUrl(g.phone, waText);
+    if (emailed || whatsapp) invitedIds.push(g.id);
+    results.push({ id: g.id, name: g.full_name, emailed, whatsapp, link });
   }
 
-  // Stamp invited_at for everyone we processed (email sent or WA link generated).
-  await db.from("guests").update({ invited_at: new Date().toISOString() }).in("id", guests.map((g) => g.id)).is("invited_at", null);
+  // Stamp invited_at only for guests actually reached: an email was sent or a
+  // WhatsApp link was generated. Guests with no email/phone stay uninvited.
+  if (invitedIds.length) {
+    await db.from("guests").update({ invited_at: new Date().toISOString() }).in("id", invitedIds).is("invited_at", null);
+  }
 
   return NextResponse.json({ ok: true, sent, results });
 }

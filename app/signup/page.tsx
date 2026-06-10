@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 const ICON = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -39,26 +39,36 @@ function Wordmark() {
   );
 }
 
-export default function SignupPage() {
+function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const params = useSearchParams();
+  // Team-invite token (a manager being added to a venue). It must ride along on the
+  // confirmation email's callback URL so /auth/callback can redeem it — otherwise the
+  // invitee lands in onboarding and creates a duplicate venue.
+  const venueInvite = params.get("venue_invite");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setMsg(null);
+    setAlreadyRegistered(false);
     const supabase = createClient();
+
+    let callbackUrl = `${window.location.origin}/auth/callback?next=/dashboard`;
+    if (venueInvite) callbackUrl += `&venue_invite=${encodeURIComponent(venueInvite)}`;
 
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+        emailRedirectTo: callbackUrl,
         data: { full_name: fullName },
       },
     });
@@ -66,8 +76,18 @@ export default function SignupPage() {
     if (error) {
       setMsg(error.message);
       setLoading(false);
+    } else if (data.user && data.user.identities?.length === 0) {
+      // Supabase returns an obfuscated user with no identities when the email is
+      // already registered — don't send them to check-email (no email is coming).
+      setAlreadyRegistered(true);
+      setLoading(false);
     } else if (data.user) {
-      router.push(`/signup/check-email?email=${encodeURIComponent(email)}&name=${encodeURIComponent(fullName)}`);
+      const qs = new URLSearchParams({ email, name: fullName });
+      if (venueInvite) qs.set("venue_invite", venueInvite);
+      router.push(`/signup/check-email?${qs.toString()}`);
+    } else {
+      setLoading(false);
+      setMsg("Something went wrong — please try again.");
     }
   }
 
@@ -75,10 +95,7 @@ export default function SignupPage() {
   const inputStyle: React.CSSProperties = { paddingLeft: "2.5rem", paddingTop: "0.7rem", paddingBottom: "0.7rem" };
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-6" style={{ background: "var(--cream)" }}>
-      <div className="w-full max-w-md">
-        <Wordmark />
-
+    <>
         <form onSubmit={handleSubmit} className="mt-9 anim-fade-up">
           <h1 className="vy-h1" style={{ fontSize: "2.1rem" }}>List your venue on Venuely</h1>
           <p className="text-sm mt-2" style={{ color: "var(--ink-2)" }}>
@@ -119,6 +136,12 @@ export default function SignupPage() {
           </button>
 
           {msg && <p className="text-sm mt-4" style={{ color: "#a3210e" }}>{msg}</p>}
+          {alreadyRegistered && (
+            <p className="text-sm mt-4" style={{ color: "#a3210e" }}>
+              You already have an account —{" "}
+              <Link href="/login" className="font-semibold underline" style={{ color: "var(--poppy)" }}>sign in instead</Link>.
+            </p>
+          )}
 
           <p className="text-sm mt-4" style={{ color: "var(--ink-2)" }}>
             Already have a Venuely account?{" "}
@@ -129,6 +152,19 @@ export default function SignupPage() {
         <p className="text-xs text-center mt-8 max-w-sm mx-auto leading-relaxed" style={{ color: "var(--ink-2)" }}>
           Couples: you don&apos;t sign up here. Your venue will email you an invitation with a private portal link.
         </p>
+    </>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <main className="min-h-screen flex items-center justify-center p-6" style={{ background: "var(--cream)" }}>
+      <div className="w-full max-w-md">
+        <Wordmark />
+        {/* useSearchParams (venue_invite passthrough) requires a Suspense boundary. */}
+        <Suspense fallback={<div className="mt-9" style={{ color: "var(--ink-2)" }}>Loading…</div>}>
+          <SignupForm />
+        </Suspense>
       </div>
     </main>
   );

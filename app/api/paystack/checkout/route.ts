@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { loadRules, computeTotals, type Charge, type Payment } from "@/lib/billing/compute";
+import { buildWeddingCharges } from "@/lib/billing/charges";
 import { getPaystackConfig, initTransaction, isPaystackConfigured } from "@/lib/billing/paystack";
 
 export const runtime = "nodejs";
@@ -99,35 +99,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Build the proforma from persisted line items + ledger, then computeTotals.
-  // NOTE: wedding_charges rows carry no commission columns, so charges read here
-  // have no base_amount → computeTotals reports commission_total = 0 and
-  // platform_fee_base = grand_total for any auto-derived (couple-selection) lines
-  // that haven't been persisted with a base. The fee below is computed off
-  // platform_fee_base, so it is correct for whatever commission the route can
-  // currently see; surfacing auto-line commission here needs the full proforma
-  // rebuild (see buildWeddingCharges in ../venue/weddings/actions.ts) — tracked
-  // as a follow-up.
-  const [rules, chargesRes, paymentsRes] = await Promise.all([
-    loadRules(ad, venue.id),
-    ad
-      .from("wedding_charges")
-      .select("id, kind, label, qty, unit_price, amount, is_refundable, day_type")
-      .eq("wedding_id", wedding.id),
-    ad
-      .from("payment_ledger")
-      .select("id, amount, direction, kind, paid_at")
-      .eq("wedding_id", wedding.id),
-  ]);
-
-  const charges = (chargesRes.data ?? []) as unknown as Charge[];
-  const payments = (paymentsRes.data ?? []) as unknown as Payment[];
-  const totals = computeTotals(rules, charges, payments);
+  // Full live proforma — auto-derived couple-selection charges (rentals,
+  // catalogue, accommodation, vendors, areas) + manual wedding_charges +
+  // breakage + payment_ledger. Shared with markInvoiced/approveSubmission via
+  // lib/billing/charges.ts, so the couple is charged off the same totals (and
+  // the same commission split) the venue's proforma shows.
+  const { feeRate, feeActive, totals } = await buildWeddingCharges(ad, venue.id, wedding.id);
 
   const amountType = body.amount_type ?? "deposit";
   let amountMajor: number;
   if (amountType === "custom") {
-    amountMajor = Number(body.amount);
+    // Custom amounts are capped at the outstanding balance — a couple can never
+    // overpay past what the proforma says is still due.
+    amountMajor = Math.min(Number(body.amount), totals.balance_due);
   } else if (amountType === "balance") {
     amountMajor = totals.balance_due;
   } else {
@@ -144,12 +128,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A customer email is required to take a payment." }, { status: 400 });
   }
 
-  // platform_fee_rate is stored as a fraction (e.g. 0.0050 for 0.5%). Venuely's fee
-  // = rate × (grand_total − venue commission); the venue keeps 100% of its
-  // commission. Paystack's subaccount percentage_charge would tax the GROSS, so
-  // instead we pass a per-transaction FIXED `transaction_charge` that overrides
-  // it, computed off the commission-excluding base.
-  const feeRate = Number(venue.platform_fee_rate ?? 0.005);
+  // venue.platform_fee_rate is stored as a fraction (e.g. 0.005 for 0.5%).
+  // Venuely's fee = rate × (grand_total − venue commission); the venue keeps 100%
+  // of its commission. Paystack's subaccount percentage_charge would tax the
+  // GROSS, so instead we pass a per-transaction FIXED `transaction_charge` that
+  // overrides it, computed off the commission-excluding base. When the venue's
+  // platform_fee_active is false the fee is waived — we still pass an explicit 0
+  // so the subaccount's stored percentage_charge can't sneak back in.
+  const effectiveFeeRate = feeActive ? feeRate : 0;
 
   // The couple pays the full amountMajor (gross) via Paystack, but we charge the
   // platform fee only on its commission-excluding share. Scale the proforma's
@@ -157,7 +143,7 @@ export async function POST(request: NextRequest) {
   // paid now (deposit / balance / custom). Guard the divide for empty proformas.
   const feeBaseRatio = totals.grand_total > 0 ? totals.platform_fee_base / totals.grand_total : 1;
   const feeBaseMajor = amountMajor * feeBaseRatio;
-  const feeAmountCents = Math.round(feeRate * feeBaseMajor * 100);
+  const feeAmountCents = Math.round(effectiveFeeRate * feeBaseMajor * 100);
 
   const proto = request.headers.get("x-forwarded-proto") ?? "https";
   const host = request.headers.get("host") ?? request.nextUrl.host;
@@ -177,7 +163,7 @@ export async function POST(request: NextRequest) {
       venue_id: venue.id,
       wedding_id: wedding.id,
       payment_kind: amountType === "balance" ? "balance" : amountType === "custom" ? "payment" : "deposit",
-      platform_fee_rate: feeRate,
+      platform_fee_rate: effectiveFeeRate,
       platform_fee_base: Math.round(feeBaseMajor * 100) / 100,
       platform_fee_amount: Math.round(feeAmountCents) / 100,
       couple_names: wedding.couple_names,

@@ -3,6 +3,8 @@ import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
 import { VenueBankingForm } from "@/components/VenueBankingForm";
 import { InvoiceDesigner } from "@/components/InvoiceDesigner";
+import { ConnectPayoutsForm } from "./ConnectPayoutsForm";
+import { isPaystackConfigured, listBanks } from "@/lib/billing/paystack";
 import { resolveInvoiceTemplate, resolveInvoiceTheme } from "@/lib/invoice/templates";
 import { resolveTheme } from "@/lib/portal/templates";
 
@@ -20,9 +22,18 @@ export default async function VenueBillingPage() {
 
   const { data: row } = await supabase
     .from("venues")
-    .select("bank_name, bank_account_name, bank_account_number, bank_branch_code, bank_swift, bank_iban, bank_verified_at, invoice_template, invoice_theme, portal_theme")
+    .select("bank_name, bank_account_name, bank_account_number, bank_branch_code, bank_swift, bank_iban, bank_verified_at, invoice_template, invoice_theme, portal_theme, paystack_subaccount_code")
     .eq("id", venue.id)
     .single();
+
+  // Paystack card-payments connect — only rendered when the platform has keys.
+  const paystackOn = isPaystackConfigured();
+  let banks: { name: string; code: string }[] = [];
+  if (paystackOn) {
+    const banksRes = await listBanks();
+    if ("ok" in banksRes && banksRes.ok) banks = banksRes.data.map((b) => ({ name: b.name, code: b.code }));
+  }
+  const payoutsConnected = !!row?.paystack_subaccount_code;
 
   const bank = {
     bank_name: row?.bank_name ?? "",
@@ -53,6 +64,21 @@ export default async function VenueBillingPage() {
         verifiedAt={row?.bank_verified_at ?? null}
         initial={bank}
       />
+
+      {paystackOn && (
+        <section className="vy-card space-y-4">
+          <div>
+            <div className="vy-eyebrow">Card payments</div>
+            <h2 className="vy-h2 mt-1">Connect payouts</h2>
+            <p className="text-sm text-[color:var(--ink-2)] mt-1">
+              {payoutsConnected
+                ? "Payouts are connected — couples can pay by card and the money settles to your account the next day. Re-submit below to change the payout account."
+                : "Connect a payout account so couples can pay by card. We verify the account holder with your bank before anything is saved."}
+            </p>
+          </div>
+          <ConnectPayoutsForm venueId={venue.id} banks={banks} feePercent={feePercent} />
+        </section>
+      )}
 
       <InvoiceDesigner
         venueId={venue.id}

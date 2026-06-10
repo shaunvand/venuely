@@ -6,9 +6,12 @@ import { AreaManager, type AreaRow } from "@/components/AreaManager";
 export default async function VenueAreas() {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
-  const [{ data: areas }, { data: pricing }, { data: areaImages }, { data: gallery }] = await Promise.all([
-    supabase.from("venue_areas").select("id, name, slug, description, area_kind, active, sort_order").eq("venue_id", venue.id).order("sort_order"),
-    supabase.from("area_pricing").select("area_id, day_type, price"),
+  const { data: areas } = await supabase.from("venue_areas").select("id, name, slug, description, area_kind, active, sort_order").eq("venue_id", venue.id).order("sort_order");
+  const areaIds = (areas ?? []).map((a) => a.id);
+  const [{ data: pricing }, { data: areaImages }, { data: gallery }] = await Promise.all([
+    areaIds.length
+      ? supabase.from("area_pricing").select("area_id, day_type, price").in("area_id", areaIds)
+      : Promise.resolve({ data: [] as { area_id: string; day_type: string; price: number }[] }),
     supabase.from("media_assets").select("id, url, owner_id, sort_order").eq("venue_id", venue.id).eq("owner_type", "area").order("sort_order"),
     supabase.from("media_assets").select("url, label, category").eq("venue_id", venue.id).eq("owner_type", "venue").eq("kind", "photo").order("sort_order"),
   ]);

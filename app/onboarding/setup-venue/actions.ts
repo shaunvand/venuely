@@ -15,14 +15,19 @@ type SeedItem = { name?: string; description?: string | null; price_zar?: number
 type SeedRoom = { name?: string; description?: string | null; sleeps?: number | null; price_per_night_zar?: number | null; room_type?: string | null };
 type SeedPayload = { catalogue?: SeedItem[]; rentals?: SeedItem[]; accommodation?: SeedRoom[] };
 
-export async function setupVenue(formData: FormData) {
+export type SetupVenueState = { error: string } | null;
+
+// Used with useActionState: expected failures are returned as { error } so the form
+// can render them inline without losing its state (throwing from a server action
+// surfaces an opaque error page instead). Success still redirects.
+export async function setupVenue(_prevState: SetupVenueState, formData: FormData): Promise<SetupVenueState> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const name = (formData.get("name") as string)?.trim();
   const slug = (formData.get("slug") as string)?.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-");
-  if (!name || !slug) throw new Error("Venue name and slug are required.");
+  if (!name || !slug) return { error: "Venue name and slug are required." };
 
   const address  = (formData.get("address") as string || "").trim() || null;
   const region   = (formData.get("address_region") as string || "").trim() || null;
@@ -89,12 +94,12 @@ export async function setupVenue(formData: FormData) {
     }
     break;
   }
-  if (!venue) throw new Error(`Could not create venue: ${lastErr?.message ?? "unknown"}`);
+  if (!venue) return { error: `Could not create venue: ${lastErr?.message ?? "unknown"}` };
 
   const { error: mErr } = await admin
     .from("venue_members")
     .insert({ venue_id: venue.id, user_id: user.id, is_primary: true });
-  if (mErr) throw new Error(`Could not link membership: ${mErr.message}`);
+  if (mErr) return { error: `Could not link membership: ${mErr.message}` };
 
   const cat = (seed.catalogue ?? []).filter((i) => i.name?.trim());
   if (cat.length) {

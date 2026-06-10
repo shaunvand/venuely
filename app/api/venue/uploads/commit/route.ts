@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { INVENTORY_TABLES, defaultsFor, type InventoryType } from "@/lib/inventory/schemas";
-import { createClient as createServerClient } from "@/lib/supabase/server";
+import { requireVenueMember } from "@/lib/security/guards";
 
 export const runtime = "nodejs";
 
@@ -37,15 +37,9 @@ export async function POST(req: NextRequest) {
     const items = (body.items ?? []) as Item[];
     if (!venueId) return NextResponse.json({ error: "Missing venue_id" }, { status: 400 });
 
-    // Auth check via server client — venue admins only.
-    const auth = await createServerClient();
-    const { data: { user } } = await auth.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const [{ data: member }, { data: profile }] = await Promise.all([
-      auth.from("venue_members").select("venue_id").eq("user_id", user.id).eq("venue_id", venueId).maybeSingle(),
-      auth.from("profiles").select("role").eq("id", user.id).maybeSingle(),
-    ]);
-    if (!member && profile?.role !== "owner") return NextResponse.json({ error: "Not your venue" }, { status: 403 });
+    // Auth check via shared guard — venue admins only.
+    const gate = await requireVenueMember(venueId);
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
     const admin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -149,9 +143,32 @@ export async function POST(req: NextRequest) {
         }
       }
       if (insertRows.length) {
-        const { error } = await admin.from(table).insert(insertRows);
-        if (error) bump(table, { failed: insertRows.length, error: error.message });
-        else { bump(table, { added: insertRows.length }); catSaved += insertRows.length; }
+        // Non-item-coded rows (vendors, accommodation, un-coded catalogue/rentals)
+        // used to always INSERT, so a retried commit duplicated them. Dedupe on
+        // (venue_id, lower(trim(name))): an existing row with the same name gets
+        // UPDATEd instead of a fresh insert.
+        const normName = (v: unknown) => String(v ?? "").trim().toLowerCase();
+        const idByName = new Map<string, string>();
+        const { data: existingNamed, error: lookupErr } = await admin.from(table).select("id, name").eq("venue_id", venueId);
+        if (!lookupErr) {
+          for (const e of existingNamed ?? []) {
+            const key = normName((e as { name?: unknown }).name);
+            if (key && !idByName.has(key)) idByName.set(key, (e as { id: string }).id);
+          }
+        }
+        const toUpdate = insertRows.filter((p) => idByName.has(normName(p.name)));
+        const toInsert = insertRows.filter((p) => !idByName.has(normName(p.name)));
+        for (const p of toUpdate) {
+          const id = idByName.get(normName(p.name))!;
+          const { error } = await admin.from(table).update(p).eq("id", id);
+          if (error) bump(table, { failed: 1, error: error.message });
+          else { bump(table, { updated: 1 }); catSaved += 1; }
+        }
+        if (toInsert.length) {
+          const { error } = await admin.from(table).insert(toInsert);
+          if (error) bump(table, { failed: toInsert.length, error: error.message });
+          else { bump(table, { added: toInsert.length }); catSaved += toInsert.length; }
+        }
       }
 
       summary[cat] = catSaved;

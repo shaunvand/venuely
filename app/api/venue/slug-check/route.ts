@@ -13,23 +13,28 @@ export async function GET(req: NextRequest) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
+  const candidates = [
+    `${slug}-venue`,
+    `${slug}-za`,
+    `${slug}-wedding`,
+    `${slug}-${new Date().getFullYear()}`,
+    `the-${slug}`,
+  ];
+
+  // The `slug%` prefix query covers the typed slug, its suffixed candidates and the
+  // random fallbacks — but NOT prefixed candidates like `the-<slug>`, so check those
+  // explicitly too. Otherwise a taken `the-<slug>` gets suggested as available.
+  const prefixed = candidates.filter((c) => !c.startsWith(slug));
   const { data: existing } = await admin
     .from("venues")
     .select("slug")
-    .ilike("slug", `${slug}%`);
+    .or([`slug.ilike.${slug}%`, ...prefixed.map((c) => `slug.eq.${c}`)].join(","));
 
   const taken = new Set((existing ?? []).map((r) => r.slug));
   const isTaken = taken.has(slug);
 
   const suggestions: string[] = [];
   if (isTaken) {
-    const candidates = [
-      `${slug}-venue`,
-      `${slug}-za`,
-      `${slug}-wedding`,
-      `${slug}-${new Date().getFullYear()}`,
-      `the-${slug}`,
-    ];
     for (const c of candidates) {
       if (!taken.has(c) && !suggestions.includes(c)) suggestions.push(c);
       if (suggestions.length >= 4) break;

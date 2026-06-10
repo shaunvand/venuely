@@ -47,15 +47,21 @@ export async function searchOneImage(query: string): Promise<string | null> {
 }
 
 // Concurrency-limited parallel map. Keeps the provider under its rate cap on
-// big imports (Pexels 200/hr, Unsplash 50/hr).
-export async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T, idx: number) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length);
+// big imports (Pexels 200/hr, Unsplash 50/hr). Each item is wrapped in its own
+// try/catch so a single rejection can't fail the whole batch — a failed item
+// simply yields null and the rest keep going.
+export async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T, idx: number) => Promise<R>): Promise<Array<R | null>> {
+  const out: Array<R | null> = new Array(items.length).fill(null);
   let next = 0;
   async function worker() {
     while (true) {
       const idx = next++;
       if (idx >= items.length) return;
-      out[idx] = await fn(items[idx], idx);
+      try {
+        out[idx] = await fn(items[idx], idx);
+      } catch {
+        out[idx] = null; // failed item → skip, don't sink the batch
+      }
     }
   }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));

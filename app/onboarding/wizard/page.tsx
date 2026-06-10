@@ -12,10 +12,10 @@ import { WizardClient } from "./WizardClient";
 //
 // Flow notes:
 // - No venue yet  → wizard starts on Step 1 (Basics) which embeds <SetupVenueForm/>.
-//   That form only supports a server-action redirect to /venue on success, so to keep
-//   the wizard flow we point couples back here: the form's create lands on /venue, and
-//   the dashboard deep-links back to /onboarding/wizard?step=2 via the welcome flow when
-//   they want to continue importing. We also honour ?step= directly.
+//   On success the setupVenue server action redirects back here to
+//   /onboarding/wizard?step=1&created=1 so the wizard flashes a confirmation and
+//   auto-advances into Step 2 (Import). Expected failures are returned as { error }
+//   and rendered inline by the form. We also honour ?step= directly.
 // - Venue exists → Step 1 is already done; the wizard opens on Step 2 (Import) unless a
 //   ?step= override is supplied, and uses live setup data to drive the review checklist.
 export default async function OnboardingWizard({

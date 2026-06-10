@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
+import { requireVenueMember, assertSafeUrl, safeFetch, isAllowedImageType, imageExtForMime } from "@/lib/security/guards";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -43,20 +44,32 @@ export async function POST(req: NextRequest) {
     if (!/^https?:\/\//i.test(site)) site = `https://${site}`;
     if (!venue_id || !/^[a-zA-Z0-9-]+$/.test(venue_id)) return NextResponse.json({ error: "Missing venue_id" }, { status: 400 });
 
-    const page = await fetch(site, { headers: { "user-agent": "Mozilla/5.0 (VenuelyBot)" }, redirect: "follow" });
+    const gate = await requireVenueMember(venue_id);
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+
+    // SSRF guard: validate the user-supplied URL up front, then fetch with
+    // manual redirect handling so every hop is re-validated too.
+    try { assertSafeUrl(site); } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Invalid URL" }, { status: 400 });
+    }
+    const page = await safeFetch(site, { headers: { "user-agent": "Mozilla/5.0 (VenuelyBot)" } });
     if (!page.ok) return NextResponse.json({ error: `site returned ${page.status}` }, { status: 422 });
     const html = await page.text();
     const imgUrl = pickImage(html, page.url || site);
     if (!imgUrl) return NextResponse.json({ error: "no image found on the page" }, { status: 422 });
 
-    const ir = await fetch(imgUrl, { headers: { "user-agent": "Mozilla/5.0 (VenuelyBot)", referer: site } });
+    try { assertSafeUrl(imgUrl); } catch {
+      return NextResponse.json({ error: "no usable image found on the page" }, { status: 422 });
+    }
+    const ir = await safeFetch(imgUrl, { headers: { "user-agent": "Mozilla/5.0 (VenuelyBot)", referer: site } });
     if (!ir.ok) return NextResponse.json({ error: "couldn't download the image" }, { status: 422 });
-    const ct = ir.headers.get("content-type") || "image/jpeg";
-    if (!ct.startsWith("image/")) return NextResponse.json({ error: "linked file isn't an image" }, { status: 422 });
+    const ct = (ir.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (!isAllowedImageType(ct)) return NextResponse.json({ error: "linked file isn't a supported image (JPEG/PNG/WebP/GIF/AVIF)" }, { status: 422 });
     const buf = Buffer.from(await ir.arrayBuffer());
     if (buf.length < 256 || buf.length > 8 * 1024 * 1024) return NextResponse.json({ error: "image too small or too large" }, { status: 422 });
 
-    const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : ct.includes("svg") ? "svg" : ct.includes("gif") ? "gif" : "jpg";
+    // Extension derived from the validated MIME type — never the remote filename.
+    const ext = imageExtForMime(ct)!;
     const admin = createAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
     const path = `${venue_id}/site-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const { error } = await admin.storage.from("venue-media").upload(path, buf, { contentType: ct, upsert: false });

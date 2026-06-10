@@ -90,15 +90,6 @@ type Venue = { name: string; region: string | null; address: string | null; desc
 const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Invites", "Reminders", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Payments", "Documents"] as const;
 type Tab = (typeof TABS)[number];
 
-// Grouped navigation — keeps the portal simple: 5 top sections, sub-tabs below.
-const SECTIONS: { name: string; icon: string; tabs: Tab[] }[] = [
-  { name: "Plan", icon: "✨", tabs: ["Overview", "Our Venue", "Inspiration"] },
-  { name: "Choose", icon: "🍽️", tabs: ["Catalogue & Rentals", "Accommodation", "Suppliers"] },
-  { name: "Guests", icon: "💌", tabs: ["Guests", "Invites", "Reminders", "Seating"] },
-  { name: "Details", icon: "📝", tabs: ["Flowers", "Dress", "Décor", "Timeline", "Music", "Checklist", "Contacts"] },
-  { name: "Money & Docs", icon: "📄", tabs: ["Budget", "Payments", "Documents"] },
-];
-
 // Couple sidebar — flat, curated order + display labels (tab keys unchanged).
 const COUPLE_NAV: { key: Tab; label: string; icon: string }[] = [
   { key: "Overview", label: "Overview", icon: "home" },
@@ -114,6 +105,11 @@ const COUPLE_NAV: { key: Tab; label: string; icon: string }[] = [
   { key: "Seating", label: "Seating plan", icon: "seat" },
   { key: "Timeline", label: "Wedding day Timeline", icon: "clock" },
   { key: "Checklist", label: "Checklist", icon: "check" },
+  { key: "Flowers", label: "Flowers", icon: "flower" },
+  { key: "Dress", label: "The Dress", icon: "dress" },
+  { key: "Décor", label: "Décor", icon: "decor" },
+  { key: "Music", label: "Music", icon: "music" },
+  { key: "Contacts", label: "Contacts", icon: "phone" },
 ];
 
 // Thin line icons (Venuely style) for the couple sidebar. Plain function (not a
@@ -133,6 +129,11 @@ function navIcon(name: string) {
     seat: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 9v12" /></>,
     clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
     check: <><path d="M9 6h11M9 12h11M9 18h11" /><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2" /></>,
+    flower: <><circle cx="12" cy="8" r="3" /><path d="M12 11v10" /><path d="M12 17c-2.8 0-4.6-1.4-5-3.5 2.8 0 4.6 1.4 5 3.5z" /><path d="M12 17c2.8 0 4.6-1.4 5-3.5-2.8 0-4.6 1.4-5 3.5z" /></>,
+    dress: <><path d="M9 3l3 3 3-3" /><path d="M12 6l-2 4-4 8c2 1.4 4 2 6 2s4-.6 6-2l-4-8z" /></>,
+    decor: <><path d="M3 5c3 4.5 15 4.5 18 0" /><path d="M6.5 7.3L8 11M17.5 7.3L16 11M12 8.4V12" /></>,
+    music: <><path d="M9 18V6l10-2v12" /><circle cx="6.5" cy="18" r="2.5" /><circle cx="16.5" cy="16" r="2.5" /></>,
+    phone: <><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" /></>,
   };
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{P[name] ?? null}</svg>;
 }
@@ -172,9 +173,8 @@ export function CouplePortal({
   initialAreaSelections?: Array<{ area_id: string; day_type: string }>;
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
-  const activeSection = SECTIONS.find((s) => s.tabs.includes(tab))?.name ?? "Plan";
   const [navOpen, setNavOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" ? window.matchMedia("(max-width: 859px)").matches : false);
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 860);
     check(); window.addEventListener("resize", check);
@@ -367,44 +367,12 @@ export function CouplePortal({
         <main style={{ flex: 1, padding: isMobile ? "16px 14px 80px" : "24px 28px 90px", width: "100%" }}>
         <div key={tab} className="anim-fade-up">
         {tab === "Overview" && (
-          <CoupleOverview slug={slug} venue={venue} coupleNames={coupleNames} daysToGo={daysToGo} dateLabel={dateLabel} totalDue={totalDue} rooms={rooms} rentals={rentals} state={state} cover={cover} onNavigate={(t) => setTab(t as Tab)} />
-        )}
-        {false && (
           <div style={{ display: "grid", gap: 16 }}>
-            {/* AI front door */}
-            <div style={{ borderRadius: tokens.cardRadius, padding: 24, background: `linear-gradient(135deg, ${primary}, ${accent})`, color: "#fff" }}>
-              <div style={{ fontSize: 12, letterSpacing: 2, textTransform: "uppercase", opacity: 0.9 }}>Your AI wedding planner</div>
-              <div style={{ ...heading, fontSize: 24, margin: "6px 0 4px", color: "#fff" }}>Not sure where to start?</div>
-              <p style={{ opacity: 0.95, margin: "0 0 14px", fontSize: 14 }}>Tell me your vibe, guest count or budget and I&apos;ll guide you through everything {venue.name} offers — and fill in the rest.</p>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button onClick={() => window.dispatchEvent(new Event("venuely:open-planner"))} style={{ background: "#fff", color: primary, border: "none", borderRadius: 999, padding: "10px 20px", fontWeight: 700, cursor: "pointer", fontSize: 14 }}>✨ Plan with AI</button>
-                <button onClick={() => setTab("Inspiration")} style={{ background: "rgba(255,255,255,0.2)", color: "#fff", border: "1px solid rgba(255,255,255,0.5)", borderRadius: 999, padding: "10px 20px", fontWeight: 600, cursor: "pointer", fontSize: 14 }}>Find your style</button>
-              </div>
-            </div>
-
-            <div style={card({ padding: 22 })}>
-              <div style={{ ...heading, fontSize: 22 }}>Welcome to your planning portal</div>
-              <p style={{ color: "#57534e", marginTop: 6 }}>Browse everything {venue.name} offers — catalogue, rentals, accommodation and trusted suppliers — and plan your day in one place.</p>
-              {weddingDate && (
-                <div style={{ marginTop: 14 }}>
-                  <AddToCalendar slug={slug} title={coupleNames || "Our wedding"} location={[venue.name, venue.address || venue.region].filter(Boolean).join(", ")} weddingDate={weddingDate} weddingEndDate={weddingEndDate} primary={primary} accent={accent} />
-                </div>
-              )}
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14 }}>
-              <Stat label="Days to go" value={daysToGo != null ? String(daysToGo) : "—"} heading={heading} accent={accent} primary={primary} />
-              <Stat label="Catalogue items" value={String(catalogue.length)} heading={heading} accent={accent} primary={primary} />
-              <Stat label="Rentals" value={String(rentals.length)} heading={heading} accent={accent} primary={primary} />
-              <Stat label="Rooms" value={String(rooms.length)} heading={heading} accent={accent} primary={primary} />
-            </div>
-            {(venue.email || venue.phone) && (
+            <CoupleOverview slug={slug} venue={venue} coupleNames={coupleNames} daysToGo={daysToGo} dateLabel={dateLabel} totalDue={totalDue} rooms={rooms} rentals={rentals} state={state} cover={cover} onNavigate={(t) => setTab(t as Tab)} />
+            {weddingDate && (
               <div style={card({ padding: 18 })}>
-                <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: primary, fontWeight: 700 }}>Your venue coordinator</div>
-                <div style={{ ...heading, fontSize: 18, marginTop: 4 }}>{venue.name}</div>
-                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                  {venue.email && <a href={`mailto:${venue.email}`} style={{ ...btn, padding: "8px 16px", fontSize: 13, textDecoration: "none" }}>✉ Email us</a>}
-                  {venue.phone && <a href={`tel:${venue.phone}`} style={{ ...btn, padding: "8px 16px", fontSize: 13, textDecoration: "none" }}>📞 Call</a>}
-                </div>
+                <div style={{ ...heading, fontSize: 17, marginBottom: 10 }}>Save the date</div>
+                <AddToCalendar slug={slug} title={coupleNames || "Our wedding"} location={[venue.name, venue.address || venue.region].filter(Boolean).join(", ")} weddingDate={weddingDate} weddingEndDate={weddingEndDate} primary={primary} accent={accent} />
               </div>
             )}
           </div>
@@ -470,7 +438,18 @@ export function CouplePortal({
               <RoomAllocator
                 slug={slug}
                 rooms={rooms.map((r) => ({ id: r.id, name: r.name, sleeps: r.sleeps, price: r.price, description: r.description, img: r.img, type: r.type }))}
-                onAllocated={(ids) => persist({ ...stateRef.current, roomAssignments: Object.fromEntries(ids.map((id) => [id, ["Allocated"]])) })}
+                onAllocated={(ids) => {
+                  // Merge, don't clobber: keep non-guest markers (e.g. ["Reserved"] set by
+                  // the AI planner / room toggle) for rooms the allocator didn't touch;
+                  // only drop previous guest-derived ["Allocated"] markers that emptied.
+                  const next = { ...(stateRef.current.roomAssignments ?? {}) };
+                  const occupied = new Set(ids);
+                  for (const [roomId, val] of Object.entries(next)) {
+                    if (!occupied.has(roomId) && Array.isArray(val) && val.length === 1 && val[0] === "Allocated") delete next[roomId];
+                  }
+                  ids.forEach((id) => { next[id] = ["Allocated"]; });
+                  persist({ ...stateRef.current, roomAssignments: next });
+                }}
                 primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius}
               />
             )}
@@ -563,15 +542,6 @@ export function CouplePortal({
       </div>
 
       <AiPlanner slug={slug} primary={primary} accent={accent} />
-    </div>
-  );
-}
-
-function Stat({ label, value, heading, accent, primary }: { label: string; value: string; heading: React.CSSProperties; accent: string; primary: string }) {
-  return (
-    <div style={{ background: `${accent}2e`, borderRadius: 14, padding: 16, textAlign: "center" }}>
-      <div style={{ ...heading, fontSize: 26, color: primary }}>{value}</div>
-      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#57534e", marginTop: 2 }}>{label}</div>
     </div>
   );
 }

@@ -1,11 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 
+// Platform default for venues.platform_fee_rate (fraction). Per-venue overrides
+// show in the table below; this is only the headline default.
+const DEFAULT_PLATFORM_FEE_RATE = 0.005;
+
 export default async function OwnerBilling() {
   const supabase = await createClient();
   const { data: venues } = await supabase
     .from("venues")
     .select("id, name, slug, platform_fee_rate, platform_fee_active, created_at")
     .order("created_at");
+
+  const defaultFeePct = +(DEFAULT_PLATFORM_FEE_RATE * 100).toFixed(2);
 
   // Compute fees owed per venue from confirmed wedding selections.
   // For each venue: sum (booked weddings total_budget) × platform_fee_rate.
@@ -51,7 +57,7 @@ export default async function OwnerBilling() {
         <div className="vy-eyebrow">Revenue</div>
         <h1 className="vy-h1 mt-1">Platform fees</h1>
         <p className="text-stone-600 text-sm mt-1">
-          0.5% of wedding spend, billed per booking. No flat subscription.
+          {defaultFeePct}% of wedding spend, billed per booking. No flat subscription.
         </p>
       </header>
 
@@ -59,7 +65,7 @@ export default async function OwnerBilling() {
         <div>
           <div className="vy-eyebrow">Pricing model</div>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className="font-serif text-4xl">0.5%</span>
+            <span className="font-serif text-4xl">{defaultFeePct}%</span>
             <span className="text-stone-500">of wedding spend</span>
           </div>
           <div className="text-xs text-stone-500 mt-1">Per-venue rate adjustable below · no monthly fee</div>

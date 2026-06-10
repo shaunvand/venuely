@@ -93,10 +93,11 @@ export function TimelineBoard({ slug, weddingDate, weddingEndDate, primary, acce
               <span style={{ width: 10, height: 10, borderRadius: "50%", border: `2px solid ${primary}`, background: "#fff" }} />
               {i < dayEntries.length - 1 && <span style={{ width: 2, flex: 1, minHeight: 28, background: "rgba(0,0,0,0.1)", marginTop: 4 }} />}
             </div>
-            <input value={e.start_time ?? ""} onChange={(ev) => patch(e.id, { start_time: ev.target.value })} placeholder="13:00" style={{ ...input, width: 72, fontWeight: 700, color: primary }} />
+            {/* Commit on blur (one PATCH per edit), not per keystroke. */}
+            <input defaultValue={e.start_time ?? ""} onBlur={(ev) => { if (ev.target.value !== (e.start_time ?? "")) patch(e.id, { start_time: ev.target.value }); }} placeholder="13:00" style={{ ...input, width: 72, fontWeight: 700, color: primary }} />
             <div style={{ flex: 1, display: "grid", gap: 4 }}>
-              <input value={e.title} onChange={(ev) => patch(e.id, { title: ev.target.value })} placeholder="What's happening" style={{ ...input, border: "none", padding: "2px 0", ...serif, fontSize: 15, fontWeight: 600 }} />
-              <input value={e.notes ?? ""} onChange={(ev) => patch(e.id, { notes: ev.target.value })} placeholder="Add a detail (optional)" style={{ ...input, border: "none", padding: "2px 0", fontSize: 12.5, color: "#57534e" }} />
+              <input defaultValue={e.title} onBlur={(ev) => { if (ev.target.value !== e.title) patch(e.id, { title: ev.target.value }); }} placeholder="What's happening" style={{ ...input, border: "none", padding: "2px 0", ...serif, fontSize: 15, fontWeight: 600 }} />
+              <input defaultValue={e.notes ?? ""} onBlur={(ev) => { if (ev.target.value !== (e.notes ?? "")) patch(e.id, { notes: ev.target.value }); }} placeholder="Add a detail (optional)" style={{ ...input, border: "none", padding: "2px 0", fontSize: 12.5, color: "#57534e" }} />
             </div>
             <button onClick={() => remove(e.id)} title="Remove" style={{ border: "none", background: "transparent", color: "#c0b9b1", cursor: "pointer", fontSize: 14 }}>✕</button>
           </div>

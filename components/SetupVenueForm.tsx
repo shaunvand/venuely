@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { VenueAddressPicker } from "@/components/VenueAddressPicker";
+import type { SetupVenueState } from "@/app/onboarding/setup-venue/actions";
 
 type SeedItem = { name: string; description: string | null; price_zar: number | null; category: string | null };
 type SeedRoom = { name: string; description: string | null; sleeps: number | null; price_per_night_zar: number | null; room_type: string | null };
@@ -24,13 +26,32 @@ function slugify(s: string) {
   return s.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 }
 
+// Inner submit button so useFormStatus sees the surrounding <form>'s pending state —
+// disables through the server-action round-trip to block double submits.
+function SubmitButton({ slugTaken }: { slugTaken: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending || slugTaken}
+      className="w-full bg-stone-900 text-white rounded py-2.5 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      {pending ? "Creating…" : slugTaken ? "Pick an available URL first" : "Create my venue"}
+    </button>
+  );
+}
+
 export function SetupVenueForm({
   action,
   mapsKey,
 }: {
-  action: (formData: FormData) => void;
+  action: (prevState: SetupVenueState, formData: FormData) => Promise<SetupVenueState>;
   mapsKey: string | null;
 }) {
+  // Expected failures come back as { error } (success redirects server-side), so the
+  // form re-renders with its state intact instead of dumping to an error page.
+  const [actionState, formAction] = useActionState(action, null);
+
   const [url, setUrl] = useState("");
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
@@ -43,8 +64,6 @@ export function SetupVenueForm({
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
-  const [logoUploading, setLogoUploading] = useState(false);
-  const [logoErr, setLogoErr] = useState<string | null>(null);
   const [addressSeed, setAddressSeed] = useState("");
   const [pickerKey, setPickerKey] = useState(0);
   const [slugTaken, setSlugTaken] = useState(false);
@@ -69,33 +88,6 @@ export function SetupVenueForm({
     }, 350);
     return () => clearTimeout(t);
   }, [slug]);
-
-  async function uploadLogo(files: FileList | null) {
-    const f = files?.[0];
-    if (!f) return;
-    setLogoErr(null);
-    setLogoUploading(true);
-    try {
-      // Mirrors YourVenueManager.upload() — posts to the shared gallery uploader and
-      // stores the returned public URL. (At onboarding there's no venue yet, so this can
-      // fail the venue-auth gate; the URL field below stays as a fallback.)
-      const fd = new FormData();
-      fd.append("category", "Other");
-      fd.append("files", f);
-      const res = await fetch("/api/venue/gallery", { method: "POST", body: fd });
-      const j = await res.json();
-      if (!res.ok || !j.ok) {
-        setLogoErr(j.error || "Upload failed — paste a hosted URL below instead.");
-        return;
-      }
-      const uploadedUrl = j.inserted?.[0]?.url;
-      if (uploadedUrl) setLogoUrl(uploadedUrl);
-    } catch (e) {
-      setLogoErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLogoUploading(false);
-    }
-  }
 
   async function runImport() {
     if (!url.trim()) return;
@@ -136,7 +128,7 @@ export function SetupVenueForm({
   }
 
   return (
-    <form action={action} className="w-full max-w-xl space-y-6 py-12">
+    <form action={formAction} className="w-full max-w-xl space-y-6 py-12">
       <div>
         <h1 className="font-serif text-3xl">Set up your venue</h1>
         <p className="text-stone-600 text-sm mt-2">
@@ -223,6 +215,9 @@ export function SetupVenueForm({
 
       <div className="space-y-1">
         <label className="text-sm font-medium">Logo (optional)</label>
+        {/* No file upload here: the gallery uploader needs an existing venue, which
+            onboarding doesn't have yet — a hosted URL (often pre-filled by Import) is
+            the only option pre-venue. */}
         <div className="flex items-center gap-3">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -230,15 +225,10 @@ export function SetupVenueForm({
           ) : (
             <div className="h-12 w-12 shrink-0 rounded border border-dashed border-stone-300 bg-stone-50" aria-hidden />
           )}
-          <label className="px-4 py-2 rounded bg-white border border-stone-300 text-sm font-medium cursor-pointer hover:bg-stone-100">
-            {logoUploading ? "Uploading…" : "Upload logo"}
-            <input type="file" accept="image/*" className="hidden"
-              onChange={(e) => uploadLogo(e.target.files)} />
-          </label>
+          <input name="logo_url" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)}
+            placeholder="Paste a hosted logo URL (https://…/logo.png)" className="flex-1 border rounded px-3 py-2 text-sm" />
         </div>
-        {logoErr && <p className="text-xs text-amber-700">{logoErr}</p>}
-        <input name="logo_url" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)}
-          placeholder="…or paste a hosted logo URL (https://…/logo.png)" className="w-full border rounded px-3 py-2 text-sm" />
+        <p className="text-xs text-stone-500">You can upload a logo after your venue is created.</p>
       </div>
 
       <div className="space-y-1">
@@ -290,18 +280,22 @@ export function SetupVenueForm({
 
       <input type="hidden" name="seed_payload" value={data ? JSON.stringify({ catalogue: data.catalogue ?? [], rentals: data.rentals ?? [], accommodation: data.accommodation ?? [] }) : ""} />
 
-      <button disabled={slugTaken} className="w-full bg-stone-900 text-white rounded py-2.5 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-        {slugTaken ? "Pick an available URL first" : "Create my venue"}
-      </button>
+      {actionState?.error && (
+        <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" aria-live="polite">
+          {actionState.error}
+        </p>
+      )}
+
+      <SubmitButton slugTaken={slugTaken} />
     </form>
   );
 }
 
-// Reusable logo upload control — posts to the shared /api/venue/gallery uploader
-// (same call shape as YourVenueManager.upload()) and writes the returned public URL
-// into a hidden field so it persists through a native server-action form submit.
-// Falls back to a paste-a-URL input (the gallery gate needs an existing venue, which
-// onboarding doesn't have yet). Renders fine inside a server component.
+// Reusable logo upload control (used post-onboarding, e.g. venue settings, where a
+// venue already exists) — posts to the shared /api/venue/gallery uploader (same call
+// shape as YourVenueManager.upload()) and writes the returned public URL into a
+// field so it persists through a native server-action form submit. Falls back to a
+// paste-a-URL input. Renders fine inside a server component.
 export function LogoUploadField({
   fieldName,
   venueId,

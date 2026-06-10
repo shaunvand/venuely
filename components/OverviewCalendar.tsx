@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { statusColor } from "@/lib/wedding/status";
 
 // -----------------------------------------------------------------------------
 // Interactive overview calendar.
@@ -25,17 +26,13 @@ export type CalBooking = {
   status?: string | null;
 };
 
-// Solid pill colours per wedding status (white text). A double-booked day overrides
-// to a strong red regardless of status.
-function pillColor(status: string | null | undefined): string {
-  switch ((status ?? "").toLowerCase()) {
-    case "booked": return "var(--poppy)";        // confirmed
-    case "provisional": case "quoted": return "#C99A2E"; // gold — pencilled in
-    case "inquiry": case "new": case "interest": return "#8a9a86"; // sage — lead
-    case "completed": return "#9aa39b";          // muted — done
-    case "cancelled": case "lost": return "#c4bdb4"; // grey — dead
-    default: return "var(--poppy)";
-  }
+// Pill colours come from lib/wedding/status.ts (the single source of truth for
+// status colours across the app). A double-booked day overrides the pill to a
+// strong red — but only for weddings that actually count toward the clash.
+// Cancelled/lost weddings still render their pill, just never as a clash.
+function isCancelledStatus(status: string | null | undefined): boolean {
+  const s = (status ?? "").toLowerCase();
+  return s === "cancelled" || s === "lost";
 }
 
 export type CalRoom = { id: string; name: string; sleeps: number };
@@ -239,12 +236,19 @@ export function OverviewCalendar({ bookings, rooms, roomOccupancy, weddingHref =
           </div>
         </div>
 
-        {/* legend */}
+        {/* legend — swatches mirror statusColor() in lib/wedding/status.ts */}
         <div className="flex flex-wrap items-center gap-4 text-xs mb-3" style={{ color: "var(--ink-2)" }}>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: "#8a9a86" }} /> Inquiry</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: "#C99A2E" }} /> Provisional</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: "var(--poppy)" }} /> Booked</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: "#9aa39b" }} /> Completed</span>
+          {([
+            ["Inquiry", "inquiry"],
+            ["Provisional", "provisional"],
+            ["Booked", "booked"],
+            ["Completed", "completed"],
+            ["Cancelled", "cancelled"],
+          ] as const).map(([label, status]) => (
+            <span key={status} className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm" style={{ background: statusColor(status).bg, border: "1px solid var(--line)" }} /> {label}
+            </span>
+          ))}
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: "#b91c1c" }} /> Double-booked</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: "var(--peach)" }} /> Selected</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full" style={{ outline: "2px solid var(--sage)", background: "transparent" }} /> Today</span>
@@ -261,7 +265,8 @@ export function OverviewCalendar({ bookings, rooms, roomOccupancy, weddingHref =
             if (!key) return <div key={`e-${i}`} className="min-h-[84px]" />;
             const day = Number(key.slice(8, 10));
             const weds = weddingByDate.get(key) ?? [];
-            const distinct = new Set(weds.map((w) => w.couple_names));
+            // Only non-cancelled weddings count toward a double-booking clash.
+            const distinct = new Set(weds.filter((w) => !isCancelledStatus(w.status)).map((w) => w.couple_names));
             const clash = distinct.size > 1;
             const isToday = key === todayKey;
             const isSelected = selectedDays.has(key);
@@ -288,18 +293,22 @@ export function OverviewCalendar({ bookings, rooms, roomOccupancy, weddingHref =
                   {day}
                 </span>
                 <span className="flex flex-col gap-0.5 overflow-hidden">
-                  {weds.slice(0, 2).map((w, idx) => (
-                    <Link
-                      key={`${w.slug}-${idx}`}
-                      href={`/venue/weddings/${w.slug}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="block truncate rounded px-1 py-0.5 text-[10px] leading-tight font-medium hover:opacity-90"
-                      style={{ background: clash ? "#b91c1c" : pillColor(w.status), color: "#fff" }}
-                      title={`${w.couple_names}${w.status ? ` · ${w.status}` : ""}${w.wedding_end_date ? ` (until ${fmtShort(String(w.wedding_end_date).slice(0, 10))})` : ""}`}
-                    >
-                      {w.couple_names}
-                    </Link>
-                  ))}
+                  {weds.slice(0, 2).map((w, idx) => {
+                    const sc = statusColor(w.status);
+                    const isClashPill = clash && !isCancelledStatus(w.status);
+                    return (
+                      <Link
+                        key={`${w.slug}-${idx}`}
+                        href={`/venue/weddings/${w.slug}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="block truncate rounded px-1 py-0.5 text-[10px] leading-tight font-medium hover:opacity-90"
+                        style={isClashPill ? { background: "#b91c1c", color: "#fff" } : { background: sc.bg, color: sc.text }}
+                        title={`${w.couple_names}${w.status ? ` · ${w.status}` : ""}${w.wedding_end_date ? ` (until ${fmtShort(String(w.wedding_end_date).slice(0, 10))})` : ""}`}
+                      >
+                        {w.couple_names}
+                      </Link>
+                    );
+                  })}
                   {weds.length > 2 && (
                     <Link
                       href={weddingHref}

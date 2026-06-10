@@ -148,6 +148,17 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
   const finishRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Abort plumbing for the parse fetch: a 240s safety timeout stops the bar
+  // hanging at ~98% forever, and the Cancel button aborts the in-flight read.
+  const abortRef = useRef<AbortController | null>(null);
+  const cancelledRef = useRef(false);
+  const PARSE_TIMEOUT_MS = 240_000;
+
+  function cancelParse() {
+    cancelledRef.current = true;
+    abortRef.current?.abort();
+  }
+
   function stopTimers() {
     for (const r of [climbRef, finishRef, msgRef]) {
       if (r.current) { clearInterval(r.current); r.current = null; }
@@ -240,11 +251,17 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
     setBusy(true); setPhase("reading"); setProgress(4); startProgress(totalBytes);
     setStatus({ tone: "info", text: `Reading ${toParse.length} file${toParse.length === 1 ? "" : "s"} — this can take 30-60 seconds for large PDFs.` });
     setMsg(null); setItems([]); setImported(false); setCommitResults(null); setUndo(null);
+    // Abortable fetch: Cancel button aborts immediately; the 240s timeout stops
+    // the bar from hanging at ~98% forever when the server never responds.
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    cancelledRef.current = false;
+    const timeoutId = setTimeout(() => ctrl.abort(), PARSE_TIMEOUT_MS);
     try {
       const fd = new FormData();
       toParse.forEach((f) => fd.append("files", f));
       fd.append("venue_id", venueId);
-      const res = await fetch("/api/venue/uploads/parse", { method: "POST", body: fd });
+      const res = await fetch("/api/venue/uploads/parse", { method: "POST", body: fd, signal: ctrl.signal });
       const j = await res.json();
       if (!res.ok || !j.ok) {
         stopTimers(); setPhase("idle"); setProgress(0);
@@ -280,8 +297,19 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
       setStatus({ tone: "success", text: `Found: ${counts}. Review below and click "Import" to save into your dashboard.` });
     } catch (e) {
       stopTimers(); setPhase("idle"); setProgress(0);
-      setStatus({ tone: "error", text: `Error: ${e instanceof Error ? e.message : String(e)}` });
-    } finally { setBusy(false); }
+      if (cancelledRef.current) {
+        // User pressed Cancel — back to the pick step, no scary error.
+        setStatus({ tone: "info", text: "Reading cancelled. Your files are still selected — press Retry to read them again, or change files." });
+      } else if (e instanceof DOMException && e.name === "AbortError") {
+        setStatus({ tone: "error", text: "Reading timed out after 4 minutes — the server may be busy or the files very large. Press Retry, or try fewer / smaller files." });
+      } else {
+        setStatus({ tone: "error", text: `Reading failed: ${e instanceof Error ? e.message : String(e)}. Check your connection and press Retry.` });
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      abortRef.current = null;
+      setBusy(false);
+    }
   }
 
   function updateItem(id: number, patch: Partial<Item>) {
@@ -469,6 +497,12 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
         >
           <span className="text-lg leading-none flex-shrink-0 mt-0.5">{statusStyles[status.tone].icon}</span>
           <span className="flex-1 leading-relaxed">{status.text}</span>
+          {/* Retry after a failed / cancelled / timed-out read — files are still selected */}
+          {!busy && phase === "idle" && status.tone !== "success" && files.length > 0 && items.length === 0 && (
+            <button type="button" onClick={() => parse()} className={BUBBLE_SECONDARY + " text-xs flex-shrink-0"}>
+              ↻ Retry
+            </button>
+          )}
         </div>
       )}
 
@@ -567,7 +601,18 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                   ? "Setting up your dashboard — please be patient, this is taking longer than normal…"
                   : (phaseMsg || "Reading & detecting your items…")}
               </span>
-              <span className="tabular-nums font-medium">{Math.round(progress)}%</span>
+              <span className="flex items-center gap-2">
+                <span className="tabular-nums font-medium">{Math.round(progress)}%</span>
+                {phase === "reading" && (
+                  <button
+                    type="button"
+                    onClick={cancelParse}
+                    className="rounded-full px-2.5 py-0.5 font-medium bg-white border border-stone-300 text-stone-700 hover:bg-stone-100"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </span>
             </div>
             {lateReading && (
               <div className="flex items-start gap-1.5 text-[11px] font-medium" style={{ color: "#a3210e" }}>

@@ -5,6 +5,7 @@ import {
   type Charge, type Payment,
 } from "@/lib/billing/compute";
 import { sendEmail, depositReminder, balanceReminder } from "@/lib/notifications";
+import { nightsBetween, nightsLabel } from "@/lib/billing/charges";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://venuely.co.za";
 const escH = (v: unknown) => String(v ?? "").replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] || c));
@@ -113,6 +114,8 @@ async function totalsFor(
     guest_count: number | null;
     wedding_state: WeddingState | null;
     area_selections: Array<{ area_id: string; day_type: string }> | null;
+    wedding_date: string | null;
+    wedding_end_date: string | null;
   },
 ) {
   const venueId = wedding.venue_id;
@@ -169,13 +172,14 @@ async function totalsFor(
     charges.push({ kind: "catalogue", label: item.name, qty: units, unit_price: unit, amount: included ? 0 : unit * units, base_amount: included ? 0 : baseUnit * units, is_refundable: false });
   }
 
-  // Accommodation
+  // Accommodation — per night × the wedding's night count (single-day = 1 night).
+  const nights = nightsBetween(wedding.wedding_date, wedding.wedding_end_date);
   for (const [roomId, names] of Object.entries(state.roomAssignments ?? {})) {
     const room = accomMap.get(roomId); if (!room || !names.length) continue;
     const baseUnit = Number(room.price_per_night);
     const unit = applyMarkup(baseUnit, room.commission_value, room.commission_type);
     const included = (room as { cost_treatment?: string }).cost_treatment === "included";
-    charges.push({ kind: "accommodation", label: room.name, qty: 1, unit_price: unit, amount: included ? 0 : unit, base_amount: included ? 0 : baseUnit, is_refundable: false });
+    charges.push({ kind: "accommodation", label: `${room.name} (${nightsLabel(nights)})`, qty: nights, unit_price: unit, amount: included ? 0 : unit * nights, base_amount: included ? 0 : baseUnit * nights, is_refundable: false });
   }
 
   // Vendor partners selected
@@ -245,7 +249,7 @@ async function run(): Promise<RunSummary> {
   // We need the venue name for the email shell. Pull it via a join so we don't
   // round-trip per wedding.
   const baseSelect =
-    "id, venue_id, couple_names, wedding_date, couple_email, guest_count, wedding_state, area_selections, deposit_due_at, balance_due_at, venue:venues(name)";
+    "id, venue_id, couple_names, wedding_date, wedding_end_date, couple_email, guest_count, wedding_state, area_selections, deposit_due_at, balance_due_at, venue:venues(name)";
 
   // --- Deposit reminders: deposit due within 7 days, not yet reminded ----------
   const { data: depositDue } = await supabase
@@ -266,6 +270,8 @@ async function run(): Promise<RunSummary> {
       guest_count: w.guest_count ?? null,
       wedding_state: (w.wedding_state ?? null) as WeddingState | null,
       area_selections: (w.area_selections ?? null) as Array<{ area_id: string; day_type: string }> | null,
+      wedding_date: (w.wedding_date ?? null) as string | null,
+      wedding_end_date: ((w as { wedding_end_date?: string | null }).wedding_end_date ?? null),
     });
     const amount = totals.deposit_amount;
     if (amount <= 0 || !haveResend || !w.couple_email) {
@@ -307,6 +313,8 @@ async function run(): Promise<RunSummary> {
       guest_count: w.guest_count ?? null,
       wedding_state: (w.wedding_state ?? null) as WeddingState | null,
       area_selections: (w.area_selections ?? null) as Array<{ area_id: string; day_type: string }> | null,
+      wedding_date: (w.wedding_date ?? null) as string | null,
+      wedding_end_date: ((w as { wedding_end_date?: string | null }).wedding_end_date ?? null),
     });
     const amount = totals.balance_due;
     if (amount <= 0 || !haveResend || !w.couple_email) {

@@ -91,7 +91,7 @@ export function BudgetBoard({ slug, totalDue, primary, accent, heading, cardRadi
               const settled = Number(l.paid || 0) >= Number(l.actual || l.estimated || 0) && Number(l.actual || l.estimated || 0) > 0;
               return (
                 <div key={l.id} style={{ ...card, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "9px 12px" }}>
-                  <input style={{ ...input, flex: "2 1 150px", border: "none", fontWeight: 600 }} value={l.description ?? ""} onChange={(e) => patch(l.id, { description: e.target.value })} placeholder="Description" />
+                  <input style={{ ...input, flex: "2 1 150px", border: "none", fontWeight: 600 }} defaultValue={l.description ?? ""} onBlur={(e) => { if (e.target.value !== (l.description ?? "")) patch(l.id, { description: e.target.value }); }} placeholder="Description" />
                   <label style={{ fontSize: 10.5, color: "#8a8a8a" }}>Est <input style={{ ...input, width: 90, padding: "5px 7px" }} defaultValue={l.estimated ?? ""} onBlur={(e) => patch(l.id, { estimated: num(e.target.value) })} /></label>
                   <label style={{ fontSize: 10.5, color: "#8a8a8a" }}>Spent <input style={{ ...input, width: 90, padding: "5px 7px" }} defaultValue={l.actual ?? ""} onBlur={(e) => patch(l.id, { actual: num(e.target.value) })} /></label>
                   <label style={{ fontSize: 10.5, color: "#8a8a8a" }}>Paid <input style={{ ...input, width: 90, padding: "5px 7px" }} defaultValue={l.paid ?? ""} onBlur={(e) => patch(l.id, { paid: num(e.target.value) })} /></label>

@@ -6,6 +6,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { INVENTORY_FIELDS, type InventoryType } from "@/lib/inventory/schemas";
 import { extractXlsxImages, extractPdfImages, type ExtractedImage } from "@/lib/imports/extract-images";
 import { searchOneImage, mapWithConcurrency } from "@/lib/imports/image-search";
+import { requireVenueMember } from "@/lib/security/guards";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -271,8 +272,11 @@ export async function POST(req: NextRequest) {
     if (!files.length) return NextResponse.json({ error: "No files" }, { status: 400 });
     if (!venueId) return NextResponse.json({ error: "Missing venue_id" }, { status: 400 });
 
+    const gate = await requireVenueMember(venueId);
+    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: "ANTHROPIC_API_KEY not set" }, { status: 500 });
+    if (!apiKey) return NextResponse.json({ error: "AI not configured (ANTHROPIC_API_KEY)." }, { status: 503 });
     const client = new Anthropic({ apiKey });
 
     const validCategories = new Set(Object.keys(INVENTORY_FIELDS)) as Set<InventoryType>;
