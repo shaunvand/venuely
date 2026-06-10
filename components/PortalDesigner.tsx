@@ -321,19 +321,63 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
   );
 }
 
-// Tiny visual glyph for the template thumbnail (hero bar + tabs + button).
+// Tiny visual glyph for the template thumbnail — hints each template's nav
+// position (sidebar / numbered top tabs / segmented / pills) + hero shape
+// (overlay / framed / split / arch).
 function TemplateGlyph({ tokens, primary, accent }: { tokens: TemplateTokens; primary: string; accent: string }) {
+  const hero = `linear-gradient(120deg, ${primary}, ${accent})`;
+  if (tokens.navStyle === "sidebar") {
+    // Classic — left sidebar + full-bleed overlay hero.
+    return (
+      <div className="rounded-md overflow-hidden" style={{ border: "1px solid var(--line)", background: tokens.surface, height: 58 }}>
+        <div className="flex h-full">
+          <div className="w-[26%] p-1 space-y-1" style={{ background: "#fff", borderRight: "1px solid var(--line)" }}>
+            {[0, 1, 2].map((i) => <div key={i} className="h-1 rounded-full" style={{ background: i === 0 ? primary : "var(--line)" }} />)}
+          </div>
+          <div className="flex-1 p-1 space-y-1 min-w-0">
+            <div className="h-6" style={{ background: hero, borderRadius: 6 }} />
+            <div className="flex gap-1">{[0, 1].map((i) => <div key={i} className="h-2.5 flex-1" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: 4 }} />)}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (tokens.navStyle === "top-tabs") {
+    // Editorial — numbered text tabs over a hairline + framed/matted plate.
+    return (
+      <div className="rounded-md overflow-hidden p-1 space-y-1" style={{ border: "1px solid var(--line)", background: tokens.surface, height: 58 }}>
+        <div className="flex gap-1 pb-0.5" style={{ borderBottom: "1px solid #1c1917" }}>
+          {[0, 1, 2, 3].map((i) => <div key={i} className="h-1 flex-1" style={{ background: i === 0 ? "#1c1917" : "var(--line)" }} />)}
+        </div>
+        <div className="mx-2" style={{ border: "1px solid #1c1917", padding: 2 }}>
+          <div className="h-5" style={{ background: hero }} />
+        </div>
+        <div className="h-1 w-1/2 mx-auto" style={{ background: "var(--line)" }} />
+      </div>
+    );
+  }
+  if (tokens.navStyle === "segmented") {
+    // Modern — joined segmented control + split colour-block hero.
+    return (
+      <div className="rounded-md overflow-hidden p-1 space-y-1" style={{ border: "1px solid var(--line)", background: tokens.surface, height: 58 }}>
+        <div className="flex w-full overflow-hidden" style={{ border: "1px solid #E7E5E4", borderRadius: 4, background: "#fff" }}>
+          {[0, 1, 2, 3].map((i) => <div key={i} className="h-2 flex-1" style={{ background: i === 0 ? primary : "transparent", borderLeft: i === 0 ? "none" : "1px solid #E7E5E4" }} />)}
+        </div>
+        <div className="flex overflow-hidden" style={{ borderRadius: 6, border: "1px solid #E7E5E4", height: 28 }}>
+          <div className="w-2/5" style={{ background: primary }} />
+          <div className="flex-1" style={{ background: hero }} />
+        </div>
+      </div>
+    );
+  }
+  // Romantic — pill tabs + arch-shaped hero + ✦ flourish.
   return (
-    <div className="rounded-md overflow-hidden" style={{ border: "1px solid var(--line)", background: tokens.surface }}>
-      <div className="h-7" style={{ background: `linear-gradient(120deg, ${primary}, ${accent})` }} />
-      <div className="flex gap-1 p-1.5">
-        {[0, 1, 2].map((i) => (
-          <span key={i} className="h-1.5 flex-1" style={{ background: i === 0 ? primary : "var(--line)", borderRadius: tokens.buttonRadius === "999px" ? "999px" : tokens.buttonRadius === "0.25rem" ? "1px" : "3px" }} />
-        ))}
+    <div className="rounded-md overflow-hidden p-1 space-y-1 text-center" style={{ border: "1px solid var(--line)", background: tokens.surface, height: 58 }}>
+      <div className="flex gap-1 justify-center">
+        {[0, 1, 2, 3].map((i) => <div key={i} className="h-2 w-5 rounded-full" style={{ background: i === 0 ? `${accent}88` : "#fff", border: `1px solid ${i === 0 ? primary : "var(--line)"}` }} />)}
       </div>
-      <div className="px-1.5 pb-1.5">
-        <span className="inline-block text-[7px] px-1.5 py-0.5" style={{ background: tokens.buttonStyle === "solid" ? primary : "transparent", color: tokens.buttonStyle === "solid" ? "#fff" : primary, border: tokens.buttonStyle === "outline" ? `1px solid ${primary}` : "none", borderRadius: tokens.buttonRadius, fontFamily: tokens.headingFont }}>Aa</span>
-      </div>
+      <div className="mx-auto w-9" style={{ height: 24, background: hero, borderRadius: "999px 999px 3px 3px" }} />
+      <div className="text-[7px] leading-none" style={{ color: primary }}>✦</div>
     </div>
   );
 }
@@ -351,110 +395,241 @@ function PortalPreview({
   onEditCover?: () => void;
   editLabel?: string;
 }) {
-  // The live couple portal renders in the Venuely brand type system regardless of
-  // template token fonts (Fraunces serif headings, Satoshi body, 16px cards, pill
-  // buttons) — the preview must show exactly that, not a token-driven variant.
-  const headingStyle: React.CSSProperties = { fontFamily: "'Fraunces', Georgia, serif", fontStyle: "normal" };
-  const cardRadius = 16;
-  const btn: React.CSSProperties = { background: primary, color: "#fff", borderRadius: 999 };
+  // The preview is fully token-driven (the templates now genuinely differ): each
+  // template shows its REAL layout in miniature — sidebar vs numbered top tabs vs
+  // segmented vs pills, plus its hero treatment — with the realistic content
+  // blocks (progress strip, stat cards, countdown rail, Next Up, Need help).
+  const t = tokens;
+  const headingStyle: React.CSSProperties = {
+    fontFamily: t.headingFont,
+    fontStyle: t.headingItalic ? "italic" : "normal",
+    ...(t.headingWeight != null ? { fontWeight: t.headingWeight } : {}),
+    ...(t.headingLetterSpacing ? { letterSpacing: t.headingLetterSpacing } : {}),
+  };
+  const cardStyle: React.CSSProperties = {
+    background: t.cardTint ? `linear-gradient(0deg, ${accent}${t.cardTint}, ${accent}${t.cardTint}), ${t.surfaceCard}` : t.surfaceCard,
+    border: t.cardBorder,
+    borderRadius: t.cardRadius,
+    boxShadow: t.cardShadow,
+  };
+  const btn: React.CSSProperties = t.buttonStyle === "solid"
+    ? { background: primary, color: "#fff", borderRadius: t.buttonRadius, border: "none" }
+    : { background: "transparent", color: primary, border: `1px solid ${primary}`, borderRadius: t.buttonRadius, textTransform: t.buttonCase, letterSpacing: t.buttonCase ? "0.08em" : undefined };
 
-  const heroImg = coverUrl
+  const heroImg: React.CSSProperties = coverUrl
     ? { backgroundImage: `url(${coverUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
     : { background: `linear-gradient(120deg, ${primary}, ${accent})` };
 
   // NB: no `title` attr here — the native tooltip doubled up with CoverEditHint.
   const coverProps = onEditCover
-    ? { onClick: onEditCover, role: "button" as const, tabIndex: 0, className: "" }
+    ? { onClick: onEditCover, role: "button" as const, tabIndex: 0 }
     : {};
   const coverEditClass = onEditCover ? "group cursor-pointer" : "";
 
-  // Miniature of the REAL couple portal (sidebar + cover hero + progress strip +
-  // stat cards + right rail) so what the venue previews is what couples get.
   const NAV = ["Overview", "Our Venue", "Guest List", "Accommodation", "Timeline", "Payments"];
   const CHIPS: Array<[string, boolean]> = [["Venue", true], ["Rooms", true], ["Catering", true], ["Guests", false], ["Timeline", false], ["Pay", false]];
 
-  return (
-    <div className="rounded-2xl overflow-hidden shadow-sm" style={{ border: "1px solid var(--line)", background: "#FBF7F2", fontFamily: "'Satoshi', system-ui, sans-serif" }}>
-      <div className="grid" style={{ gridTemplateColumns: "108px 1fr 132px" }}>
-        {/* MINI SIDEBAR — mirrors the portal's left nav */}
-        <div className="p-2.5" style={{ background: "#fff", borderRight: "1px solid var(--line)" }}>
-          <div className="mb-2.5 px-1">
-            {logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt="" className="h-5 max-w-[88px] object-contain" />
-            ) : (
-              <span className="text-[10px] font-semibold leading-tight block" style={{ ...headingStyle, color: "var(--ink)" }}>{venueName}</span>
-            )}
-          </div>
-          <div className="space-y-0.5">
-            {NAV.map((t, i) => (
-              <div key={t} className="text-[9px] px-1.5 py-1 truncate" style={{ borderRadius: 999, background: i === 0 ? `${primary}1a` : "transparent", color: i === 0 ? primary : "var(--ink-2)", fontWeight: i === 0 ? 700 : 500 }}>{t}</div>
-            ))}
-            <div className="text-[9px] px-1.5 pt-1" style={{ color: "var(--ink-2)" }}>+ 12 more…</div>
-          </div>
-        </div>
-
-        {/* MAIN — cover hero, progress strip, stat cards */}
-        <div className="p-2.5 space-y-2.5 min-w-0">
-          <div {...coverProps} className={`relative h-[104px] overflow-hidden ${coverEditClass}`} style={{ ...(heroImg as React.CSSProperties), borderRadius: cardRadius }}>
-            {coverUrl && <div className="absolute inset-0" style={{ background: "linear-gradient(transparent 30%, rgba(0,0,0,0.6))" }} />}
-            <div className="absolute bottom-2 left-2.5 right-2.5">
-              <div className="text-[8px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.9)" }}>Wedding portal</div>
-              <div className="text-[17px] leading-tight text-white" style={{ ...headingStyle, fontStyle: "italic" }}>Adam &amp; Eve</div>
-              <div className="text-[9px]" style={{ color: "rgba(255,255,255,0.92)" }}>{venueName} · 14 Dec 2025 · 112 days to go</div>
-            </div>
+  // ── Mini hero — one of the four real treatments ──
+  let heroMini: React.ReactNode;
+  if (t.heroStyle === "framed") {
+    heroMini = (
+      <div style={{ background: "#fff", border: t.cardBorder, padding: 5 }}>
+        <div style={{ border: t.divider, padding: 3 }}>
+          <div {...coverProps} className={`relative h-[68px] overflow-hidden ${coverEditClass}`} style={heroImg}>
             {onEditCover && <CoverEditHint label={editLabel} />}
           </div>
+        </div>
+        <div className="flex items-end justify-between gap-2 pt-1.5">
+          <div className="min-w-0">
+            <div className="text-[6px] uppercase" style={{ letterSpacing: t.eyebrowTracking, color: "#78716c" }}>The wedding of</div>
+            <div className="text-[11px] leading-tight truncate" style={{ ...headingStyle, textTransform: t.heroNameTransform, color: "var(--ink)" }}>Adam &amp; Eve</div>
+          </div>
+          <div className="text-[6px] uppercase text-right shrink-0" style={{ letterSpacing: "0.14em", color: "var(--ink)" }}>14 Dec 2025<br />112 days</div>
+        </div>
+      </div>
+    );
+  } else if (t.heroStyle === "split") {
+    heroMini = (
+      <div className="grid overflow-hidden" style={{ gridTemplateColumns: "5fr 6fr", borderRadius: t.cardRadius, border: t.cardBorder }}>
+        <div className="p-2 text-white flex flex-col justify-center gap-0.5 min-w-0" style={{ background: primary }}>
+          <div className="text-[6px] uppercase opacity-85 truncate" style={{ letterSpacing: t.eyebrowTracking }}>Wedding portal</div>
+          <div className="text-[12px] leading-tight" style={headingStyle}>Adam &amp; Eve</div>
+          <div className="text-[7px] opacity-95">14 Dec 2025</div>
+          <div className="text-[7px] mt-0.5 px-1.5 py-0.5 self-start" style={{ background: "rgba(255,255,255,0.18)", borderRadius: t.buttonRadius }}>112 days to go</div>
+        </div>
+        <div {...coverProps} className={`relative min-h-[92px] ${coverEditClass}`} style={heroImg}>
+          {onEditCover && <CoverEditHint label={editLabel} />}
+        </div>
+      </div>
+    );
+  } else if (t.heroStyle === "arch") {
+    heroMini = (
+      <div className="text-center">
+        <div {...coverProps} className={`relative h-[84px] w-[70%] mx-auto overflow-hidden ${coverEditClass}`} style={{ ...heroImg, borderRadius: "999px 999px 10px 10px", boxShadow: t.cardShadow }}>
+          {onEditCover && <CoverEditHint label={editLabel} />}
+        </div>
+        <div className="flex items-center justify-center gap-1 mt-1" style={{ color: primary }}>
+          <span style={{ width: 14, borderTop: `1px solid ${primary}66` }} />
+          <span className="text-[7px] leading-none">{t.flourish ?? "✦"}</span>
+          <span style={{ width: 14, borderTop: `1px solid ${primary}66` }} />
+        </div>
+        <div className="text-[12px] leading-tight" style={{ ...headingStyle, color: "var(--ink)" }}>Adam &amp; Eve</div>
+        <div className="text-[7px]" style={{ color: "var(--ink-2)" }}>{venueName} · 14 Dec 2025 · 112 days to go</div>
+      </div>
+    );
+  } else {
+    // Classic overlay — full-bleed cover with names on top.
+    heroMini = (
+      <div {...coverProps} className={`relative h-[104px] overflow-hidden ${coverEditClass}`} style={{ ...heroImg, borderRadius: t.cardRadius }}>
+        {coverUrl && <div className="absolute inset-0" style={{ background: "linear-gradient(transparent 30%, rgba(0,0,0,0.6))" }} />}
+        <div className="absolute bottom-2 left-2.5 right-2.5">
+          <div className="text-[8px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.9)" }}>Wedding portal</div>
+          <div className="text-[17px] leading-tight text-white" style={{ ...headingStyle, fontStyle: "italic" }}>Adam &amp; Eve</div>
+          <div className="text-[9px]" style={{ color: "rgba(255,255,255,0.92)" }}>{venueName} · 14 Dec 2025 · 112 days to go</div>
+        </div>
+        {onEditCover && <CoverEditHint label={editLabel} />}
+      </div>
+    );
+  }
 
-          {/* Wedding Progress strip — exactly like the live overview */}
-          <div className="p-2.5" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: cardRadius }}>
-            <div className="flex items-baseline justify-between">
-              <span className="text-[11px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>Wedding Progress</span>
-              <span className="text-[11px] font-bold" style={{ color: "var(--ink)" }}>52%</span>
+  // ── Shared realistic content blocks (token-styled) ──
+  const progressStrip = (
+    <div className="p-2.5" style={cardStyle}>
+      <div className="flex items-baseline justify-between">
+        <span className="text-[11px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>Wedding Progress</span>
+        <span className="text-[11px] font-bold" style={{ color: "var(--ink)" }}>52%</span>
+      </div>
+      <div className="h-1.5 rounded-full mt-1.5 overflow-hidden" style={{ background: "#efe7e0" }}>
+        <div className="h-full rounded-full" style={{ width: "52%", background: primary }} />
+      </div>
+      <div className="grid grid-cols-6 gap-1 mt-2">
+        {CHIPS.map(([label, done]) => (
+          <div key={label} className="text-center">
+            <div className="w-5 h-5 rounded-full mx-auto flex items-center justify-center text-[7px] font-bold" style={{ background: done ? "#e8f1ea" : "#fbf1e7", color: done ? "#1a7f4b" : "#c07c10" }}>{done ? "✓" : "○"}</div>
+            <div className="text-[7px] mt-0.5 truncate" style={{ color: "var(--ink-2)" }}>{label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+  const statCards = (
+    <div className="grid grid-cols-2 gap-2">
+      {[["Guests", "32 confirmed"], ["Accommodation", "12 / 40 rooms"]].map(([eb, v]) => (
+        <div key={eb} className="p-2" style={cardStyle}>
+          <div className="text-[8px] uppercase" style={{ color: "var(--ink-2)", letterSpacing: t.eyebrowTracking }}>{eb}</div>
+          <div className="text-[11px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>{v}</div>
+        </div>
+      ))}
+    </div>
+  );
+  const rail = (
+    <>
+      <div className="p-2 text-center text-white" style={{ background: "#5F8B6A", borderRadius: t.cardRadius }}>
+        <div className="text-[7px] uppercase tracking-wider opacity-90">Your wedding day</div>
+        <div className="text-xl leading-none my-0.5" style={headingStyle}>112</div>
+        <div className="text-[7px] uppercase tracking-wider opacity-90">days to go</div>
+      </div>
+      <div className="p-2" style={cardStyle}>
+        <div className="text-[9px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>Next Up</div>
+        {["Assign rooms", "Guest list", "Pay invoice"].map((task) => (
+          <div key={task} className="text-[8px] mt-1 px-1.5 py-1 truncate" style={{ border: "1px solid var(--line)", borderRadius: t.navStyle === "sidebar" ? 7 : t.cardRadius, color: "var(--ink-2)" }}>{task} ›</div>
+        ))}
+      </div>
+      <div className="p-2" style={{ background: "#fbf1e7", borderRadius: t.cardRadius }}>
+        <div className="text-[9px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>Need help?</div>
+        <div className="mt-1 text-center text-[8px] font-bold px-1 py-1" style={{ ...btn, ...(t.buttonStyle === "solid" ? {} : { fontWeight: 700 }) }}>Message your venue</div>
+      </div>
+    </>
+  );
+
+  // ── Classic: sidebar layout (the original miniature) ──
+  if (t.navStyle === "sidebar") {
+    return (
+      <div className="rounded-2xl overflow-hidden shadow-sm" style={{ border: "1px solid var(--line)", background: t.mainBg, fontFamily: t.bodyFont }}>
+        <div className="grid" style={{ gridTemplateColumns: "108px 1fr 132px" }}>
+          {/* MINI SIDEBAR — mirrors the portal's left nav */}
+          <div className="p-2.5" style={{ background: "#fff", borderRight: "1px solid var(--line)" }}>
+            <div className="mb-2.5 px-1">
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoUrl} alt="" className="h-5 max-w-[88px] object-contain" />
+              ) : (
+                <span className="text-[10px] font-semibold leading-tight block" style={{ ...headingStyle, color: "var(--ink)" }}>{venueName}</span>
+              )}
             </div>
-            <div className="h-1.5 rounded-full mt-1.5 overflow-hidden" style={{ background: "#efe7e0" }}>
-              <div className="h-full rounded-full" style={{ width: "52%", background: primary }} />
-            </div>
-            <div className="grid grid-cols-6 gap-1 mt-2">
-              {CHIPS.map(([label, done]) => (
-                <div key={label} className="text-center">
-                  <div className="w-5 h-5 rounded-full mx-auto flex items-center justify-center text-[7px] font-bold" style={{ background: done ? "#e8f1ea" : "#fbf1e7", color: done ? "#1a7f4b" : "#c07c10" }}>{done ? "✓" : "○"}</div>
-                  <div className="text-[7px] mt-0.5 truncate" style={{ color: "var(--ink-2)" }}>{label}</div>
-                </div>
+            <div className="space-y-0.5">
+              {NAV.map((nav, i) => (
+                <div key={nav} className="text-[9px] px-1.5 py-1 truncate" style={{ borderRadius: 999, background: i === 0 ? `${primary}1a` : "transparent", color: i === 0 ? primary : "var(--ink-2)", fontWeight: i === 0 ? 700 : 500 }}>{nav}</div>
               ))}
+              <div className="text-[9px] px-1.5 pt-1" style={{ color: "var(--ink-2)" }}>+ 12 more…</div>
             </div>
           </div>
 
-          {/* Stat cards row */}
-          <div className="grid grid-cols-2 gap-2">
-            {[["Guests", "32 confirmed"], ["Accommodation", "12 / 40 rooms"]].map(([eb, v]) => (
-              <div key={eb} className="p-2" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: cardRadius }}>
-                <div className="text-[8px] uppercase tracking-wider" style={{ color: "var(--ink-2)" }}>{eb}</div>
-                <div className="text-[11px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>{v}</div>
-              </div>
+          {/* MAIN — cover hero, progress strip, stat cards */}
+          <div className="p-2.5 space-y-2.5 min-w-0">
+            {heroMini}
+            {progressStrip}
+            {statCards}
+            <button className="text-[10px] px-2.5 py-1 font-medium" style={btn}>Start planning</button>
+          </div>
+
+          {/* MINI RIGHT RAIL — countdown + next up, like the live overview */}
+          <div className="p-2.5 space-y-2" style={{ borderLeft: "1px solid var(--line)" }}>{rail}</div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Editorial / Modern / Romantic: horizontal top-nav layouts ──
+  return (
+    <div className="rounded-2xl overflow-hidden shadow-sm" style={{ border: "1px solid var(--line)", background: t.mainBg, fontFamily: t.bodyFont }}>
+      {/* Mini header: venue logo + couple name */}
+      <div className="flex items-center justify-between px-2.5 pt-2 gap-2">
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} alt="" className="h-4 max-w-[88px] object-contain" />
+        ) : (
+          <span className="text-[9px] font-semibold leading-tight truncate" style={{ ...headingStyle, color: primary }}>{venueName}</span>
+        )}
+        <span className="text-[7px] shrink-0" style={{ color: "var(--ink-2)" }}>Adam &amp; Eve</span>
+      </div>
+
+      {/* Mini top nav — numbered tabs / segmented group / pills */}
+      {t.navStyle === "top-tabs" && (
+        <div className="flex gap-2 px-2.5 pt-1.5 overflow-hidden" style={{ borderBottom: t.divider }}>
+          {NAV.map((nav, i) => (
+            <span key={nav} className="text-[6.5px] uppercase whitespace-nowrap pb-1" style={{ letterSpacing: "0.1em", fontWeight: i === 0 ? 700 : 500, color: i === 0 ? "#1c1917" : "#78716c", boxShadow: i === 0 ? "inset 0 -1.5px 0 #1c1917" : undefined }}>
+              <span style={{ color: i === 0 ? primary : "#a8a29e", marginRight: 2 }}>{String(i + 1).padStart(2, "0")}</span>{nav}
+            </span>
+          ))}
+        </div>
+      )}
+      {t.navStyle === "segmented" && (
+        <div className="px-2.5 pt-1.5">
+          <div className="inline-flex overflow-hidden max-w-full" style={{ border: t.cardBorder, borderRadius: 7, background: "#fff" }}>
+            {NAV.slice(0, 5).map((nav, i) => (
+              <span key={nav} className="text-[6.5px] px-1.5 py-1 whitespace-nowrap" style={{ borderLeft: i === 0 ? "none" : t.divider, background: i === 0 ? primary : "transparent", color: i === 0 ? "#fff" : "var(--ink-2)", fontWeight: i === 0 ? 700 : 500 }}>{nav}</span>
             ))}
           </div>
+        </div>
+      )}
+      {t.navStyle === "pills" && (
+        <div className="flex gap-1 px-2.5 pt-1.5 overflow-hidden">
+          {NAV.map((nav, i) => (
+            <span key={nav} className="text-[6.5px] px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ border: `1px solid ${i === 0 ? `${primary}55` : "rgba(0,0,0,0.10)"}`, background: i === 0 ? `${accent}55` : "rgba(255,255,255,0.65)", color: i === 0 ? primary : "var(--ink-2)", fontWeight: i === 0 ? 700 : 500 }}>{nav}</span>
+          ))}
+        </div>
+      )}
+
+      {/* Mini main + right rail */}
+      <div className="grid gap-2 p-2.5" style={{ gridTemplateColumns: "1fr 124px" }}>
+        <div className="space-y-2 min-w-0">
+          {heroMini}
+          {progressStrip}
+          {statCards}
           <button className="text-[10px] px-2.5 py-1 font-medium" style={btn}>Start planning</button>
         </div>
-
-        {/* MINI RIGHT RAIL — countdown + next up, like the live overview */}
-        <div className="p-2.5 space-y-2" style={{ borderLeft: "1px solid var(--line)" }}>
-          <div className="p-2 text-center text-white" style={{ background: "#5F8B6A", borderRadius: cardRadius }}>
-            <div className="text-[7px] uppercase tracking-wider opacity-90">Your wedding day</div>
-            <div className="text-xl leading-none my-0.5" style={headingStyle}>112</div>
-            <div className="text-[7px] uppercase tracking-wider opacity-90">days to go</div>
-          </div>
-          <div className="p-2" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: cardRadius }}>
-            <div className="text-[9px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>Next Up</div>
-            {["Assign rooms", "Guest list", "Pay invoice"].map((t) => (
-              <div key={t} className="text-[8px] mt-1 px-1.5 py-1 truncate" style={{ border: "1px solid var(--line)", borderRadius: 7, color: "var(--ink-2)" }}>{t} ›</div>
-            ))}
-          </div>
-          <div className="p-2" style={{ background: "#fbf1e7", borderRadius: cardRadius }}>
-            <div className="text-[9px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>Need help?</div>
-            <div className="mt-1 text-center text-[8px] font-bold text-white px-1 py-1 rounded-full" style={{ background: primary }}>Message your venue</div>
-          </div>
-        </div>
+        <div className="space-y-2">{rail}</div>
       </div>
     </div>
   );

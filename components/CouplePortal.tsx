@@ -190,7 +190,13 @@ export function CouplePortal({
   const [, startTransition] = useTransition();
   const primary = theme.primary;
   const accent = theme.accent;
-  const heading: React.CSSProperties = { fontFamily: tokens.headingFont, fontStyle: tokens.headingItalic ? "italic" : "normal" };
+  // Classic omits weight/letter-spacing tokens so headings inherit exactly as before.
+  const heading: React.CSSProperties = {
+    fontFamily: tokens.headingFont,
+    fontStyle: tokens.headingItalic ? "italic" : "normal",
+    ...(tokens.headingWeight != null ? { fontWeight: tokens.headingWeight } : {}),
+    ...(tokens.headingLetterSpacing ? { letterSpacing: tokens.headingLetterSpacing } : {}),
+  };
 
   const catSel = state.catalogueSelections ?? {};
   const rentSel = state.rentalSelections ?? {};
@@ -310,23 +316,51 @@ export function CouplePortal({
     }
   }
 
-  const btn: React.CSSProperties = tokens.buttonStyle === "solid"
+  // ── Template-driven design system ────────────────────────────────────────
+  // Classic = the original portal, untouched: it keeps the desktop sidebar and
+  // all of its original hardcoded styles (the classic token values mirror them
+  // exactly). Editorial / Modern / Romantic depart via a horizontal top nav,
+  // their own hero treatment (rendered inside CoupleOverview) and surfaces.
+  const isClassic = tokens.id === "classic";
+  const topNav = tokens.navStyle !== "sidebar"; // editorial/modern/romantic use a top nav strip on desktop
+  const showAside = isMobile || !topNav;        // mobile always keeps the drawer
+
+  const btnBase: React.CSSProperties = tokens.buttonStyle === "solid"
     ? { background: primary, color: "#fff", borderRadius: tokens.buttonRadius }
     : { background: "transparent", color: primary, border: `1.5px solid ${primary}`, borderRadius: tokens.buttonRadius };
+  const btn: React.CSSProperties = tokens.buttonCase === "uppercase"
+    ? { ...btnBase, textTransform: "uppercase", letterSpacing: "0.1em", fontSize: 12.5 }
+    : btnBase;
 
-  const card = (extra?: React.CSSProperties): React.CSSProperties => ({ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: tokens.cardRadius, ...extra });
+  // Romantic layers a soft accent tint over its near-white cards; others are flat.
+  const cardBg = tokens.cardTint
+    ? `linear-gradient(0deg, ${accent}${tokens.cardTint}, ${accent}${tokens.cardTint}), ${tokens.surfaceCard}`
+    : tokens.surfaceCard;
+  const card = (extra?: React.CSSProperties): React.CSSProperties => ({ background: cardBg, border: tokens.cardBorder, borderRadius: tokens.cardRadius, boxShadow: tokens.cardShadow, ...extra });
 
-  const heroImg: React.CSSProperties = cover
-    ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.45),rgba(0,0,0,0.45)),url('${cover}')`, backgroundSize: "cover", backgroundPosition: "center" }
-    : { background: `linear-gradient(135deg, ${primary}, ${accent})` };
+  const eyebrow: React.CSSProperties = { fontSize: 11, textTransform: "uppercase", letterSpacing: tokens.eyebrowTracking, fontWeight: 700 };
+
+  // Filter chips / folder toggles — tint (classic, romantic), outline (editorial) or solid (modern).
+  const chip = (on: boolean): React.CSSProperties => {
+    const base: React.CSSProperties = { borderRadius: tokens.chipRadius, cursor: "pointer", fontWeight: on ? 700 : 500 };
+    if (tokens.chipStyle === "outline") return { ...base, border: `1px solid ${on ? "#1c1917" : "rgba(0,0,0,0.35)"}`, background: on ? "#1c1917" : "#fff", color: on ? "#fff" : "#44403c", textTransform: "uppercase", letterSpacing: "0.07em" };
+    if (tokens.chipStyle === "solid") return { ...base, border: `1px solid ${on ? primary : "rgba(0,0,0,0.12)"}`, background: on ? primary : "#fff", color: on ? "#fff" : "#57534e" };
+    return { ...base, border: `1px solid ${on ? primary : "rgba(0,0,0,0.15)"}`, background: on ? `${primary}1f` : "#fff", color: on ? primary : "#57534e" };
+  };
+  // Classic keeps its two original (slightly different) chip treatments exactly.
+  const folderChip = (on: boolean): React.CSSProperties => isClassic ? { ...chip(on), borderRadius: tokens.cardRadius } : chip(on);
+  const filterChip = (on: boolean): React.CSSProperties => isClassic
+    ? { borderRadius: 999, cursor: "pointer", border: `1px solid ${on ? primary : "rgba(0,0,0,0.15)"}`, background: on ? primary : "#fff", color: on ? "#fff" : "#57534e", fontWeight: on ? 700 : 500 }
+    : chip(on);
 
   const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 14 };
-  const itemProps = { primary, accent, heading, cardRadius: tokens.cardRadius };
+  const itemProps = { primary, accent, heading, cardRadius: tokens.cardRadius, cardBorder: tokens.cardBorder };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "var(--cream, #FBF7F2)", fontFamily: tokens.bodyFont, color: "var(--ink, #1c1917)" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: tokens.surface, fontFamily: tokens.bodyFont, color: "var(--ink, #1c1917)" }}>
       {isMobile && navOpen && <div onClick={() => setNavOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 55 }} />}
-      {/* SIDEBAR — mirrors the venue dashboard (drawer on mobile) */}
+      {/* SIDEBAR — classic keeps it on desktop; every template uses it as the mobile drawer */}
+      {showAside && (
       <aside style={isMobile
         ? { width: 256, background: "#fffdfb", borderRight: "1px solid var(--line, #ece7e1)", display: "flex", flexDirection: "column", padding: "20px 14px", position: "fixed", top: 0, left: 0, height: "100vh", overflowY: "auto", zIndex: 60, transform: navOpen ? "translateX(0)" : "translateX(-100%)", transition: "transform 0.2s ease", boxShadow: navOpen ? "4px 0 24px rgba(0,0,0,0.18)" : "none" }
         : { width: 248, flexShrink: 0, background: "#fffdfb", borderRight: "1px solid var(--line, #ece7e1)", display: "flex", flexDirection: "column", padding: "20px 14px", position: "sticky", top: 0, height: "100vh", overflowY: "auto" }}>
@@ -354,13 +388,18 @@ export function CouplePortal({
           {venue.email && <a href={`mailto:${venue.email}`} style={{ display: "block", textAlign: "center", border: "1px solid var(--poppy,#FA523C)", color: "var(--poppy,#FA523C)", borderRadius: 999, padding: "6px", fontSize: 12.5, fontWeight: 600, textDecoration: "none" }}>Message Venue</a>}
         </div>
       </aside>
+      )}
 
-      {/* MAIN COLUMN — soft peach→cream fade across the top */}
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: "linear-gradient(180deg, #FCE7DA 0%, var(--cream, #FBF7F2) 300px)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 16px", background: "transparent", position: "sticky", top: 0, zIndex: 10, backdropFilter: "blur(6px)" }}>
-          {isMobile ? <button onClick={() => setNavOpen(true)} aria-label="Menu" style={{ border: "none", background: "transparent", fontSize: 22, cursor: "pointer", lineHeight: 1 }}>☰</button> : <span />}
-          <span style={{ fontSize: 13, color: "#78716c", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, textAlign: isMobile ? "center" : "right" }}>{venue.name} · {dateLabel}</span>
-          {!isMobile && <span style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>{coupleNames}</span>}
+      {/* MAIN COLUMN — surface from the template (classic: soft peach→cream fade) */}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: tokens.mainBg }}>
+        <div style={{ position: "sticky", top: 0, zIndex: 10, backdropFilter: "blur(6px)", background: topNav && !isMobile ? `${tokens.surface}E6` : "transparent", borderBottom: topNav && !isMobile && tokens.navStyle !== "top-tabs" ? tokens.divider : "none" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 16px" }}>
+            {isMobile ? <button onClick={() => setNavOpen(true)} aria-label="Menu" style={{ border: "none", background: "transparent", fontSize: 22, cursor: "pointer", lineHeight: 1 }}>☰</button>
+              : topNav ? <PortalLogo logoUrl={logoUrl} venueName={venue.name} heading={{ ...heading, color: primary }} light={false} /> : <span />}
+            <span style={{ fontSize: 13, color: "#78716c", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, textAlign: isMobile ? "center" : "right" }}>{venue.name} · {dateLabel}</span>
+            {!isMobile && <span style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>{coupleNames}</span>}
+          </div>
+          {topNav && !isMobile && <TopNavBar tokens={tokens} primary={primary} accent={accent} tab={tab} onTab={setTab} />}
         </div>
 
         {/* BODY */}
@@ -373,6 +412,7 @@ export function CouplePortal({
               rooms={rooms} rentals={rentals} state={state} cover={cover} onNavigate={(t) => setTab(t as Tab)}
               weddingDate={weddingDate} weddingEndDate={weddingEndDate}
               selectedAreas={areas.filter((a) => initialAreaSelections.some((s) => s.area_id === a.id)).map((a) => ({ name: a.name, kind: a.kind }))}
+              tokens={tokens} themePrimary={primary} themeAccent={accent}
             />
             {weddingDate && (
               <div style={card({ padding: 18 })}>
@@ -384,9 +424,9 @@ export function CouplePortal({
         )}
 
         {tab === "Our Venue" && (
-          <Section heading={heading} title="Our Venue" sub={venue.address || venue.region || ""}>
+          <Section heading={heading} tokens={tokens} primary={primary} title="Our Venue" sub={venue.address || venue.region || ""}>
             {venue.description && <p style={{ color: "#57534e", maxWidth: 720, marginBottom: 16 }}>{venue.description}</p>}
-            {gallery.length === 0 ? <Empty>No photos yet.</Empty> : groupBy(gallery, (g) => g.category || "The venue").map(([label, items]) => (
+            {gallery.length === 0 ? <Empty radius={isClassic ? undefined : tokens.cardRadius}>No photos yet.</Empty> : groupBy(gallery, (g) => g.category || "The venue").map(([label, items]) => (
               <div key={label} style={{ marginBottom: 22 }}>
                 <div style={{ ...heading, fontSize: 16, marginBottom: 10 }}>{label}</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 10 }}>
@@ -414,17 +454,17 @@ export function CouplePortal({
             (rentFolder === "all" || (rentFolder === "included") === m.item.included) &&
             (rentFilter === "All" || keyOf(m.item) === rentFilter));
           return (
-            <Section heading={heading} title="Catalogue & Rentals" sub="Everything included with your booking, plus optional extras to add">
+            <Section heading={heading} tokens={tokens} primary={primary} title="Catalogue & Rentals" sub="Everything included with your booking, plus optional extras to add">
               <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
                 {([["all", "All"], ["included", "📁 Included with booking"], ["extra", "📁 To pay for"]] as const).map(([k, label]) => {
                   const on = rentFolder === k;
-                  return <button key={k} onClick={() => setRentFolder(k)} style={{ fontSize: 12.5, padding: "7px 14px", borderRadius: tokens.cardRadius, cursor: "pointer", border: `1px solid ${on ? primary : "rgba(0,0,0,0.15)"}`, background: on ? `${primary}1f` : "#fff", color: on ? primary : "#57534e", fontWeight: on ? 700 : 500 }}>{label}</button>;
+                  return <button key={k} onClick={() => setRentFolder(k)} style={{ fontSize: 12.5, padding: "7px 14px", ...folderChip(on) }}>{label}</button>;
                 })}
               </div>
-              <FilterChips primary={primary} value={rentFilter} onChange={setRentFilter} options={cats} />
-              {shown.length === 0 ? <Empty>Nothing in this folder.</Empty> : groupBy(shown, (m) => keyOf(m.item)).map(([catName, items]) => (
+              <FilterChips chip={filterChip} value={rentFilter} onChange={setRentFilter} options={cats} />
+              {shown.length === 0 ? <Empty radius={isClassic ? undefined : tokens.cardRadius}>Nothing in this folder.</Empty> : groupBy(shown, (m) => keyOf(m.item)).map(([catName, items]) => (
                 <div key={catName} style={{ marginBottom: 22 }}>
-                  <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: primary, fontWeight: 700, marginBottom: 8 }}>{catName}</div>
+                  <div style={{ ...eyebrow, color: primary, marginBottom: 8 }}>{catName}</div>
                   <div style={grid}>{items.map((m) => m.kind === "cat" ? (
                     <PortalItemCard key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} badge={m.item.included ? "Included" : undefined} selected={catIsSelected(m.item)} onToggle={() => toggleCat(m.item)} days={catSel[m.item.id]} onDay={(d) => toggleCatDay(m.item, d)} {...itemProps} />
                   ) : (
@@ -439,7 +479,7 @@ export function CouplePortal({
         {tab === "Accommodation" && (
           <div style={{ display: "grid", gap: 26 }}>
             <GuestManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} rooms={rooms.map((r) => ({ id: r.id, name: r.name }))} />
-            {rooms.length === 0 ? <Section heading={heading} title="Accommodation" sub="On-site stays for you and your guests"><Empty>No accommodation listed by your venue yet.</Empty></Section> : (
+            {rooms.length === 0 ? <Section heading={heading} tokens={tokens} primary={primary} title="Accommodation" sub="On-site stays for you and your guests"><Empty radius={isClassic ? undefined : tokens.cardRadius}>No accommodation listed by your venue yet.</Empty></Section> : (
               <RoomAllocator
                 slug={slug}
                 rooms={rooms.map((r) => ({ id: r.id, name: r.name, sleeps: r.sleeps, price: r.price, description: r.description, img: r.img, type: r.type }))}
@@ -477,7 +517,7 @@ export function CouplePortal({
         {tab === "Invites" && (
           <div style={{ display: "grid", gap: 28 }}>
             <GuestInvites slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
-            <div style={{ borderTop: "1px solid var(--line,#ece7e1)", paddingTop: 20 }}>
+            <div style={{ borderTop: tokens.divider, paddingTop: 20 }}>
               <RemindersManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
             </div>
           </div>
@@ -518,7 +558,7 @@ export function CouplePortal({
         {tab === "Payments" && (
           <div style={{ display: "grid", gap: 28 }}>
             <PaymentsManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
-            <div style={{ borderTop: "1px solid var(--line,#ece7e1)", paddingTop: 20 }}>
+            <div style={{ borderTop: tokens.divider, paddingTop: 20 }}>
               <DocumentManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
             </div>
           </div>
@@ -526,11 +566,11 @@ export function CouplePortal({
         </div>
       </main>
 
-      {/* Running total + submit */}
-      <div style={{ position: "sticky", bottom: 0, zIndex: 20, background: "#fff", borderTop: "1px solid rgba(0,0,0,0.1)", boxShadow: "0 -4px 16px rgba(0,0,0,0.06)" }}>
+      {/* Running total + submit — non-classic picks up the template's surface + rule */}
+      <div style={{ position: "sticky", bottom: 0, zIndex: 20, background: isClassic ? "#fff" : tokens.surfaceCard, borderTop: isClassic ? "1px solid rgba(0,0,0,0.1)" : tokens.divider, boxShadow: tokens.id === "editorial" ? "none" : "0 -4px 16px rgba(0,0,0,0.06)" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div>
-            <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#57534e" }}>Estimated total{busy ? " · updating…" : ""}</div>
+            <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: tokens.eyebrowTracking, color: "#57534e" }}>Estimated total{busy ? " · updating…" : ""}</div>
             <div style={{ ...heading, fontSize: 24, color: primary }}>{rZA(totalDue)}</div>
             <div style={{ fontSize: 11, color: "#8a8a8a" }}>{selectedCount} item{selectedCount === 1 ? "" : "s"} selected · final quote confirmed by {venue.name}</div>
           </div>
@@ -551,34 +591,82 @@ export function CouplePortal({
   );
 }
 
-function Section({ title, sub, heading, children }: { title: string; sub?: string; heading: React.CSSProperties; children: React.ReactNode }) {
-  return (
-    <div>
-      <div style={{ marginBottom: 16 }}>
-        <h2 style={{ ...heading, fontSize: 26, margin: 0 }}>{title}</h2>
-        {sub && <div style={{ color: "#57534e", fontSize: 13, marginTop: 2 }}>{sub}</div>}
+// Top nav strip for the non-sidebar templates (desktop only — mobile uses the drawer).
+// Same items + behaviour as the sidebar, different clothes per template.
+function TopNavBar({ tokens, primary, accent, tab, onTab }: { tokens: TemplateTokens; primary: string; accent: string; tab: Tab; onTab: (t: Tab) => void }) {
+  if (tokens.navStyle === "segmented") {
+    // Modern — one joined pill-group control, horizontally scrollable.
+    return (
+      <div style={{ padding: "0 16px 12px", overflowX: "auto" }}>
+        <div style={{ display: "inline-flex", border: tokens.cardBorder, borderRadius: "0.75rem", overflow: "hidden", background: "#fff" }}>
+          {COUPLE_NAV.map(({ key, label }, i) => {
+            const active = key === tab;
+            return (
+              <button key={key} onClick={() => onTab(key)} style={{ border: "none", borderLeft: i === 0 ? "none" : tokens.divider, padding: "8px 13px", fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer", fontWeight: active ? 700 : 500, background: active ? primary : "transparent", color: active ? "#fff" : "#57534e" }}>{label}</button>
+            );
+          })}
+        </div>
       </div>
-      {children}
-    </div>
-  );
-}
-
-function FilterChips({ options, value, onChange, primary }: { options: string[]; value: string; onChange: (v: string) => void; primary: string }) {
-  if (options.length <= 2) return null;
+    );
+  }
+  if (tokens.navStyle === "pills") {
+    // Romantic — soft pill tabs, accent tint when active.
+    return (
+      <div style={{ display: "flex", gap: 6, padding: "0 16px 12px", overflowX: "auto" }}>
+        {COUPLE_NAV.map(({ key, label }) => {
+          const active = key === tab;
+          return (
+            <button key={key} onClick={() => onTab(key)} style={{ borderRadius: 999, padding: "7px 14px", fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer", fontWeight: active ? 700 : 500, border: `1px solid ${active ? `${primary}55` : "rgba(0,0,0,0.10)"}`, background: active ? `${accent}55` : "rgba(255,255,255,0.65)", color: active ? primary : "#57534e" }}>{label}</button>
+          );
+        })}
+      </div>
+    );
+  }
+  // Editorial — numbered uppercase text tabs over a hairline ink rule.
   return (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
-      {options.map((o) => {
-        const on = o === value;
+    <div style={{ display: "flex", gap: 22, padding: "0 16px", overflowX: "auto", borderBottom: tokens.divider }}>
+      {COUPLE_NAV.map(({ key, label }, i) => {
+        const active = key === tab;
         return (
-          <button key={o} onClick={() => onChange(o)} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 999, cursor: "pointer", border: `1px solid ${on ? primary : "rgba(0,0,0,0.15)"}`, background: on ? primary : "#fff", color: on ? "#fff" : "#57534e", fontWeight: on ? 700 : 500 }}>{o}</button>
+          <button key={key} onClick={() => onTab(key)} style={{ border: "none", background: "transparent", cursor: "pointer", padding: "4px 0 10px", whiteSpace: "nowrap", fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: active ? 700 : 500, color: active ? "#1c1917" : "#78716c", boxShadow: active ? "inset 0 -2px 0 #1c1917" : "none" }}>
+            <span style={{ fontSize: 9.5, marginRight: 5, color: active ? primary : "#a8a29e" }}>{String(i + 1).padStart(2, "0")}</span>{label}
+          </button>
         );
       })}
     </div>
   );
 }
 
-function Empty({ children }: { children: React.ReactNode }) {
-  return <div style={{ padding: 24, textAlign: "center", color: "#8a8a8a", border: "1px dashed rgba(0,0,0,0.12)", borderRadius: 12 }}>{children}</div>;
+function Section({ title, sub, heading, tokens, primary, children }: { title: string; sub?: string; heading: React.CSSProperties; tokens: TemplateTokens; primary: string; children: React.ReactNode }) {
+  const editorial = tokens.id === "editorial";
+  return (
+    <div>
+      <div style={{ marginBottom: 16, paddingBottom: editorial ? 12 : 0, borderBottom: editorial ? tokens.divider : "none" }}>
+        {editorial && <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: tokens.eyebrowTracking, color: "#78716c", fontWeight: 700, marginBottom: 5 }}>{sub || "Your wedding"}</div>}
+        <h2 style={{ ...heading, fontSize: 26, margin: 0 }}>
+          {tokens.flourish && <span style={{ color: primary, fontSize: 15, marginRight: 9, verticalAlign: "middle" }}>{tokens.flourish}</span>}
+          {title}
+        </h2>
+        {!editorial && sub && <div style={{ color: "#57534e", fontSize: 13, marginTop: 2 }}>{sub}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function FilterChips({ options, value, onChange, chip }: { options: string[]; value: string; onChange: (v: string) => void; chip: (on: boolean) => React.CSSProperties }) {
+  if (options.length <= 2) return null;
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+      {options.map((o) => (
+        <button key={o} onClick={() => onChange(o)} style={{ fontSize: 12, padding: "5px 12px", ...chip(o === value) }}>{o}</button>
+      ))}
+    </div>
+  );
+}
+
+function Empty({ children, radius }: { children: React.ReactNode; radius?: string }) {
+  return <div style={{ padding: 24, textAlign: "center", color: "#8a8a8a", border: "1px dashed rgba(0,0,0,0.12)", borderRadius: radius ?? 12 }}>{children}</div>;
 }
 
 function PortalLogo({ logoUrl, venueName, heading, light }: { logoUrl: string | null; venueName: string; heading: React.CSSProperties; light: boolean }) {
@@ -589,15 +677,15 @@ function PortalLogo({ logoUrl, venueName, heading, light }: { logoUrl: string | 
   return <span style={{ ...heading, color: light ? "#fff" : "var(--ink)", fontWeight: 700 }}>{venueName}</span>;
 }
 
-function PortalItemCard({ name, description, img, price, badge, selected, onToggle, days, onDay, qty, onQty, primary, accent, heading, cardRadius }: {
+function PortalItemCard({ name, description, img, price, badge, selected, onToggle, days, onDay, qty, onQty, primary, accent, heading, cardRadius, cardBorder }: {
   name: string; description: string; img: string | null; price?: number; badge?: string;
   selected?: boolean; onToggle?: () => void;
   days?: DaySel; onDay?: (d: "mg" | "wed" | "fb") => void;
   qty?: number; onQty?: (n: number) => void;
-  primary: string; accent: string; heading: React.CSSProperties; cardRadius: string;
+  primary: string; accent: string; heading: React.CSSProperties; cardRadius: string; cardBorder?: string;
 }) {
   return (
-    <div className="hover-lift" style={{ background: "#fff", border: selected ? `2px solid ${primary}` : "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+    <div className="hover-lift" style={{ background: "#fff", border: selected ? `2px solid ${primary}` : (cardBorder ?? "1px solid rgba(0,0,0,0.08)"), borderRadius: cardRadius, overflow: "hidden", display: "flex", flexDirection: "column" }}>
       {img ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={img} alt="" style={{ width: "100%", height: 120, objectFit: "cover" }} />
