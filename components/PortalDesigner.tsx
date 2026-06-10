@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRef, useState, useTransition } from "react";
 import {
@@ -371,11 +371,12 @@ function PortalPreview({
   onEditCover?: () => void;
   editLabel?: string;
 }) {
-  const headingStyle: React.CSSProperties = { fontFamily: tokens.headingFont, fontStyle: tokens.headingItalic ? "italic" : "normal" };
-  const btn: React.CSSProperties =
-    tokens.buttonStyle === "solid"
-      ? { background: primary, color: "#fff", borderRadius: tokens.buttonRadius }
-      : { background: "transparent", color: primary, border: `1.5px solid ${primary}`, borderRadius: tokens.buttonRadius };
+  // The live couple portal renders in the Venuely brand type system regardless of
+  // template token fonts (Fraunces serif headings, Satoshi body, 16px cards, pill
+  // buttons) — the preview must show exactly that, not a token-driven variant.
+  const headingStyle: React.CSSProperties = { fontFamily: "'Fraunces', Georgia, serif", fontStyle: "normal" };
+  const cardRadius = 16;
+  const btn: React.CSSProperties = { background: primary, color: "#fff", borderRadius: 999 };
 
   const heroImg = coverUrl
     ? { backgroundImage: `url(${coverUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
@@ -393,7 +394,7 @@ function PortalPreview({
   const CHIPS: Array<[string, boolean]> = [["Venue", true], ["Rooms", true], ["Catering", true], ["Guests", false], ["Timeline", false], ["Pay", false]];
 
   return (
-    <div className="rounded-2xl overflow-hidden shadow-sm" style={{ border: "1px solid var(--line)", background: "#FBF7F2", fontFamily: tokens.bodyFont }}>
+    <div className="rounded-2xl overflow-hidden shadow-sm" style={{ border: "1px solid var(--line)", background: "#FBF7F2", fontFamily: "'Satoshi', system-ui, sans-serif" }}>
       <div className="grid" style={{ gridTemplateColumns: "108px 1fr 132px" }}>
         {/* MINI SIDEBAR — mirrors the portal's left nav */}
         <div className="p-2.5" style={{ background: "#fff", borderRight: "1px solid var(--line)" }}>
@@ -407,7 +408,7 @@ function PortalPreview({
           </div>
           <div className="space-y-0.5">
             {NAV.map((t, i) => (
-              <div key={t} className="text-[9px] px-1.5 py-1 truncate" style={{ borderRadius: tokens.buttonRadius === "999px" ? 999 : 6, background: i === 0 ? `${primary}1a` : "transparent", color: i === 0 ? primary : "var(--ink-2)", fontWeight: i === 0 ? 700 : 500 }}>{t}</div>
+              <div key={t} className="text-[9px] px-1.5 py-1 truncate" style={{ borderRadius: 999, background: i === 0 ? `${primary}1a` : "transparent", color: i === 0 ? primary : "var(--ink-2)", fontWeight: i === 0 ? 700 : 500 }}>{t}</div>
             ))}
             <div className="text-[9px] px-1.5 pt-1" style={{ color: "var(--ink-2)" }}>+ 12 more…</div>
           </div>
@@ -415,7 +416,7 @@ function PortalPreview({
 
         {/* MAIN — cover hero, progress strip, stat cards */}
         <div className="p-2.5 space-y-2.5 min-w-0">
-          <div {...coverProps} className={`relative h-[104px] overflow-hidden ${coverEditClass}`} style={{ ...(heroImg as React.CSSProperties), borderRadius: tokens.cardRadius }}>
+          <div {...coverProps} className={`relative h-[104px] overflow-hidden ${coverEditClass}`} style={{ ...(heroImg as React.CSSProperties), borderRadius: cardRadius }}>
             {coverUrl && <div className="absolute inset-0" style={{ background: "linear-gradient(transparent 30%, rgba(0,0,0,0.6))" }} />}
             <div className="absolute bottom-2 left-2.5 right-2.5">
               <div className="text-[8px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.9)" }}>Wedding portal</div>
@@ -426,7 +427,7 @@ function PortalPreview({
           </div>
 
           {/* Wedding Progress strip — exactly like the live overview */}
-          <div className="p-2.5" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: tokens.cardRadius }}>
+          <div className="p-2.5" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: cardRadius }}>
             <div className="flex items-baseline justify-between">
               <span className="text-[11px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>Wedding Progress</span>
               <span className="text-[11px] font-bold" style={{ color: "var(--ink)" }}>52%</span>
@@ -447,7 +448,7 @@ function PortalPreview({
           {/* Stat cards row */}
           <div className="grid grid-cols-2 gap-2">
             {[["Guests", "32 confirmed"], ["Accommodation", "12 / 40 rooms"]].map(([eb, v]) => (
-              <div key={eb} className="p-2" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: tokens.cardRadius }}>
+              <div key={eb} className="p-2" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: cardRadius }}>
                 <div className="text-[8px] uppercase tracking-wider" style={{ color: "var(--ink-2)" }}>{eb}</div>
                 <div className="text-[11px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>{v}</div>
               </div>
@@ -458,18 +459,18 @@ function PortalPreview({
 
         {/* MINI RIGHT RAIL — countdown + next up, like the live overview */}
         <div className="p-2.5 space-y-2" style={{ borderLeft: "1px solid var(--line)" }}>
-          <div className="p-2 text-center text-white" style={{ background: "#5F8B6A", borderRadius: tokens.cardRadius }}>
+          <div className="p-2 text-center text-white" style={{ background: "#5F8B6A", borderRadius: cardRadius }}>
             <div className="text-[7px] uppercase tracking-wider opacity-90">Your wedding day</div>
             <div className="text-xl leading-none my-0.5" style={headingStyle}>112</div>
             <div className="text-[7px] uppercase tracking-wider opacity-90">days to go</div>
           </div>
-          <div className="p-2" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: tokens.cardRadius }}>
+          <div className="p-2" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: cardRadius }}>
             <div className="text-[9px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>Next Up</div>
             {["Assign rooms", "Guest list", "Pay invoice"].map((t) => (
               <div key={t} className="text-[8px] mt-1 px-1.5 py-1 truncate" style={{ border: "1px solid var(--line)", borderRadius: 7, color: "var(--ink-2)" }}>{t} ›</div>
             ))}
           </div>
-          <div className="p-2" style={{ background: "#fbf1e7", borderRadius: tokens.cardRadius }}>
+          <div className="p-2" style={{ background: "#fbf1e7", borderRadius: cardRadius }}>
             <div className="text-[9px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>Need help?</div>
             <div className="mt-1 text-center text-[8px] font-bold text-white px-1 py-1 rounded-full" style={{ background: primary }}>Message your venue</div>
           </div>
