@@ -5,6 +5,7 @@ import { createWedding, setPortalPassword, markCouplePaid, deleteWedding } from 
 import { WeddingRowActions } from "@/components/WeddingRowActions";
 import { WeddingsTable, type WeddingRow } from "@/components/WeddingsTable";
 import { SaveButton } from "@/components/SaveButton";
+import { computeWeddingsProgress } from "@/lib/venue/progress";
 
 export default async function VenueWeddings({
   searchParams,
@@ -23,9 +24,16 @@ export default async function VenueWeddings({
 
   const { data: weddings } = await supabase
     .from("weddings")
-    .select("id, slug, couple_names, wedding_date, wedding_end_date, guest_count, status, portal_password_hash, invoiced_at, couple_paid_at")
+    .select("id, slug, couple_names, wedding_date, wedding_end_date, guest_count, status, portal_password_hash, invoiced_at, couple_paid_at, area_selections")
     .eq("venue_id", venue.id)
     .order("wedding_date", { ascending: false });
+
+  // Planning progress + health per wedding (guests, rooms, timeline, selections,
+  // checklist, payments — see lib/venue/progress.ts).
+  const progressMap = await computeWeddingsProgress(
+    supabase,
+    (weddings ?? []).map((w) => ({ id: w.id as string, area_selections: w.area_selections })),
+  );
 
   const rows: WeddingRow[] = (weddings ?? []).map((w) => ({
     id: w.id as string,
@@ -34,6 +42,9 @@ export default async function VenueWeddings({
     endDate: (w.wedding_end_date as string | null) ?? null,
     guests: w.guest_count == null ? null : Number(w.guest_count),
     status: String(w.status ?? "inquiry"),
+    progressPct: progressMap.get(w.id as string)?.pct ?? 0,
+    health: progressMap.get(w.id as string)?.health ?? "risk",
+    missing: progressMap.get(w.id as string)?.missing ?? [],
     portalShort: `${host}/${w.slug}`,
     portalFull: `${base}/${w.slug}`,
     actions: (

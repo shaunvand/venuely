@@ -136,6 +136,7 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
     supabase.from("catalogue_items").select("category").eq("venue_id", venue.id),
     supabase.from("rental_items").select("category").eq("venue_id", venue.id),
   ]);
+  const { data: enquiryRows } = await supabase.from("enquiries").select("id, status, wedding_id").eq("venue_id", venue.id);
 
   type WeddingRow = {
     id: string;
@@ -157,6 +158,24 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
     .filter((w) => w.wedding_date && String(w.wedding_end_date ?? w.wedding_date).slice(0, 10) >= todayIso)
     .sort((a, b) => String(a.wedding_date).localeCompare(String(b.wedding_date)));
   const upcoming = upcomingAll.slice(0, 5);
+
+  // "This weekend" spotlight — the wedding running now or up next. Guests +
+  // assigned rooms come from the couple's live guest list.
+  const spotlight = upcomingAll[0] ?? null;
+  const in7 = new Date(Date.now() + 2 * 3600 * 1000 + 7 * 86400000).toISOString().slice(0, 10);
+  let spotlightGuests = 0;
+  let spotlightRooms = 0;
+  if (spotlight) {
+    const { data: sg } = await supabase.from("guests").select("id, room_id").eq("wedding_id", spotlight.id);
+    spotlightGuests = (sg ?? []).length;
+    spotlightRooms = new Set((sg ?? []).map((g) => g.room_id).filter(Boolean)).size;
+  }
+
+  // Enquiry → booking conversion: an enquiry counts as converted once it's
+  // marked booked or linked to a wedding.
+  const enquiriesTotal = (enquiryRows ?? []).length;
+  const enquiriesConverted = (enquiryRows ?? []).filter((e) => e.status === "booked" || e.wedding_id).length;
+  const conversionPct = enquiriesTotal ? Math.round((enquiriesConverted / enquiriesTotal) * 100) : null;
 
   // Marketplace snapshot — listing counts per type + how many distinct product
   // categories the venue has populated across catalogue + rentals.
@@ -367,6 +386,7 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
     { label: "Outstanding", value: fmtRand(outstanding), sub: overdue.length ? `${overdue.length} overdue` : "All paid up", href: "/venue/payments", accent: overdue.length ? "var(--poppy)" : "var(--sage)" },
     { label: "Accommodation rooms", value: counts.rooms.toString(), sub: counts.rooms ? "Active" : "Add your first", href: "/venue/accommodation", accent: "var(--sage)" },
     { label: "Catalogue + rentals", value: (counts.catalogue + counts.rentals).toString(), sub: `${counts.catalogue} included · ${counts.rentals} extras`, href: "/venue/catalogue", accent: "var(--sage)" },
+    { label: "Enquiry conversion", value: conversionPct == null ? "—" : `${conversionPct}%`, sub: enquiriesTotal ? `${enquiriesConverted} of ${enquiriesTotal} enquiries booked` : "No enquiries yet", href: "/venue/enquiries", accent: "var(--poppy)" },
   ];
 
   // Clamp: collected can legitimately exceed invoiced (deposits taken before the
@@ -409,6 +429,42 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
           </div>
         </Link>
       </header>
+
+      {/* This-weekend spotlight — the wedding running now or up next, with the
+          numbers a venue manager actually checks first. */}
+      {spotlight && (() => {
+        const start = String(spotlight.wedding_date).slice(0, 10);
+        const end = String(spotlight.wedding_end_date ?? spotlight.wedding_date).slice(0, 10);
+        const running = start <= todayIso;
+        const imminent = start <= in7;
+        const owed = balances.find((b) => b.wedding.id === spotlight.id)?.outstanding ?? 0;
+        const fmtDay = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
+        const facts = [
+          { label: "Dates", value: end !== start ? `${fmtDay(start)} – ${fmtDay(end)}` : fmtDay(start) },
+          { label: "Guests", value: spotlightGuests ? String(spotlightGuests) : "—" },
+          { label: "Rooms booked", value: spotlightRooms ? String(spotlightRooms) : "—" },
+          { label: "Outstanding", value: owed > 0 ? `R${Math.round(owed).toLocaleString("en-ZA")}` : "Paid up ✓" },
+        ];
+        return (
+          <section className="vy-card" style={{ background: "linear-gradient(120deg, var(--cream), #fff)", border: "2px solid var(--peach)" }}>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div className="vy-eyebrow">{running ? "Happening now" : imminent ? "This weekend" : "Next wedding"}</div>
+                <h2 className="font-serif text-3xl mt-1" style={{ color: "var(--ink)" }}>{spotlight.couple_names}</h2>
+              </div>
+              <div className="flex flex-wrap gap-6">
+                {facts.map((f) => (
+                  <div key={f.label}>
+                    <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--ink-2)" }}>{f.label}</div>
+                    <div className="text-lg font-semibold tabular-nums" style={{ color: f.label === "Outstanding" && owed > 0 ? "var(--poppy)" : "var(--ink)" }}>{f.value}</div>
+                  </div>
+                ))}
+              </div>
+              <Link href={`/venue/weddings/${spotlight.slug}`} className="vy-btn vy-btn-primary">Open wedding →</Link>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Next up — one prioritised feed of what needs action (reviews, payments,
           imminent weddings). Consolidates submissions, overdue & due-soon payments. */}

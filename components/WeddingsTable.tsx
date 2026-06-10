@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { statusColor } from "@/lib/wedding/status";
+import { HEALTH_COLOR, HEALTH_LABEL, type WeddingHealth } from "@/lib/venue/progress";
 
 export type WeddingRow = {
   id: string;
@@ -10,6 +11,9 @@ export type WeddingRow = {
   endDate: string | null;
   guests: number | null;
   status: string;
+  progressPct: number;
+  health: WeddingHealth;
+  missing: string[];
   portalShort: string; // e.g. venuely.co.za/h-s-2027
   portalFull: string;
   actions: React.ReactNode; // server-bound <WeddingRowActions />
@@ -87,6 +91,7 @@ export function WeddingsTable({ rows }: { rows: WeddingRow[] }) {
             <th>Date</th>
             <th>Guests</th>
             <th>Status</th>
+            <th>Planned</th>
             <th>Portal URL</th>
             <th className="text-right">&nbsp;</th>
           </tr>
@@ -103,6 +108,20 @@ export function WeddingsTable({ rows }: { rows: WeddingRow[] }) {
                 </span>
               </td>
               <td>
+                <div
+                  className="min-w-[120px]"
+                  title={r.missing.length ? `${HEALTH_LABEL[r.health]} — still to do: ${r.missing.join(", ")}` : "Everything in place"}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="tabular-nums text-xs font-semibold w-9">{r.progressPct}%</span>
+                    <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: HEALTH_COLOR[r.health].text }} aria-label={HEALTH_LABEL[r.health]} />
+                  </div>
+                  <div className="h-1.5 rounded-full mt-1 overflow-hidden" style={{ background: "var(--line)" }}>
+                    <div className="h-full rounded-full transition-all" style={{ width: `${r.progressPct}%`, background: HEALTH_COLOR[r.health].text }} />
+                  </div>
+                </div>
+              </td>
+              <td>
                 <span className="inline-flex items-center gap-1.5 font-mono text-xs text-stone-500 max-w-[220px]">
                   <span className="truncate" title={r.portalFull}>{r.portalShort}</span>
                   <button type="button" onClick={() => copy(r)} aria-label="Copy portal URL" className="press shrink-0" style={{ color: copiedId === r.id ? "#1f5d3e" : "var(--ink-2)" }}>
@@ -116,7 +135,7 @@ export function WeddingsTable({ rows }: { rows: WeddingRow[] }) {
             </tr>
           ))}
           {!visible.length && (
-            <tr><td colSpan={6} className="text-center text-sm py-8" style={{ color: "var(--ink-2)" }}>No weddings match — clear the search or filter.</td></tr>
+            <tr><td colSpan={7} className="text-center text-sm py-8" style={{ color: "var(--ink-2)" }}>No weddings match — clear the search or filter.</td></tr>
           )}
         </tbody>
       </table>

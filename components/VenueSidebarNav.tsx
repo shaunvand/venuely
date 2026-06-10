@@ -18,6 +18,8 @@ const TOP_LINKS: (Item & { icon: IconName })[] = [
   { href: "/venue", label: "Overview", icon: "overview" },
   { href: "/venue/your-venue", label: "Your Venue", icon: "venue" },
   { href: "/venue/weddings", label: "Weddings", icon: "weddings" },
+  // Accommodation is half the business for farm/lodge venues — first-class nav.
+  { href: "/venue/accommodation", label: "Accommodation", icon: "bed" },
   { href: "/venue/calendar", label: "Calendar", icon: "calendar" },
   { href: "/venue/suppliers", label: "Suppliers", icon: "vendors" },
   { href: "/venue/enquiries", label: "Enquiries", icon: "enquiries" },
@@ -39,7 +41,6 @@ const GROUPS: Group[] = [
           { href: "/venue/rentals?view=extras", label: "Extras" },
         ],
       },
-      { href: "/venue/accommodation", label: "Accommodation", icon: "bed" },
       { href: "/venue/areas", label: "Areas", icon: "areas" },
       { href: "/venue/seating", label: "Seating & tables", icon: "seat" },
     ],

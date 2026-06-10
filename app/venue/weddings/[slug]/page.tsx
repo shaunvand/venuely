@@ -9,6 +9,7 @@ import {
   sendPortalInvite, rotatePortalAccess, revokeCoupleAccess, approveSubmission,
 } from "../actions";
 import { statusColor } from "@/lib/wedding/status";
+import { computeWeddingsProgress, HEALTH_COLOR, HEALTH_LABEL } from "@/lib/venue/progress";
 import { SaveButton } from "@/components/SaveButton";
 import { addPayment, deletePayment, addCharge, deleteCharge } from "./ledger-actions";
 import { sendDepositReminder, sendBalanceReminder } from "../reminder-actions";
@@ -103,6 +104,12 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     supabase.from("wedding_charges").select("id, kind, label, qty, unit_price, amount, is_refundable, is_auto, day_type, notes").eq("wedding_id", wedding.id),
     supabase.from("wedding_documents").select("id, label, url, kind, visible_to_couple, created_at").eq("wedding_id", wedding.id).order("created_at", { ascending: false }),
   ]);
+  // Weekend view + planning progress data.
+  const [{ data: timelineRows }, progressMap] = await Promise.all([
+    supabase.from("wedding_timeline").select("id, title, start_time, location, event_date, sort_order").eq("wedding_id", wedding.id).order("sort_order"),
+    computeWeddingsProgress(supabase, [{ id: wedding.id, area_selections: wedding.area_selections }]),
+  ]);
+  const weddingProgress = progressMap.get(wedding.id) ?? null;
   const rentalMap = new Map((rentalsRes.data ?? []).map((r) => [r.id, r]));
   const cataMap = new Map((cataRes.data ?? []).map((c) => [c.id, c]));
   const accomMap = new Map((accomRes.data ?? []).map((r) => [r.id, r]));
@@ -267,6 +274,11 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
           <h1 className="vy-h1 mt-1">{wedding.couple_names}</h1>
           <p className="text-stone-600 text-sm">
             {wedding.wedding_date ? (wedding.wedding_end_date ? `${wedding.wedding_date} → ${wedding.wedding_end_date}` : wedding.wedding_date) : "Date TBD"} · {wedding.guest_count ?? "?"} guests · <span className="text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-full" style={{ background: statusColor(wedding.status).bg, color: statusColor(wedding.status).text }}>{wedding.status}</span>
+            {weddingProgress && (
+              <span className="text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-full ml-2" style={{ background: HEALTH_COLOR[weddingProgress.health].bg, color: HEALTH_COLOR[weddingProgress.health].text }} title={weddingProgress.missing.length ? `Still to do: ${weddingProgress.missing.join(", ")}` : "Everything in place"}>
+                {weddingProgress.pct}% planned · {HEALTH_LABEL[weddingProgress.health]}
+              </span>
+            )}
           </p>
           {wedding.wedding_state_updated_at && (
             <p className="text-xs text-stone-500 mt-1">
@@ -290,6 +302,53 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
         lastOpenedAt={lastOpenedAt}
         sendAction={sendPortalInvite.bind(null, wedding.id, wedding.slug)}
       />
+
+      {/* Wedding weekend at a glance — the run of days with the couple's timeline
+          grouped per day (venues think in weekends, not single dates). */}
+      {wedding.wedding_date && (() => {
+        const start = String(wedding.wedding_date).slice(0, 10);
+        const end = String(wedding.wedding_end_date ?? wedding.wedding_date).slice(0, 10);
+        const days: string[] = [];
+        for (let d = new Date(`${start}T12:00:00`); days.length < 7 && d.toISOString().slice(0, 10) <= end; d.setDate(d.getDate() + 1)) {
+          days.push(d.toISOString().slice(0, 10));
+        }
+        type TlRow = { id: string; title: string; start_time: string | null; location: string | null; event_date: string | null };
+        const tl = (timelineRows ?? []) as TlRow[];
+        if (days.length < 2 && tl.length === 0) return null;
+        const byDay = new Map<string, TlRow[]>();
+        for (const item of tl) {
+          const key = item.event_date && days.includes(String(item.event_date).slice(0, 10)) ? String(item.event_date).slice(0, 10) : days[0];
+          (byDay.get(key) ?? byDay.set(key, []).get(key)!).push(item);
+        }
+        const dayName = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "short" });
+        return (
+          <section className="vy-card">
+            <div className="vy-eyebrow">Wedding weekend</div>
+            <h2 className="vy-h2 mt-1 mb-4">{days.length > 1 ? `${days.length} days at a glance` : "The day at a glance"}</h2>
+            <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(days.length, 4)}, minmax(0, 1fr))` }}>
+              {days.map((d, i) => (
+                <div key={d} className="rounded-xl p-4" style={{ border: "1px solid var(--line)", background: i === 0 && days.length > 1 ? "var(--cream)" : "#fff" }}>
+                  <div className="text-sm font-semibold" style={{ color: "var(--poppy-deep)" }}>{dayName(d)}</div>
+                  <ul className="mt-2 space-y-1.5">
+                    {(byDay.get(d) ?? []).map((item) => (
+                      <li key={item.id} className="text-sm flex gap-2">
+                        <span className="tabular-nums shrink-0 font-medium" style={{ color: "var(--ink-2)" }}>{item.start_time || "—"}</span>
+                        <span>
+                          {item.title}
+                          {item.location && <span style={{ color: "var(--ink-2)" }}> · {item.location}</span>}
+                        </span>
+                      </li>
+                    ))}
+                    {!(byDay.get(d) ?? []).length && (
+                      <li className="text-xs" style={{ color: "var(--ink-2)" }}>Nothing scheduled yet — the couple builds this in their portal&apos;s Timeline tab.</li>
+                    )}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Link lifecycle: rotate the access code, or remove a couple's account access. */}
       <div className="vy-card space-y-3">
