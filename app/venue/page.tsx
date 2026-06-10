@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { computeSetupSteps } from "@/lib/venue/setup";
 import { applyMarkup } from "@/lib/billing/compute";
 import { WelcomeImportModal } from "@/components/WelcomeImportModal";
+import { VenuelyOpener } from "@/components/VenuelyOpener";
 import { OverviewCalendar } from "@/components/OverviewCalendar";
 
 // Expand an accommodation booking's check_in..check_out into one ISO night per
@@ -94,7 +95,8 @@ function parseEngagement(blob: unknown): CoupleEngagement {
   };
 }
 
-export default async function VenueOverview() {
+export default async function VenueOverview({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
+  const { welcome } = await searchParams;
   const venue = await getCurrentVenue();
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -374,6 +376,8 @@ export default async function VenueOverview() {
 
   return (
     <div className="space-y-10 anim-fade-up">
+      {/* Onboarding-complete celebration: logo opener plays once (gated in-component). */}
+      {welcome === "1" && <VenuelyOpener trigger="welcome" />}
       {showWelcome && <WelcomeImportModal venueId={venue.id} venueName={venue.name} />}
 
       <header className="flex flex-wrap items-end justify-between gap-4">

@@ -553,7 +553,8 @@ function StepReview({
           {previewHref && (
             <Link href={previewHref} className="vy-btn vy-btn-secondary">Preview what couples see ↗</Link>
           )}
-          <Link href="/venue" className="vy-btn vy-btn-primary">Go to my dashboard →</Link>
+          {/* welcome=1 plays the logo opener once on first dashboard arrival */}
+          <Link href="/venue?welcome=1" className="vy-btn vy-btn-primary">Go to my dashboard →</Link>
         </div>
       </div>
     </StepShell>
