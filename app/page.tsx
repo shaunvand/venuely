@@ -93,14 +93,15 @@ function Nav({ signedIn }: { signedIn: boolean }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-4 sm:py-5 flex items-center justify-between gap-3">
         <Link href="/" className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition-opacity min-w-0">
           <span className="shrink-0"><LogoMark size={44} /></span>
-          <span className="flex flex-col leading-none min-w-0">
+          {/* Full wordmark only when it fits untruncated — tiny screens get just the V. badge */}
+          <span className="hidden min-[480px]:flex flex-col leading-none whitespace-nowrap">
             <span
-              className="font-serif text-2xl sm:text-3xl truncate"
+              className="font-serif text-2xl sm:text-3xl"
               style={{ color: "var(--poppy)", fontWeight: 900, letterSpacing: "-0.03em" }}
             >
               Venuely.
             </span>
-            <span className="text-[10px] sm:text-[11px] tracking-wide truncate" style={{ color: "var(--ink-2)" }}>Weddings Made Easy</span>
+            <span className="text-[10px] sm:text-[11px] tracking-wide" style={{ color: "var(--ink-2)" }}>Weddings Made Easy</span>
           </span>
         </Link>
         <nav className="hidden md:flex items-center gap-8 text-sm" style={{ color: "var(--ink)" }}>
