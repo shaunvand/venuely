@@ -10,8 +10,6 @@ import {
 } from "@/lib/portal/templates";
 import { saveVenuePortalDesign } from "@/app/venue/your-venue/actions";
 
-const SAMPLE_TABS = ["Overview", "Catalogue", "Guests", "Timeline", "Budget"];
-
 export function PortalDesigner({
   venueId,
   venueName,
@@ -389,62 +387,91 @@ function PortalPreview({
     : {};
   const coverEditClass = onEditCover ? "group cursor-pointer" : "";
 
-  return (
-    <div className="rounded-2xl overflow-hidden shadow-sm" style={{ border: "1px solid var(--line)", background: tokens.surface, fontFamily: tokens.bodyFont }}>
-      {/* HERO */}
-      {tokens.heroStyle === "split" ? (
-        <div className="grid grid-cols-2">
-          <div {...coverProps} className={`relative h-40 ${coverEditClass}`} style={heroImg as React.CSSProperties}>
-            <div className="absolute top-3 left-3 z-10"><PreviewLogo logoUrl={logoUrl} venueName={venueName} headingStyle={headingStyle} /></div>
-            {onEditCover && <CoverEditHint label={editLabel} />}
-          </div>
-          <div className="p-4 flex flex-col justify-center" style={{ background: accent + "33" }}>
-            <div className="text-[10px] uppercase tracking-widest" style={{ color: "var(--ink-2)" }}>Wedding portal</div>
-            <div className="text-2xl leading-tight" style={{ ...headingStyle, color: "var(--ink)" }}>Adam &amp; Eve</div>
-            <div className="text-[11px]" style={{ color: "var(--ink-2)" }}>{venueName} · 14 Dec 2025</div>
-          </div>
-        </div>
-      ) : tokens.heroStyle === "framed" ? (
-        <div className="p-3">
-          <div {...coverProps} className={`relative h-36 ${coverEditClass}`} style={{ ...(heroImg as React.CSSProperties), border: `1px solid var(--line)` }}>
-            <div className="absolute top-3 left-3 z-10"><PreviewLogo logoUrl={logoUrl} venueName={venueName} headingStyle={headingStyle} /></div>
-            {onEditCover && <CoverEditHint label={editLabel} />}
-          </div>
-          <div className="pt-3">
-            <div className="text-[10px] uppercase tracking-widest" style={{ color: "var(--ink-2)" }}>Wedding portal</div>
-            <div className="text-2xl leading-tight" style={{ ...headingStyle, color: "var(--ink)" }}>Adam &amp; Eve</div>
-            <div className="text-[11px]" style={{ color: "var(--ink-2)" }}>{venueName} · 14 Dec 2025</div>
-          </div>
-        </div>
-      ) : (
-        <div {...coverProps} className={`relative h-44 ${coverEditClass}`} style={heroImg as React.CSSProperties}>
-          <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.05), rgba(0,0,0,0.55))" }} />
-          <div className="absolute top-3 left-3 z-10"><PreviewLogo logoUrl={logoUrl} venueName={venueName} headingStyle={headingStyle} /></div>
-          <div className="absolute bottom-3 left-3 right-3 z-10">
-            <div className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.85)" }}>Wedding portal</div>
-            <div className="text-xl leading-tight text-white" style={headingStyle}>Adam &amp; Eve</div>
-            <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.9)" }}>{venueName} · 14 Dec 2025</div>
-          </div>
-          {onEditCover && <CoverEditHint label={editLabel} />}
-        </div>
-      )}
+  // Miniature of the REAL couple portal (sidebar + cover hero + progress strip +
+  // stat cards + right rail) so what the venue previews is what couples get.
+  const NAV = ["Overview", "Our Venue", "Guest List", "Accommodation", "Timeline", "Payments"];
+  const CHIPS: Array<[string, boolean]> = [["Venue", true], ["Rooms", true], ["Catering", true], ["Guests", false], ["Timeline", false], ["Pay", false]];
 
-      {/* TABS + BODY */}
-      <div className="p-4 space-y-4">
-        <PreviewTabs tokens={tokens} primary={primary} />
-        <div className="rounded-xl p-4" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: tokens.cardRadius }}>
-          <div className="text-base" style={{ ...headingStyle, color: "var(--ink)" }}>Welcome to your planning portal</div>
-          <p className="text-[11px] mt-1" style={{ color: "var(--ink-2)" }}>Pick your menu, manage guests, track your budget and timeline — all in one place.</p>
-          <button className="mt-3 text-[11px] px-3 py-1.5 font-medium" style={btn}>Start planning</button>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="p-3" style={{ background: accent + "2e", borderRadius: tokens.cardRadius }}>
-            <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--ink-2)" }}>Countdown</div>
-            <div className="text-lg" style={{ ...headingStyle, color: primary }}>112 days</div>
+  return (
+    <div className="rounded-2xl overflow-hidden shadow-sm" style={{ border: "1px solid var(--line)", background: "#FBF7F2", fontFamily: tokens.bodyFont }}>
+      <div className="grid" style={{ gridTemplateColumns: "108px 1fr 132px" }}>
+        {/* MINI SIDEBAR — mirrors the portal's left nav */}
+        <div className="p-2.5" style={{ background: "#fff", borderRight: "1px solid var(--line)" }}>
+          <div className="mb-2.5 px-1">
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt="" className="h-5 max-w-[88px] object-contain" />
+            ) : (
+              <span className="text-[10px] font-semibold leading-tight block" style={{ ...headingStyle, color: "var(--ink)" }}>{venueName}</span>
+            )}
           </div>
-          <div className="p-3" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: tokens.cardRadius }}>
-            <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--ink-2)" }}>Checklist</div>
-            <div className="text-lg" style={{ ...headingStyle, color: "var(--ink)" }}>3 / 8 done</div>
+          <div className="space-y-0.5">
+            {NAV.map((t, i) => (
+              <div key={t} className="text-[9px] px-1.5 py-1 truncate" style={{ borderRadius: tokens.buttonRadius === "999px" ? 999 : 6, background: i === 0 ? `${primary}1a` : "transparent", color: i === 0 ? primary : "var(--ink-2)", fontWeight: i === 0 ? 700 : 500 }}>{t}</div>
+            ))}
+            <div className="text-[9px] px-1.5 pt-1" style={{ color: "var(--ink-2)" }}>+ 12 more…</div>
+          </div>
+        </div>
+
+        {/* MAIN — cover hero, progress strip, stat cards */}
+        <div className="p-2.5 space-y-2.5 min-w-0">
+          <div {...coverProps} className={`relative h-[104px] overflow-hidden ${coverEditClass}`} style={{ ...(heroImg as React.CSSProperties), borderRadius: tokens.cardRadius }}>
+            {coverUrl && <div className="absolute inset-0" style={{ background: "linear-gradient(transparent 30%, rgba(0,0,0,0.6))" }} />}
+            <div className="absolute bottom-2 left-2.5 right-2.5">
+              <div className="text-[8px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.9)" }}>Wedding portal</div>
+              <div className="text-[17px] leading-tight text-white" style={{ ...headingStyle, fontStyle: "italic" }}>Adam &amp; Eve</div>
+              <div className="text-[9px]" style={{ color: "rgba(255,255,255,0.92)" }}>{venueName} · 14 Dec 2025 · 112 days to go</div>
+            </div>
+            {onEditCover && <CoverEditHint label={editLabel} />}
+          </div>
+
+          {/* Wedding Progress strip — exactly like the live overview */}
+          <div className="p-2.5" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: tokens.cardRadius }}>
+            <div className="flex items-baseline justify-between">
+              <span className="text-[11px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>Wedding Progress</span>
+              <span className="text-[11px] font-bold" style={{ color: "var(--ink)" }}>52%</span>
+            </div>
+            <div className="h-1.5 rounded-full mt-1.5 overflow-hidden" style={{ background: "#efe7e0" }}>
+              <div className="h-full rounded-full" style={{ width: "52%", background: primary }} />
+            </div>
+            <div className="grid grid-cols-6 gap-1 mt-2">
+              {CHIPS.map(([label, done]) => (
+                <div key={label} className="text-center">
+                  <div className="w-5 h-5 rounded-full mx-auto flex items-center justify-center text-[7px] font-bold" style={{ background: done ? "#e8f1ea" : "#fbf1e7", color: done ? "#1a7f4b" : "#c07c10" }}>{done ? "✓" : "○"}</div>
+                  <div className="text-[7px] mt-0.5 truncate" style={{ color: "var(--ink-2)" }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Stat cards row */}
+          <div className="grid grid-cols-2 gap-2">
+            {[["Guests", "32 confirmed"], ["Accommodation", "12 / 40 rooms"]].map(([eb, v]) => (
+              <div key={eb} className="p-2" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: tokens.cardRadius }}>
+                <div className="text-[8px] uppercase tracking-wider" style={{ color: "var(--ink-2)" }}>{eb}</div>
+                <div className="text-[11px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>{v}</div>
+              </div>
+            ))}
+          </div>
+          <button className="text-[10px] px-2.5 py-1 font-medium" style={btn}>Start planning</button>
+        </div>
+
+        {/* MINI RIGHT RAIL — countdown + next up, like the live overview */}
+        <div className="p-2.5 space-y-2" style={{ borderLeft: "1px solid var(--line)" }}>
+          <div className="p-2 text-center text-white" style={{ background: "#5F8B6A", borderRadius: tokens.cardRadius }}>
+            <div className="text-[7px] uppercase tracking-wider opacity-90">Your wedding day</div>
+            <div className="text-xl leading-none my-0.5" style={headingStyle}>112</div>
+            <div className="text-[7px] uppercase tracking-wider opacity-90">days to go</div>
+          </div>
+          <div className="p-2" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: tokens.cardRadius }}>
+            <div className="text-[9px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>Next Up</div>
+            {["Assign rooms", "Guest list", "Pay invoice"].map((t) => (
+              <div key={t} className="text-[8px] mt-1 px-1.5 py-1 truncate" style={{ border: "1px solid var(--line)", borderRadius: 7, color: "var(--ink-2)" }}>{t} ›</div>
+            ))}
+          </div>
+          <div className="p-2" style={{ background: "#fbf1e7", borderRadius: tokens.cardRadius }}>
+            <div className="text-[9px] font-semibold" style={{ ...headingStyle, color: "var(--ink)" }}>Need help?</div>
+            <div className="mt-1 text-center text-[8px] font-bold text-white px-1 py-1 rounded-full" style={{ background: primary }}>Message your venue</div>
           </div>
         </div>
       </div>
@@ -460,40 +487,3 @@ function CoverEditHint({ label }: { label: string }) {
   );
 }
 
-function PreviewLogo({ logoUrl, venueName, headingStyle }: { logoUrl: string | null; venueName: string; headingStyle: React.CSSProperties }) {
-  return logoUrl ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={logoUrl} alt="" className="h-7 max-w-[120px] object-contain" />
-  ) : (
-    <span className="font-semibold text-sm" style={{ ...headingStyle, color: "#fff" }}>{venueName}</span>
-  );
-}
-
-function PreviewTabs({ tokens, primary }: { tokens: TemplateTokens; primary: string }) {
-  const base = "text-[11px] px-2.5 py-1 transition";
-  if (tokens.tabStyle === "pill") {
-    return (
-      <div className="flex flex-wrap gap-1.5">
-        {SAMPLE_TABS.map((t, i) => (
-          <span key={t} className={base} style={{ borderRadius: 999, background: i === 0 ? primary : "transparent", color: i === 0 ? "#fff" : "var(--ink-2)", border: i === 0 ? "none" : "1px solid var(--line)" }}>{t}</span>
-        ))}
-      </div>
-    );
-  }
-  if (tokens.tabStyle === "segmented") {
-    return (
-      <div className="inline-flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--line)" }}>
-        {SAMPLE_TABS.map((t, i) => (
-          <span key={t} className={base} style={{ background: i === 0 ? primary : "#fff", color: i === 0 ? "#fff" : "var(--ink-2)" }}>{t}</span>
-        ))}
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-wrap gap-4 border-b" style={{ borderColor: "var(--line)" }}>
-      {SAMPLE_TABS.map((t, i) => (
-        <span key={t} className="text-[11px] pb-1.5" style={{ color: i === 0 ? primary : "var(--ink-2)", borderBottom: i === 0 ? `2px solid ${primary}` : "2px solid transparent", fontWeight: i === 0 ? 600 : 400 }}>{t}</span>
-      ))}
-    </div>
-  );
-}
