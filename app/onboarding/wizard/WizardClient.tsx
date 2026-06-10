@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SetupVenueForm } from "@/components/SetupVenueForm";
 import type { SetupVenueState } from "@/app/onboarding/setup-venue/actions";
@@ -160,7 +161,45 @@ export function WizardClient({
   previewHref: string | null;
   justCreated?: boolean;
 }) {
+  const router = useRouter();
   const [step, setStep] = useState<number>(initialStep);
+
+  // Auto pre-import the venue's own Google photos into "Your Venue" the first
+  // time the wizard loads with a created venue. This reuses the proven
+  // /api/venue/places-photos route (Google lookup → vision-tag → upload) so the
+  // photos are already in the gallery by the time the couple reaches the Your
+  // Venue page — no manual "Import from Google" click. Fire-once per venue via
+  // sessionStorage, non-blocking, and only when there's nothing to duplicate.
+  const [photoPull, setPhotoPull] = useState<"idle" | "pulling" | "done">("idle");
+  useEffect(() => {
+    if (!venue) return;
+    // Fire-once per venue per browser session. The places-photos route is itself
+    // idempotent — it skips slots already imported as "Google photo N" — so even
+    // if this re-fired it would never duplicate; the guard just avoids the work.
+    const guardKey = `venuely:gphotos:${venue.id}`;
+    if (typeof window !== "undefined" && sessionStorage.getItem(guardKey)) return;
+    try { sessionStorage.setItem(guardKey, "1"); } catch {}
+    let cancelled = false;
+    setPhotoPull("pulling");
+    (async () => {
+      try {
+        const imp = await fetch("/api/venue/places-photos", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ venue_id: venue.id }),
+        });
+        if (cancelled) return;
+        const ij = await imp.json().catch(() => null);
+        setPhotoPull("done");
+        // Surface the new photos if they're already looking at the gallery.
+        if (imp.ok && ij?.added) router.refresh();
+      } catch {
+        if (!cancelled) setPhotoPull("idle");
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venue?.id]);
 
   // Step 1 is only actionable when there's no venue yet; once a venue exists it's done.
   const basicsDone = !!venue;
@@ -206,6 +245,15 @@ export function WizardClient({
             </span>
           )}
         </header>
+
+        {/* Non-blocking notice while we pull the venue's Google photos in the
+            background — onboarding continues regardless. */}
+        {photoPull === "pulling" && (
+          <div className="mb-6 flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm" style={{ background: "var(--cream)", border: "1px solid var(--line)", color: "var(--ink-2)" }}>
+            <span className="inline-block w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: "var(--peach)", borderTopColor: "var(--poppy)" }} />
+            Pulling your venue photos from Google… they&apos;ll appear in Your Venue automatically.
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-[220px_1fr] gap-8">
           {/* Left-rail progress */}

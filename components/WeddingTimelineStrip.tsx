@@ -1,8 +1,12 @@
+"use client";
+
 import Link from "next/link";
+import { useMemo, useState } from "react";
 
 // Horizontal phase Gantt for the visible month. One row per active wedding, with
 // up to three coloured bars per wedding — Set-up → Wedding Weekend → Breakdown —
-// laid out on a CSS grid whose columns are the days of the month. No deps.
+// laid out on a CSS grid whose columns are the days of the month. Client
+// component: holds the visible month in state so Today / ‹ / › navigate. No deps.
 
 export type TimelineWedding = {
   id: string;
@@ -13,33 +17,66 @@ export type TimelineWedding = {
   setup_date?: string | null;
   breakdown_date?: string | null;
   status: string | null;
+  guests?: number | null;
+  couple_paid_at?: string | null;
 };
 
 type Phase = "setup" | "weekend" | "breakdown";
 
-// Bar palette keyed by the wedding's status health. Tentative/inquiry get a soft
-// fill; confirmed (booked) green; cancelled muted. Amber is reserved for the
-// "needs attention" override the page passes in.
-type BarTone = "confirmed" | "attention" | "tentative" | "cancelled";
+// Bar palette keyed by the wedding's status health, mapped to Venuely brand
+// colours. The Wedding Weekend bar uses the SOLID status colour; Set-up and
+// Breakdown shoulders use a lighter pre-tinted fill of the same hue.
+type BarTone = "confirmed" | "paid" | "attention" | "tentative" | "cancelled";
 
 const PHASE_LABEL: Record<Phase, string> = {
   setup: "Set-up",
-  weekend: "Wedding weekend",
+  weekend: "Wedding Weekend",
   breakdown: "Breakdown",
 };
 
-const TONE_STYLE: Record<BarTone, { bg: string; text: string; border?: string }> = {
-  confirmed: { bg: "#cfe7d8", text: "#1f5d3e", border: "#8fc6a6" },
-  attention: { bg: "#fdf0d4", text: "#8a6116", border: "#e7c878" },
-  tentative: { bg: "var(--cream)", text: "var(--ink-2)", border: "var(--line)" },
-  cancelled: { bg: "#ece9e7", text: "#8a8480", border: "var(--line)" },
+// solid    → Wedding Weekend fill / solidText → its text colour
+// shoulder → Set-up & Breakdown fill / shoulderText → their text colour
+// dot      → legend swatch
+type ToneStyle = {
+  label: string;
+  solid: string;
+  solidText: string;
+  shoulder: string;
+  shoulderText: string;
+  dot: string;
+  border: string;
 };
 
-function toneFor(status: string | null): BarTone {
+const TONE_STYLE: Record<BarTone, ToneStyle> = {
+  // sage green
+  confirmed: { label: "Confirmed", solid: "#8a9a86", solidText: "#fff", shoulder: "rgba(138,154,134,0.30)", shoulderText: "#3f4a3c", dot: "#8a9a86", border: "rgba(138,154,134,0.55)" },
+  // deeper leaf green
+  paid: { label: "Paid in Full", solid: "#BFDAD3", solidText: "#1f5d3e", shoulder: "rgba(191,218,211,0.45)", shoulderText: "#1f5d3e", dot: "#1f5d3e", border: "rgba(31,93,62,0.30)" },
+  // Venuely coral
+  attention: { label: "Needs Attention", solid: "#FA523C", solidText: "#fff", shoulder: "rgba(255,198,173,0.55)", shoulderText: "#9a2f1d", dot: "#FA523C", border: "rgba(250,82,60,0.45)" },
+  // warm neutral
+  tentative: { label: "Tentative", solid: "var(--cream)", solidText: "var(--ink-2)", shoulder: "rgba(255,246,240,0.9)", shoulderText: "var(--ink-2)", dot: "var(--bone)", border: "var(--line)" },
+  // muted grey, de-emphasised
+  cancelled: { label: "Cancelled", solid: "#ece9e7", solidText: "#8a8480", shoulder: "rgba(236,233,231,0.7)", shoulderText: "#a39e99", dot: "#d6d2cf", border: "var(--line)" },
+};
+
+function toneFor(status: string | null, attention: boolean, paid: boolean): BarTone {
   const s = (status ?? "").toLowerCase();
   if (s === "cancelled" || s === "lost") return "cancelled";
-  if (s === "booked" || s === "completed" || s === "confirmed") return "confirmed";
+  if (attention) return "attention";
+  if (paid || s === "completed") return "paid";
+  if (s === "booked" || s === "confirmed") return "confirmed";
   return "tentative"; // inquiry / provisional / unknown
+}
+
+function initialsOf(name: string): string {
+  const parts = String(name ?? "")
+    .replace(/&|\band\b/gi, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 // Inclusive day index within the month for an ISO date, or null if outside.
@@ -87,61 +124,111 @@ function addDaysIso(iso: string, delta: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Sun..Sat weekday letters (Date.getDay() order).
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
+
+const LEGEND: BarTone[] = ["confirmed", "attention", "paid", "tentative"];
 
 export function WeddingTimelineStrip({
   weddings,
   year,
   month0,
-  monthLabel,
+  monthLabel: _monthLabel, // derived client-side from view; kept for compat
   cap = 6,
   attentionIds,
 }: {
   weddings: TimelineWedding[];
   year: number;
   month0: number; // 0-based month
-  monthLabel: string;
+  monthLabel?: string;
   cap?: number;
   attentionIds?: Set<string>;
 }) {
-  const daysInMonth = new Date(year, month0 + 1, 0).getDate();
-  const todayIso = new Date(Date.now() + 2 * 3600 * 1000).toISOString().slice(0, 10);
-  const todayCol = dayIndex(todayIso, year, month0, daysInMonth);
+  // Visible month state (absolute month index from year 0 keeps arithmetic simple).
+  const [viewIdx, setViewIdx] = useState(() => year * 12 + month0);
+  const vYear = Math.floor(viewIdx / 12);
+  const vMonth0 = ((viewIdx % 12) + 12) % 12;
+
+  const monthLabel = useMemo(
+    () => new Date(vYear, vMonth0, 1).toLocaleDateString("en-ZA", { month: "long", year: "numeric" }),
+    [vYear, vMonth0],
+  );
+
+  const daysInMonth = new Date(vYear, vMonth0 + 1, 0).getDate();
+  const today = new Date();
+  const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const todayCol = dayIndex(todayIso, vYear, vMonth0, daysInMonth);
+  const todayMonthIdx = today.getFullYear() * 12 + today.getMonth();
 
   // Only weddings whose any phase intersects the visible month, soonest first.
-  const visible = weddings
-    .filter((w) => {
-      const wkEnd = w.wedding_end_date ?? w.wedding_date;
-      const setupEnd = w.wedding_date ? addDaysIso(w.wedding_date, -1) : null;
-      const breakStart = wkEnd ? addDaysIso(wkEnd, 1) : null;
-      return (
-        spanColumns(w.wedding_date, wkEnd, year, month0, daysInMonth) ||
-        (w.setup_date && spanColumns(w.setup_date, setupEnd, year, month0, daysInMonth)) ||
-        (w.breakdown_date && spanColumns(breakStart, w.breakdown_date, year, month0, daysInMonth))
-      );
-    })
-    .sort((a, b) => String(a.wedding_date).localeCompare(String(b.wedding_date)));
+  const visible = useMemo(
+    () =>
+      weddings
+        .filter((w) => {
+          const wkEnd = w.wedding_end_date ?? w.wedding_date;
+          const setupEnd = w.wedding_date ? addDaysIso(w.wedding_date, -1) : null;
+          const breakStart = wkEnd ? addDaysIso(wkEnd, 1) : null;
+          return (
+            spanColumns(w.wedding_date, wkEnd, vYear, vMonth0, daysInMonth) ||
+            (w.setup_date && spanColumns(w.setup_date, setupEnd, vYear, vMonth0, daysInMonth)) ||
+            (w.breakdown_date && spanColumns(breakStart, w.breakdown_date, vYear, vMonth0, daysInMonth))
+          );
+        })
+        .sort((a, b) => String(a.wedding_date).localeCompare(String(b.wedding_date))),
+    [weddings, vYear, vMonth0, daysInMonth],
+  );
 
   const shown = visible.slice(0, cap);
   const overflow = visible.length - shown.length;
 
   // Grid template: a label column + one column per day.
-  const gridCols = `minmax(120px, 160px) repeat(${daysInMonth}, minmax(20px, 1fr))`;
+  const gridCols = `minmax(180px, 220px) repeat(${daysInMonth}, minmax(22px, 1fr))`;
+
+  const stepBtn =
+    "w-7 h-7 inline-flex items-center justify-center rounded-full border text-sm leading-none transition-colors hover:bg-[var(--cream)]";
 
   return (
     <section className="vy-card">
-      <div className="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+      {/* Header row: title + control cluster */}
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
         <div>
-          <div className="vy-eyebrow">Phases</div>
-          <h2 className="vy-h2 mt-1">Wedding timeline · {monthLabel}</h2>
+          <h2 className="font-serif text-[1.4rem] leading-tight" style={{ color: "var(--ink)" }}>
+            Wedding timeline
+          </h2>
+          <p className="text-sm mt-0.5" style={{ color: "var(--ink-2)" }}>
+            Overview of bookings, set-up and breakdown.
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-xs" style={{ color: "var(--ink-2)" }}>
-          {(["confirmed", "attention", "tentative", "cancelled"] as BarTone[]).map((t) => (
-            <span key={t} className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm" style={{ background: TONE_STYLE[t].bg, border: `1px solid ${TONE_STYLE[t].border}` }} />
-              {t === "confirmed" ? "Confirmed" : t === "attention" ? "Needs attention" : t === "tentative" ? "Tentative" : "Cancelled"}
-            </span>
-          ))}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setViewIdx(todayMonthIdx)}
+            className="px-3 h-7 inline-flex items-center rounded-full border text-xs font-medium transition-colors hover:bg-[var(--cream)]"
+            style={{ borderColor: "var(--line)", color: "var(--ink)" }}
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            aria-label="Previous month"
+            onClick={() => setViewIdx((i) => i - 1)}
+            className={stepBtn}
+            style={{ borderColor: "var(--line)", color: "var(--ink-2)" }}
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            aria-label="Next month"
+            onClick={() => setViewIdx((i) => i + 1)}
+            className={stepBtn}
+            style={{ borderColor: "var(--line)", color: "var(--ink-2)" }}
+          >
+            ›
+          </button>
+          <span className="font-serif text-sm min-w-[7.5rem] text-right" style={{ color: "var(--ink)" }}>
+            {monthLabel}
+          </span>
         </div>
       </div>
 
@@ -149,88 +236,138 @@ export function WeddingTimelineStrip({
         <div className="vy-empty text-sm">No weddings fall in {monthLabel}.</div>
       ) : (
         <div className="overflow-x-auto -mx-1 px-1">
-          <div style={{ minWidth: 640 }}>
-            {/* Day header row */}
-            <div className="grid items-end gap-px mb-1" style={{ gridTemplateColumns: gridCols }}>
+          <div style={{ minWidth: 720 }}>
+            {/* Day axis: number above weekday letter, today highlighted */}
+            <div className="grid items-end gap-px mb-2" style={{ gridTemplateColumns: gridCols }}>
               <div />
               {Array.from({ length: daysInMonth }, (_, i) => {
                 const day = i + 1;
-                const dow = new Date(year, month0, day).getDay();
+                const dow = new Date(vYear, vMonth0, day).getDay();
                 const isToday = todayCol === day;
-                const weekend = dow === 0 || dow === 6;
                 return (
-                  <div key={day} className="text-center leading-tight" style={{ color: isToday ? "var(--poppy)" : "var(--ink-2)" }}>
-                    <div className="text-[9px] uppercase" style={{ opacity: weekend ? 1 : 0.6 }}>{DOW[dow]}</div>
-                    <div className="text-[10px] tabular-nums" style={{ fontWeight: isToday ? 700 : 400 }}>{day}</div>
+                  <div key={day} className="flex flex-col items-center leading-none gap-0.5">
+                    <span
+                      className="text-[11px] tabular-nums inline-flex items-center justify-center"
+                      style={
+                        isToday
+                          ? {
+                              width: 20,
+                              height: 20,
+                              borderRadius: 9999,
+                              background: "var(--poppy)",
+                              color: "#fff",
+                              fontWeight: 700,
+                            }
+                          : { color: "var(--ink-2)", fontWeight: 500 }
+                      }
+                    >
+                      {day}
+                    </span>
+                    <span className="text-[9px] uppercase" style={{ color: "var(--ink-2)", opacity: 0.6 }}>
+                      {DOW[dow]}
+                    </span>
                   </div>
                 );
               })}
             </div>
 
             {/* One row per wedding */}
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {shown.map((w) => {
-                const tone = attentionIds?.has(w.id) ? "attention" : toneFor(w.status);
+                const paid = !!w.couple_paid_at;
+                const attention = attentionIds?.has(w.id) ?? false;
+                const tone = toneFor(w.status, attention, paid);
                 const style = TONE_STYLE[tone];
+                const dim = tone === "cancelled";
                 const wkEnd = w.wedding_end_date ?? w.wedding_date;
                 const setupEnd = w.wedding_date ? addDaysIso(w.wedding_date, -1) : null;
                 const breakStart = wkEnd ? addDaysIso(wkEnd, 1) : null;
 
                 const bars: Array<{ phase: Phase; cols: { start: number; end: number } }> = [];
-                const setup = w.setup_date && setupEnd ? spanColumns(w.setup_date, setupEnd, year, month0, daysInMonth) : null;
+                const setup = w.setup_date && setupEnd ? spanColumns(w.setup_date, setupEnd, vYear, vMonth0, daysInMonth) : null;
                 if (setup) bars.push({ phase: "setup", cols: setup });
-                const weekend = spanColumns(w.wedding_date, wkEnd, year, month0, daysInMonth);
+                const weekend = spanColumns(w.wedding_date, wkEnd, vYear, vMonth0, daysInMonth);
                 if (weekend) bars.push({ phase: "weekend", cols: weekend });
-                const breakdown = w.breakdown_date && breakStart ? spanColumns(breakStart, w.breakdown_date, year, month0, daysInMonth) : null;
+                const breakdown = w.breakdown_date && breakStart ? spanColumns(breakStart, w.breakdown_date, vYear, vMonth0, daysInMonth) : null;
                 if (breakdown) bars.push({ phase: "breakdown", cols: breakdown });
 
                 return (
-                  <div key={w.id} className="grid items-center gap-px" style={{ gridTemplateColumns: gridCols, minHeight: 30 }}>
+                  <div
+                    key={w.id}
+                    className="grid items-center gap-px"
+                    style={{ gridTemplateColumns: gridCols, minHeight: 40, opacity: dim ? 0.6 : 1 }}
+                  >
+                    {/* Label cell: avatar + name + guests */}
                     <Link
                       href={`/venue/weddings/${w.slug}`}
-                      className="text-xs font-medium truncate pr-2 hover:underline"
-                      style={{ color: "var(--ink)" }}
+                      className="flex items-center gap-2.5 pr-3 min-w-0 group"
                       title={w.couple_names}
                     >
-                      {w.couple_names}
+                      <span
+                        className="shrink-0 w-9 h-9 rounded-full inline-flex items-center justify-center text-[11px] font-semibold"
+                        style={{ background: style.shoulder, color: style.shoulderText, border: `1px solid ${style.border}` }}
+                      >
+                        {initialsOf(w.couple_names)}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-medium truncate group-hover:underline" style={{ color: "var(--ink)" }}>
+                          {w.couple_names}
+                        </span>
+                        {w.guests != null && (
+                          <span className="block text-[11px] truncate" style={{ color: "var(--ink-2)" }}>
+                            {w.guests} guests
+                          </span>
+                        )}
+                      </span>
                     </Link>
-                    {/* The day cells form the track; bars are placed by gridColumn. */}
+
+                    {/* Day track — today gets a faint vertical highlight band */}
                     {Array.from({ length: daysInMonth }, (_, i) => {
                       const day = i + 1;
-                      const dow = new Date(year, month0, day).getDay();
+                      const dow = new Date(vYear, vMonth0, day).getDay();
                       const isToday = todayCol === day;
                       return (
                         <div
                           key={day}
-                          className="h-[26px] rounded-[3px]"
+                          className="h-[34px] rounded-[4px]"
                           style={{
                             gridColumn: day + 1,
                             gridRow: 1,
-                            background: dow === 0 || dow === 6 ? "rgba(28,25,23,0.035)" : "transparent",
-                            outline: isToday ? "1px solid var(--peach)" : undefined,
-                            outlineOffset: -1,
+                            background: isToday
+                              ? "rgba(255,198,173,0.45)"
+                              : dow === 0 || dow === 6
+                              ? "rgba(28,25,23,0.03)"
+                              : "transparent",
                           }}
                         />
                       );
                     })}
-                    {bars.map((b) => (
-                      <div
-                        key={b.phase}
-                        className="h-[18px] rounded-full flex items-center px-2 overflow-hidden self-center"
-                        style={{
-                          gridColumn: `${b.cols.start + 1} / ${b.cols.end + 2}`,
-                          gridRow: 1,
-                          background: style.bg,
-                          border: `1px solid ${style.border ?? "transparent"}`,
-                          color: style.text,
-                        }}
-                        title={`${w.couple_names} · ${PHASE_LABEL[b.phase]}`}
-                      >
-                        <span className="text-[9px] font-medium uppercase tracking-wide truncate">
-                          {b.phase === "weekend" ? "Wedding" : PHASE_LABEL[b.phase]}
-                        </span>
-                      </div>
-                    ))}
+
+                    {/* Phase bars */}
+                    {bars.map((b) => {
+                      const isWeekend = b.phase === "weekend";
+                      const span = b.cols.end - b.cols.start + 1;
+                      return (
+                        <div
+                          key={b.phase}
+                          className="h-[24px] rounded-lg flex items-center justify-center px-2 overflow-hidden self-center"
+                          style={{
+                            gridColumn: `${b.cols.start + 1} / ${b.cols.end + 2}`,
+                            gridRow: 1,
+                            background: isWeekend ? style.solid : style.shoulder,
+                            color: isWeekend ? style.solidText : style.shoulderText,
+                            border: isWeekend ? "none" : `1px solid ${style.border}`,
+                          }}
+                          title={`${w.couple_names} · ${PHASE_LABEL[b.phase]}`}
+                        >
+                          {span >= 2 && (
+                            <span className="text-[10px] font-medium truncate">
+                              {PHASE_LABEL[b.phase]}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}
@@ -246,6 +383,16 @@ export function WeddingTimelineStrip({
           </Link>
         </div>
       )}
+
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 pt-4 text-xs" style={{ color: "var(--ink-2)", borderTop: "1px solid var(--line)" }}>
+        {LEGEND.map((t) => (
+          <span key={t} className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: TONE_STYLE[t].dot, border: `1px solid ${TONE_STYLE[t].border}` }} />
+            {TONE_STYLE[t].label}
+          </span>
+        ))}
+      </div>
     </section>
   );
 }

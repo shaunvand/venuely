@@ -115,7 +115,7 @@ function ImportPrompt({ highlighted = false }: { highlighted?: boolean }) {
           <div className="flex-1 min-w-0">
             <div className="font-serif text-lg" style={{ fontWeight: 700 }}>Add your venue photos to bring the preview to life</div>
             <div className="text-sm" style={{ color: "var(--ink-2)" }}>
-              Couples see these images in their portal. Import them from Google, run Smart Import, or upload your own — it only takes a minute.
+              Couples see these images in their portal. Run Smart Import or upload your own — it only takes a minute.
             </div>
           </div>
           <span className="vy-btn vy-btn-primary flex-shrink-0">Add photos ↓</span>

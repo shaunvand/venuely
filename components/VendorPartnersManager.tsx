@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addItem, updateItem, bulkDelete } from "@/app/venue/_inventory/actions";
 import { VENDOR_TYPES, VENDOR_LABELS, VENDOR_DB_VALUE } from "@/lib/inventory/schemas";
+import { useLoading } from "@/components/LoadingProvider";
 
 // Generic stock placeholders (attached during Smart Import) — a supplier's own
 // website image always beats these, so the auto-pull treats them as replaceable.
@@ -25,6 +26,7 @@ const blank = (): Draft => ({ typeSlug: "caterers", name: "", description: "", p
 // bulk-pull website images. Mirrors the couple portal's supplier layout.
 export function VendorPartnersManager({ venueId, items }: { venueId: string; items: Row[] }) {
   const router = useRouter();
+  const loading = useLoading();
   const [filter, setFilter] = useState<string>("all");
   const [editing, setEditing] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
@@ -37,6 +39,7 @@ export function VendorPartnersManager({ venueId, items }: { venueId: string; ite
   async function save() {
     if (!editing || !editing.name.trim()) return;
     setBusy(true);
+    loading.show("Saving supplier…");
     try {
       // No photo chosen but a website given → pull their site image automatically
       // (the Upload / From website / Remove controls still override it any time).
@@ -55,7 +58,10 @@ export function VendorPartnersManager({ venueId, items }: { venueId: string; ite
       };
       if (editing.id) await updateItem("caterers", editing.id, patch);
       else await addItem(editing.typeSlug as never, venueId, patch);
-      setEditing(null); router.refresh();
+      setEditing(null); loading.complete("Saved ✓"); router.refresh();
+    } catch (e) {
+      loading.hide();
+      throw e;
     } finally { setBusy(false); }
   }
   async function remove(id: string) {
@@ -66,34 +72,47 @@ export function VendorPartnersManager({ venueId, items }: { venueId: string; ite
 
   async function uploadImage(f: File) {
     setImgBusy(true);
+    loading.show("Uploading image…", { messages: ["Uploading…", "Optimising…"] });
     try {
       const fd = new FormData(); fd.append("file", f); fd.append("venue_id", venueId);
       const r = await fetch("/api/venue/inventory/image", { method: "POST", body: fd });
-      const j = await r.json(); if (r.ok && j.ok) setEditing((d) => d ? { ...d, image_url: j.url } : d);
-    } finally { setImgBusy(false); }
+      const j = await r.json(); if (r.ok && j.ok) { setEditing((d) => d ? { ...d, image_url: j.url } : d); loading.complete("Uploaded ✓"); } else loading.hide();
+    } catch (e) { loading.hide(); throw e; } finally { setImgBusy(false); }
   }
   async function fromWebsite() {
     if (!editing?.website_url.trim()) return;
     setImgBusy(true);
+    loading.show("Reading the website…", { messages: ["Reading the website…", "Finding their best image…"] });
     try {
       const r = await fetch("/api/venue/site-image", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: editing.website_url, venue_id: venueId }) });
-      const j = await r.json(); if (r.ok && j.ok && j.url) setEditing((d) => d ? { ...d, image_url: j.url } : d); else alert(`No image: ${j.error ?? "nothing usable"}`);
-    } finally { setImgBusy(false); }
+      const j = await r.json(); if (r.ok && j.ok && j.url) { setEditing((d) => d ? { ...d, image_url: j.url } : d); loading.complete("Pulled ✓"); } else { loading.hide(); alert(`No image: ${j.error ?? "nothing usable"}`); }
+    } catch (e) { loading.hide(); throw e; } finally { setImgBusy(false); }
   }
   async function pullAllImages(auto = false) {
     const targets = items.filter(needsSiteImage);
     if (!targets.length) { if (!auto) setBulkMsg("No suppliers with a website and a missing or stock image."); return; }
     setBulkBusy(true); let done = 0, failed = 0;
-    for (const i of targets) {
-      setBulkMsg(`${auto ? "Auto-fetching supplier photos from their websites — " : ""}${done + failed + 1} of ${targets.length}…`);
-      try {
-        const r = await fetch("/api/venue/site-image", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: String(i.website_url), venue_id: venueId }) });
-        const j = await r.json();
-        if (r.ok && j.ok && j.url) { await updateItem("caterers", i.id, { image_url: j.url }); done++; } else failed++;
-      } catch { failed++; }
-      if (done && (done + failed) % 8 === 0) router.refresh(); // surface progress as cards update
+    // Only surface the full-screen overlay for the explicit user action — the
+    // silent auto-pull on mount keeps its quiet inline message instead.
+    if (!auto) loading.show(`Fetching supplier photos…`, { determinate: true });
+    try {
+      for (const i of targets) {
+        setBulkMsg(`${auto ? "Auto-fetching supplier photos from their websites — " : ""}${done + failed + 1} of ${targets.length}…`);
+        if (!auto) loading.set(((done + failed) / targets.length) * 100, `${done + failed + 1} of ${targets.length}…`);
+        try {
+          const r = await fetch("/api/venue/site-image", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: String(i.website_url), venue_id: venueId }) });
+          const j = await r.json();
+          if (r.ok && j.ok && j.url) { await updateItem("caterers", i.id, { image_url: j.url }); done++; } else failed++;
+        } catch { failed++; }
+        if (done && (done + failed) % 8 === 0) router.refresh(); // surface progress as cards update
+      }
+      if (!auto) loading.complete(`${done} photo${done === 1 ? "" : "s"} pulled`);
+    } catch (e) {
+      if (!auto) loading.hide();
+      throw e;
+    } finally {
+      setBulkBusy(false); setBulkMsg(`Done — ${done} supplier photo${done === 1 ? "" : "s"} pulled from their websites${failed ? `, ${failed} had no usable image` : ""}.`); router.refresh();
     }
-    setBulkBusy(false); setBulkMsg(`Done — ${done} supplier photo${done === 1 ? "" : "s"} pulled from their websites${failed ? `, ${failed} had no usable image` : ""}.`); router.refresh();
   }
 
   // Auto-pull: any supplier with a website but no photo (or just a generic stock

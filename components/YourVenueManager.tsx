@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
+import { useLoading } from "@/components/LoadingProvider";
 
 const LOCATIONS = [
   "Outside",
@@ -37,6 +38,7 @@ export function YourVenueManager({
   floorPlans?: Media[];
 }) {
   const router = useRouter();
+  const loading = useLoading();
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -54,46 +56,49 @@ export function YourVenueManager({
     if (!files || files.length === 0) return;
     setErr(null);
     setBusy("Uploading…");
-    const fd = new FormData();
-    fd.append("venue_id", venueId);
-    fd.append("category", cat);
-    Array.from(files).forEach((f) => fd.append("files", f));
-    const res = await fetch("/api/venue/gallery", { method: "POST", body: fd });
-    const j = await res.json();
-    setBusy(null);
-    if (!res.ok) return setErr(j.error || "Upload failed");
-    if (ref.current) ref.current.value = "";
-    start(() => router.refresh());
+    loading.show("Uploading your media…", { messages: ["Uploading…", "Optimising…"] });
+    try {
+      const fd = new FormData();
+      fd.append("venue_id", venueId);
+      fd.append("category", cat);
+      Array.from(files).forEach((f) => fd.append("files", f));
+      const res = await fetch("/api/venue/gallery", { method: "POST", body: fd });
+      const j = await res.json();
+      if (!res.ok) { loading.hide(); return setErr(j.error || "Upload failed"); }
+      if (ref.current) ref.current.value = "";
+      loading.complete("Uploaded ✓");
+      start(() => router.refresh());
+    } catch (e) {
+      loading.hide();
+      setErr(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function smartImport() {
     setErr(null);
     setBusy("Pulling & labelling images…");
-    const res = await fetch("/api/venue/gallery/smart-import", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ venue_id: venueId }),
+    loading.show("Pulling images from your venue…", {
+      messages: ["Pulling images from your venue…", "Labelling your best photos…"],
     });
-    const j = await res.json();
-    setBusy(null);
-    if (!res.ok) return setErr(j.error || "Smart import failed");
-    setErr(j.added ? null : j.message || "No new images found.");
-    start(() => router.refresh());
-  }
-
-  async function importGoogle() {
-    setErr(null);
-    setBusy("Importing your Google photos…");
-    const res = await fetch("/api/venue/places-photos", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ venue_id: venueId }),
-    });
-    const j = await res.json();
-    setBusy(null);
-    if (!res.ok) return setErr(j.error || "Google import failed");
-    setErr(j.added ? null : j.message || "No Google photos found.");
-    start(() => router.refresh());
+    try {
+      const res = await fetch("/api/venue/gallery/smart-import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ venue_id: venueId }),
+      });
+      const j = await res.json();
+      if (!res.ok) { loading.hide(); return setErr(j.error || "Smart import failed"); }
+      setErr(j.added ? null : j.message || "No new images found.");
+      loading.complete(j.added ? "Done ✓" : "No new images");
+      start(() => router.refresh());
+    } catch (e) {
+      loading.hide();
+      setErr(e instanceof Error ? e.message : "Smart import failed");
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function recategorise(id: string, cat: string) {
@@ -122,25 +127,9 @@ export function YourVenueManager({
   return (
     <div className="space-y-8">
       <div className="vy-card space-y-4">
-        {/* Primary action — pull the venue's real photos from Google */}
-        <div className="flex flex-col items-center text-center gap-1.5 py-2">
-          <button
-            type="button"
-            onClick={importGoogle}
-            disabled={!!busy || pending}
-            className="vy-btn vy-btn-primary text-base px-7 py-3"
-            style={{ borderRadius: "999px" }}
-            title="Pull your venue's own photos from Google Maps into the gallery"
-          >
-            📍 Import from Google
-          </button>
-          <span className="text-xs" style={{ color: "var(--ink-2)" }}>
-            Recommended — pulls your venue&apos;s real photos straight from Google Maps.
-          </span>
-        </div>
-
-        {/* Secondary options */}
-        <div className="flex flex-wrap items-end justify-center gap-4 pt-3 border-t" style={{ borderColor: "var(--line)" }}>
+        {/* Add more photos — Google import now happens automatically at
+            onboarding, so Smart Import + manual upload are the ways to add more. */}
+        <div className="flex flex-wrap items-end justify-center gap-4">
           <div className="space-y-1">
             <label className="vy-label">Location</label>
             <select className="vy-select" value={category} onChange={(e) => setCategory(e.target.value)}>
@@ -198,20 +187,27 @@ export function YourVenueManager({
               {g.loc}
               <span className="vy-tag vy-tag-soft">{g.media.length}</span>
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {g.media.map((m) => (
-                <div key={m.id} className="group relative rounded-lg overflow-hidden border border-stone-200 bg-stone-50">
-                  {m.kind === "video" ? (
-                    <video src={m.url} controls className="h-36 w-full object-cover" />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={m.url} alt={m.label || ""} className="h-36 w-full object-cover" />
-                  )}
-                  <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-white/90 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div
+                  key={m.id}
+                  className="group relative rounded-2xl bg-white p-2 transition hover:shadow-md"
+                  style={{ border: "1px solid var(--line)" }}
+                >
+                  <div className="rounded-xl overflow-hidden" style={{ background: "var(--bone)" }}>
+                    {m.kind === "video" ? (
+                      <video src={m.url} controls className="aspect-[4/3] w-full object-cover" />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.url} alt={m.label || ""} className="aspect-[4/3] w-full object-cover" />
+                    )}
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5">
                     <select
                       value={g.loc}
                       onChange={(e) => recategorise(m.id, e.target.value)}
-                      className="text-xs border border-stone-200 rounded px-1 py-0.5 flex-1 min-w-0"
+                      className="text-xs rounded-lg px-2 py-1 flex-1 min-w-0 bg-white"
+                      style={{ border: "1px solid var(--line)" }}
                     >
                       {LOCATIONS.map((l) => (
                         <option key={l} value={l}>{l}</option>
@@ -220,7 +216,8 @@ export function YourVenueManager({
                     <button
                       type="button"
                       onClick={() => remove(m.id)}
-                      className="text-xs text-[color:var(--poppy)] px-1"
+                      className="text-xs px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ color: "var(--poppy)" }}
                     >
                       Remove
                     </button>
@@ -243,16 +240,23 @@ export function YourVenueManager({
               Layout images couples see on the Floor Plans tab of their portal.
             </p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {floorPlans.map((m) => (
-              <div key={m.id} className="group relative rounded-lg overflow-hidden border border-stone-200 bg-stone-50">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={m.url} alt={m.label || "Floor plan"} className="h-36 w-full object-contain bg-white" />
-                <div className="absolute inset-x-0 bottom-0 flex items-center justify-end bg-white/90 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div
+                key={m.id}
+                className="group relative rounded-2xl bg-white p-2 transition hover:shadow-md"
+                style={{ border: "1px solid var(--line)" }}
+              >
+                <div className="rounded-xl overflow-hidden bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={m.url} alt={m.label || "Floor plan"} className="aspect-[4/3] w-full object-contain" />
+                </div>
+                <div className="mt-2 flex items-center justify-end">
                   <button
                     type="button"
                     onClick={() => remove(m.id)}
-                    className="text-xs text-[color:var(--poppy)] px-1"
+                    className="text-xs px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ color: "var(--poppy)" }}
                   >
                     Remove
                   </button>

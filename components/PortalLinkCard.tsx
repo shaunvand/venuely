@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useLoading } from "@/components/LoadingProvider";
 
 export function PortalLinkCard({
   portalUrl,
@@ -15,6 +16,7 @@ export function PortalLinkCard({
   const [editing, setEditing] = useState(false);
   const [pw, setPw] = useState("");
   const [isPending, startTransition] = useTransition();
+  const loading = useLoading();
 
   function copyUrl() {
     navigator.clipboard.writeText(portalUrl).then(() => {
@@ -26,15 +28,26 @@ export function PortalLinkCard({
   function submit() {
     const fd = new FormData();
     fd.set("password", pw);
+    loading.show("Setting portal password…");
     startTransition(async () => {
-      await setPasswordAction(fd);
-      setEditing(false); setPw("");
+      try {
+        await setPasswordAction(fd);
+        setEditing(false); setPw("");
+        loading.complete("Saved ✓");
+      } catch (e) {
+        loading.hide();
+        throw e;
+      }
     });
   }
   function clearPw() {
     const fd = new FormData();
     fd.set("password", "");
-    startTransition(async () => { await setPasswordAction(fd); });
+    loading.show("Removing portal password…");
+    startTransition(async () => {
+      try { await setPasswordAction(fd); loading.complete("Removed ✓"); }
+      catch (e) { loading.hide(); throw e; }
+    });
   }
 
   return (

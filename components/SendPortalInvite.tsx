@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { SendPortalInviteResult } from "@/app/venue/weddings/actions";
+import { useLoading } from "@/components/LoadingProvider";
 
 export function SendPortalInvite({
   portalUrl,
@@ -20,6 +21,7 @@ export function SendPortalInvite({
   const [copied, setCopied] = useState(false);
   const [result, setResult] = useState<SendPortalInviteResult | null>(null);
   const [isPending, startTransition] = useTransition();
+  const loading = useLoading();
 
   // The live link is whatever the action last returned, else the SSR-provided URL.
   const liveUrl = result?.url ?? portalUrl;
@@ -36,9 +38,16 @@ export function SendPortalInvite({
   }
 
   function send() {
+    loading.show("Sending the couple their link…");
     startTransition(async () => {
-      const r = await sendAction({ email: email.trim(), whatsapp: whatsapp.trim() });
-      setResult(r);
+      try {
+        const r = await sendAction({ email: email.trim(), whatsapp: whatsapp.trim() });
+        setResult(r);
+        loading.complete("Sent ✓");
+      } catch (e) {
+        loading.hide();
+        throw e;
+      }
     });
   }
 

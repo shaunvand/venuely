@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLoading } from "@/components/LoadingProvider";
 
 type Guest = { id: string; full_name: string; email: string | null; phone: string | null; rsvp_status: string | null; rsvp_token: string; invited_at: string | null; responded_at: string | null; party_size: number | null };
 type Settings = { headline?: string; message?: string; accent?: string; primary?: string; cover?: string; deadline?: string; allowPhoto?: boolean; allowParty?: boolean; thankYou?: string };
@@ -25,6 +26,7 @@ export function GuestInvites({ slug, primary, accent, heading, cardRadius }: {
   const [sendingAll, setSendingAll] = useState(false);
   const [origin, setOrigin] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const overlay = useLoading();
 
   function loadGuests() { return fetch(`/api/wedding/${slug}/guests`).then((r) => r.json()).then((j) => setGuests(j.guests ?? [])); }
   useEffect(() => {
@@ -45,22 +47,40 @@ export function GuestInvites({ slug, primary, accent, heading, cardRadius }: {
   async function importFile(f: File | null) {
     if (!f) return;
     setImporting(true); setImportMsg("");
-    const fd = new FormData(); fd.append("file", f);
-    const r = await fetch(`/api/wedding/${slug}/guests/import`, { method: "POST", body: fd });
-    const j = await r.json();
-    setImporting(false);
-    if (j.ok) { setImportMsg(`✓ Imported ${j.imported} guests`); await loadGuests(); }
-    else setImportMsg(j.error || "import failed");
-    if (fileRef.current) fileRef.current.value = "";
+    overlay.show("Importing your guest list…", { messages: ["Reading your file…", "Matching the columns…", "Adding your guests…"] });
+    try {
+      const fd = new FormData(); fd.append("file", f);
+      const r = await fetch(`/api/wedding/${slug}/guests/import`, { method: "POST", body: fd });
+      const j = await r.json();
+      if (j.ok) { setImportMsg(`✓ Imported ${j.imported} guests`); await loadGuests(); overlay.complete(`Imported ${j.imported} ✓`); }
+      else { setImportMsg(j.error || "import failed"); overlay.hide(); }
+    } catch (e) {
+      overlay.hide();
+      setImportMsg(e instanceof Error ? e.message : "import failed");
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   }
 
   async function sendInvites(guestIds?: string[], onlyUninvited?: boolean) {
     setSendingAll(true);
-    const r = await fetch(`/api/wedding/${slug}/invite`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(guestIds ? { guestIds } : { onlyUninvited }) });
-    const j = await r.json();
-    setSendingAll(false);
-    if (j.ok) await loadGuests();
-    return j.results as Array<{ id: string; whatsapp: string | null }> | undefined;
+    // A single-guest send (from the row "Invite" button) is quick; only show the
+    // overlay for the bulk "email all uninvited" action.
+    const bulk = !guestIds;
+    if (bulk) overlay.show("Emailing your guests…");
+    try {
+      const r = await fetch(`/api/wedding/${slug}/invite`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(guestIds ? { guestIds } : { onlyUninvited }) });
+      const j = await r.json();
+      if (j.ok) await loadGuests();
+      if (bulk) overlay.complete("Sent ✓");
+      return j.results as Array<{ id: string; whatsapp: string | null }> | undefined;
+    } catch (e) {
+      if (bulk) overlay.hide();
+      throw e;
+    } finally {
+      setSendingAll(false);
+    }
   }
 
   async function sendOne(g: Guest) {

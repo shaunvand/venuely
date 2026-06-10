@@ -9,6 +9,18 @@ function isCancelledStatus(status: string | null | undefined): boolean {
   return s === "cancelled" || s === "lost";
 }
 
+// Venuely status → pill colour. Mirrors the timeline strip's mapping so both
+// views read the same. attention/paid aren't available on the lightweight
+// Booking shape here, so we key off status alone (+ cancelled de-emphasis).
+type StatusStyle = { fill: string; text: string; dot: string };
+function statusStyle(status: string | null | undefined): StatusStyle {
+  const s = (status ?? "").toLowerCase();
+  if (s === "cancelled" || s === "lost") return { fill: "rgba(236,233,231,0.7)", text: "#a39e99", dot: "#d6d2cf" };
+  if (s === "completed" || s === "paid") return { fill: "rgba(191,218,211,0.55)", text: "#1f5d3e", dot: "#1f5d3e" }; // leaf / paid
+  if (s === "booked" || s === "confirmed") return { fill: "rgba(138,154,134,0.28)", text: "#3f4a3c", dot: "#8a9a86" }; // sage / confirmed
+  return { fill: "var(--cream)", text: "var(--ink-2)", dot: "var(--bone)" }; // tentative / inquiry
+}
+
 // Expand a booking's wedding_date..wedding_end_date span into one ISO key per
 // day so multi-day weddings light up every day they cover. A null/absent end
 // date (or an end before the start) collapses to the single start day. Capped to
@@ -128,13 +140,6 @@ export function BookingsCalendar({
     return cells;
   }
 
-  // All distinct couples on a date — drives the single/multiple cell colour.
-  function distinctCouples(c: Cell): number {
-    const set = new Set<string>();
-    c.bookings.forEach((b) => set.add(b.couple_names));
-    return set.size;
-  }
-
   // A clash = more than one DISTINCT non-cancelled wedding on the same date.
   function distinctActiveCouples(c: Cell): number {
     const set = new Set<string>();
@@ -155,10 +160,16 @@ export function BookingsCalendar({
         </div>
         <div className="flex flex-wrap items-center gap-4 text-xs" style={{ color: "var(--ink-2)" }}>
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full" style={{ background: "var(--poppy)" }} /> Single booking
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#8a9a86" }} /> Confirmed
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full" style={{ background: "var(--peach)" }} /> Multiple
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#1f5d3e" }} /> Paid in full
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "var(--bone)", border: "1px solid var(--line)" }} /> Tentative
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#b91c1c" }} /> Clash
           </span>
           {hasOverlays && (
             <>
@@ -181,17 +192,23 @@ export function BookingsCalendar({
           const cells = buildGrid(m.year, m.month);
           return (
             <div key={m.label}>
-              <div className="font-serif text-base mb-2">{m.label}</div>
-              <div className="grid grid-cols-7 gap-1 text-center">
+              <div className="font-serif text-base mb-2" style={{ color: "var(--ink)" }}>{m.label}</div>
+              <div
+                className="grid grid-cols-7 rounded-xl overflow-hidden"
+                style={{ border: "1px solid var(--line)", background: "var(--line)", gap: "1px" }}
+              >
                 {WEEKDAYS.map((w, i) => (
-                  <div key={`${m.label}-h-${i}`} className="text-[10px] uppercase tracking-wider py-1" style={{ color: "var(--ink-2)" }}>
+                  <div
+                    key={`${m.label}-h-${i}`}
+                    className="text-[10px] uppercase tracking-wider py-1.5 text-center"
+                    style={{ color: "var(--ink-2)", background: "var(--cream)" }}
+                  >
                     {w}
                   </div>
                 ))}
                 {cells.map((c, i) => {
-                  if (!c) return <div key={`${m.label}-e-${i}`} />;
+                  if (!c) return <div key={`${m.label}-e-${i}`} style={{ background: "#fff", minHeight: 64 }} />;
                   const count = c.bookings.length;
-                  const couples = distinctCouples(c);
                   const activeCouples = distinctActiveCouples(c);
                   const clash = activeCouples > 1;
                   const roomCount = c.rooms.length;
@@ -217,60 +234,93 @@ export function BookingsCalendar({
                   if (count === 0) tipLines.push("+ Add a wedding on this date");
                   const tooltip = tipLines.join("\n");
 
-                  const colour = count === 0 ? "transparent" : couples === 1 ? "var(--poppy)" : "var(--peach)";
-                  const txtColour = count === 0 ? "var(--ink)" : couples === 1 ? "#fff" : "var(--ink)";
                   const link = count === 1 ? `/venue/weddings/${c.bookings[0].slug}` : count > 1 ? weddingHref : `/venue/weddings?date=${c.key}`;
+
+                  // De-dupe couples to one pill each (a multi-day span lands the
+                  // same booking on consecutive days).
+                  const seen = new Set<string>();
+                  const pills = c.bookings.filter((b) => {
+                    if (seen.has(b.couple_names)) return false;
+                    seen.add(b.couple_names);
+                    return true;
+                  });
 
                   const cell = (
                     <div
-                      className="relative w-9 h-9 mx-auto flex items-center justify-center text-xs rounded-full transition-transform hover:scale-110"
+                      className="relative h-full px-1.5 pt-1 pb-1.5 transition-colors"
                       style={{
-                        background: colour,
-                        color: txtColour,
-                        fontWeight: count ? 600 : 400,
-                        outline: clash
-                          ? "2px solid #b91c1c"
+                        background: "#fff",
+                        minHeight: 64,
+                        boxShadow: clash
+                          ? "inset 0 0 0 2px #b91c1c"
                           : c.isToday
-                          ? "2px solid var(--sage)"
+                          ? "inset 0 0 0 2px var(--sage)"
                           : undefined,
-                        outlineOffset: clash || c.isToday ? "1px" : undefined,
                       }}
                       title={tooltip || undefined}
                     >
-                      {c.day}
+                      {/* Day number top-left; today gets a filled coral chip */}
+                      <div className="flex items-start justify-between">
+                        <span
+                          className="text-[11px] tabular-nums inline-flex items-center justify-center"
+                          style={
+                            c.isToday
+                              ? { width: 18, height: 18, borderRadius: 9999, background: "var(--poppy)", color: "#fff", fontWeight: 700 }
+                              : { color: "var(--ink-2)", fontWeight: 500 }
+                          }
+                        >
+                          {c.day}
+                        </span>
+                        {/* Status dots + overlay markers, top-right */}
+                        <span className="flex items-center gap-0.5 pt-0.5">
+                          {pills.slice(0, 3).map((b, bi) => (
+                            <span
+                              key={`dot-${bi}`}
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ background: statusStyle(b.status).dot }}
+                              aria-hidden
+                            />
+                          ))}
+                          {roomCount > 0 && <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--sage)" }} aria-hidden />}
+                          {holdQty > 0 && <span className="w-1.5 h-1.5" style={{ background: "var(--ink-2)" }} aria-hidden />}
+                        </span>
+                      </div>
+
+                      {/* Booking pills */}
+                      <div className="mt-1 space-y-0.5">
+                        {pills.slice(0, 2).map((b, bi) => {
+                          const st = statusStyle(b.status);
+                          return (
+                            <div
+                              key={`pill-${bi}`}
+                              className="text-[10px] leading-tight truncate rounded-md px-1.5 py-0.5"
+                              style={{ background: st.fill, color: st.text }}
+                            >
+                              {b.couple_names}
+                            </div>
+                          );
+                        })}
+                        {pills.length > 2 && (
+                          <div className="text-[9px] leading-none" style={{ color: "var(--ink-2)" }}>
+                            +{pills.length - 2} more
+                          </div>
+                        )}
+                      </div>
+
                       {clash && (
                         <span
-                          className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center"
+                          className="absolute top-1 right-1 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center"
                           style={{ background: "#b91c1c", color: "#fff" }}
                         >
                           {activeCouples}
                         </span>
                       )}
-                      {/* Overlay markers along the bottom of the day cell. */}
-                      {(roomCount > 0 || holdQty > 0) && (
-                        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5">
-                          {roomCount > 0 && (
-                            <span
-                              className="w-1.5 h-1.5 rounded-full"
-                              style={{ background: "var(--sage)" }}
-                              aria-hidden
-                            />
-                          )}
-                          {holdQty > 0 && (
-                            <span
-                              className="w-1.5 h-1.5"
-                              style={{ background: "var(--ink-2)" }}
-                              aria-hidden
-                            />
-                          )}
-                        </span>
-                      )}
                     </div>
                   );
                   return (
-                    <div key={c.key} className="py-0.5">
+                    <div key={c.key} className="block">
                       {link ? (
-                        <Link href={link} aria-label={tooltip || `${c.day} ${m.label}`}>
+                        <Link href={link} aria-label={tooltip || `${c.day} ${m.label}`} className="block h-full">
                           {cell}
                         </Link>
                       ) : (

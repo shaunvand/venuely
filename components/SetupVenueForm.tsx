@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { VenueAddressPicker } from "@/components/VenueAddressPicker";
+import { useLoading } from "@/components/LoadingProvider";
 import type { SetupVenueState } from "@/app/onboarding/setup-venue/actions";
 
 type SeedItem = { name: string; description: string | null; price_zar: number | null; category: string | null };
@@ -51,6 +52,7 @@ export function SetupVenueForm({
   // Expected failures come back as { error } (success redirects server-side), so the
   // form re-renders with its state intact instead of dumping to an error page.
   const [actionState, formAction] = useActionState(action, null);
+  const loading = useLoading();
 
   const [url, setUrl] = useState("");
   const [importing, setImporting] = useState(false);
@@ -93,6 +95,9 @@ export function SetupVenueForm({
     if (!url.trim()) return;
     setImporting(true);
     setImportMsg("Reading site…");
+    loading.show("Reading your website…", {
+      messages: ["Reading your website…", "Pulling in your details…", "Finding your catalogue & rooms…"],
+    });
     try {
       const res = await fetch("/api/venue/import", {
         method: "POST",
@@ -101,6 +106,7 @@ export function SetupVenueForm({
       });
       const json = await res.json();
       if (!res.ok || !json.ok) {
+        loading.hide();
         setImportMsg(`Import failed: ${json.error ?? "unknown"}`);
         return;
       }
@@ -120,7 +126,9 @@ export function SetupVenueForm({
         d.accommodation?.length ? `${d.accommodation.length} rooms` : null,
       ].filter(Boolean).join(", ");
       setImportMsg(`Imported${seeded ? `: ${seeded}` : " — no inventory detected, basics only"}.`);
+      loading.complete("Imported ✓");
     } catch (e) {
+      loading.hide();
       setImportMsg(`Import error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setImporting(false);
@@ -308,12 +316,14 @@ export function LogoUploadField({
   const [logoUrl, setLogoUrl] = useState(defaultUrl);
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const loading = useLoading();
 
   async function upload(files: FileList | null) {
     const f = files?.[0];
     if (!f) return;
     setErr(null);
     setUploading(true);
+    loading.show("Uploading your logo…", { messages: ["Uploading…", "Optimising…"] });
     try {
       const fd = new FormData();
       if (venueId) fd.append("venue_id", venueId);
@@ -322,12 +332,15 @@ export function LogoUploadField({
       const res = await fetch("/api/venue/gallery", { method: "POST", body: fd });
       const j = await res.json();
       if (!res.ok || !j.ok) {
+        loading.hide();
         setErr(j.error || "Upload failed — paste a hosted URL below instead.");
         return;
       }
       const uploaded = j.inserted?.[0]?.url;
       if (uploaded) setLogoUrl(uploaded);
+      loading.complete("Uploaded ✓");
     } catch (e) {
+      loading.hide();
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setUploading(false);

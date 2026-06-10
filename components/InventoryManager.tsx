@@ -4,6 +4,7 @@ import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { bulkDelete, bulkSetActive, bulkSetPrice, bulkSetCommission, bulkSetCostTreatment, updateItem, bulkInsert, addItem } from "@/app/venue/_inventory/actions";
 import type { InventoryType } from "@/lib/inventory/schemas";
+import { useLoading } from "@/components/LoadingProvider";
 
 type Field = { key: string; label: string; type: "string" | "number" | "select"; options: string[] | null; required?: boolean };
 type Item = Record<string, unknown> & { id: string; active?: boolean };
@@ -41,6 +42,7 @@ export function InventoryManager({
   const [siteAllBusy, setSiteAllBusy] = useState(false);
   const [siteAllMsg, setSiteAllMsg] = useState("");
   const router = useRouter();
+  const loading = useLoading();
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
   const [bulkPrice, setBulkPrice] = useState("");
   const [bulkCommission, setBulkCommission] = useState("");
@@ -126,27 +128,36 @@ export function InventoryManager({
     }
     const missing = fields.filter((f) => f.required && !String(editDraft[f.key] ?? "").trim());
     if (missing.length) return;
+    loading.show("Saving…");
     startTransition(async () => {
-      if (editMode === "edit" && editingId) {
-        await updateItem(type, editingId, patch);
-      } else {
-        await addItem(type, venueId, patch);
+      try {
+        if (editMode === "edit" && editingId) {
+          await updateItem(type, editingId, patch);
+        } else {
+          await addItem(type, venueId, patch);
+        }
+        setEditOpen(false); setEditingId(null);
+        loading.complete("Saved ✓");
+      } catch (e) {
+        loading.hide();
+        throw e;
       }
-      setEditOpen(false); setEditingId(null);
     });
   }
 
   async function uploadImage(f: File) {
     setUploadingImg(true);
+    loading.show("Uploading image…", { messages: ["Uploading…", "Optimising…"] });
     try {
       const fd = new FormData();
       fd.append("file", f);
       fd.append("venue_id", venueId);
       const res = await fetch("/api/venue/inventory/image", { method: "POST", body: fd });
       const j = await res.json();
-      if (res.ok && j.ok) setEditDraft((d) => ({ ...d, image_url: j.url }));
-      else alert(`Upload failed: ${j.error ?? "unknown"}`);
+      if (res.ok && j.ok) { setEditDraft((d) => ({ ...d, image_url: j.url })); loading.complete("Uploaded ✓"); }
+      else { loading.hide(); alert(`Upload failed: ${j.error ?? "unknown"}`); }
     } catch (e) {
+      loading.hide();
       alert(`Upload error: ${e instanceof Error ? e.message : String(e)}`);
     } finally { setUploadingImg(false); }
   }
@@ -156,12 +167,14 @@ export function InventoryManager({
     const site = String(editDraft.website_url ?? "").trim();
     if (!site) return;
     setSiteImgBusy(true);
+    loading.show("Reading the website…", { messages: ["Reading the website…", "Finding their best image…"] });
     try {
       const res = await fetch("/api/venue/site-image", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: site, venue_id: venueId }) });
       const j = await res.json();
-      if (res.ok && j.ok && j.url) setEditDraft((d) => ({ ...d, image_url: j.url }));
-      else alert(`Couldn't get an image from that website: ${j.error ?? "nothing usable found"}`);
+      if (res.ok && j.ok && j.url) { setEditDraft((d) => ({ ...d, image_url: j.url })); loading.complete("Pulled ✓"); }
+      else { loading.hide(); alert(`Couldn't get an image from that website: ${j.error ?? "nothing usable found"}`); }
     } catch (e) {
+      loading.hide();
       alert(`Error: ${e instanceof Error ? e.message : String(e)}`);
     } finally { setSiteImgBusy(false); }
   }
@@ -173,17 +186,26 @@ export function InventoryManager({
     if (!targets.length) { setSiteAllMsg("No suppliers with a website and a missing image."); return; }
     setSiteAllBusy(true);
     let done = 0, failed = 0;
-    for (const i of targets) {
-      setSiteAllMsg(`Fetching ${done + failed + 1} of ${targets.length}…`);
-      try {
-        const res = await fetch("/api/venue/site-image", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: String(i.website_url), venue_id: venueId }) });
-        const j = await res.json();
-        if (res.ok && j.ok && j.url) { await updateItem(type, i.id, { image_url: j.url }); done++; } else failed++;
-      } catch { failed++; }
+    loading.show("Fetching images from websites…", { determinate: true });
+    try {
+      for (const i of targets) {
+        setSiteAllMsg(`Fetching ${done + failed + 1} of ${targets.length}…`);
+        loading.set(((done + failed) / targets.length) * 100, `${done + failed + 1} of ${targets.length}…`);
+        try {
+          const res = await fetch("/api/venue/site-image", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: String(i.website_url), venue_id: venueId }) });
+          const j = await res.json();
+          if (res.ok && j.ok && j.url) { await updateItem(type, i.id, { image_url: j.url }); done++; } else failed++;
+        } catch { failed++; }
+      }
+      loading.complete(`${done} updated`);
+    } catch (e) {
+      loading.hide();
+      throw e;
+    } finally {
+      setSiteAllBusy(false);
+      setSiteAllMsg(`Done — ${done} updated${failed ? `, ${failed} had no usable image` : ""}.`);
+      startTransition(() => router.refresh());
     }
-    setSiteAllBusy(false);
-    setSiteAllMsg(`Done — ${done} updated${failed ? `, ${failed} had no usable image` : ""}.`);
-    startTransition(() => router.refresh());
   }
 
   function doBulkDelete() {
@@ -241,18 +263,21 @@ export function InventoryManager({
 
   async function onImportFile(f: File) {
     setImporting(true); setImportMsg("Reading sheet & detecting columns…");
+    loading.show("Reading your sheet…", { messages: ["Reading your sheet…", "Detecting your columns…"] });
     try {
       const fd = new FormData();
       fd.append("file", f);
       fd.append("type", type);
       const res = await fetch("/api/venue/inventory/parse", { method: "POST", body: fd });
       const j = await res.json();
-      if (!res.ok || !j.ok) { setImportMsg(`Import failed: ${j.error ?? "unknown"}`); return; }
+      if (!res.ok || !j.ok) { loading.hide(); setImportMsg(`Import failed: ${j.error ?? "unknown"}`); return; }
       setImportFields(j.fields);
       setImportPreview((j.preview as Record<string, unknown>[]).map((r) => ({ ...r, _include: true })));
       const mapped = Object.entries(j.mapping || {}).filter(([, v]) => v).length;
       setImportMsg(`Detected ${mapped} columns. Review rows below — uncheck any you don't want, edit, then confirm.`);
+      loading.complete("Ready to review ✓");
     } catch (e) {
+      loading.hide();
       setImportMsg(`Error: ${e instanceof Error ? e.message : String(e)}`);
     } finally { setImporting(false); }
   }
@@ -269,13 +294,16 @@ export function InventoryManager({
       return out;
     }).filter((r) => r.name);
     if (!rows.length) { setImportMsg("Nothing to import — each row needs a Name."); return; }
+    loading.show(`Importing ${rows.length} item${rows.length === 1 ? "" : "s"}…`);
     startTransition(async () => {
       try {
         await bulkInsert(type, venueId, rows);
         setImportMsg(`Imported ${rows.length} item(s).`);
         setImportPreview([]); setImportFields([]);
+        loading.complete(`Imported ${rows.length} ✓`);
         setTimeout(() => { setImportOpen(false); setImportMsg(null); }, 1200);
       } catch (e) {
+        loading.hide();
         setImportMsg(`Import failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     });

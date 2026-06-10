@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useLoading } from "@/components/LoadingProvider";
 
 // Row actions matching the dashboard mock: [Open ↗] [⚙ Manage] [⋯ menu] —
 // the overflow menu holds copy-URL, portal-password controls, mark-paid and delete.
@@ -32,6 +33,7 @@ export function WeddingRowActions({
   const [pw, setPw] = useState("");
   const [isPending, startTransition] = useTransition();
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const loading = useLoading();
 
   useEffect(() => {
     if (!open) return;
@@ -51,21 +53,37 @@ export function WeddingRowActions({
   function savePw() {
     const fd = new FormData();
     fd.set("password", pw);
-    startTransition(async () => { await setPasswordAction(fd); setPwOpen(false); setPw(""); setOpen(false); });
+    loading.show("Setting portal password…");
+    startTransition(async () => {
+      try { await setPasswordAction(fd); setPwOpen(false); setPw(""); setOpen(false); loading.complete("Saved ✓"); }
+      catch (e) { loading.hide(); throw e; }
+    });
   }
   function clearPw() {
     const fd = new FormData();
     fd.set("password", "");
-    startTransition(async () => { await setPasswordAction(fd); setOpen(false); });
+    loading.show("Removing portal password…");
+    startTransition(async () => {
+      try { await setPasswordAction(fd); setOpen(false); loading.complete("Removed ✓"); }
+      catch (e) { loading.hide(); throw e; }
+    });
   }
   function markPaid() {
     if (!confirm("Mark this couple as paid?")) return;
-    startTransition(async () => { await markCouplePaidAction(); setOpen(false); });
+    loading.show("Marking couple paid…");
+    startTransition(async () => {
+      try { await markCouplePaidAction(); setOpen(false); loading.complete("Done ✓"); }
+      catch (e) { loading.hide(); throw e; }
+    });
   }
   function remove() {
     if (!deleteAction) return;
     if (!confirm(`Delete ${coupleNames ? `${coupleNames}'s` : "this"} wedding?\n\nThis permanently removes their portal and all planning data. This cannot be undone.`)) return;
-    startTransition(async () => { await deleteAction(); });
+    loading.show("Deleting wedding…");
+    startTransition(async () => {
+      try { await deleteAction(); loading.complete("Deleted ✓"); }
+      catch (e) { loading.hide(); throw e; }
+    });
   }
 
   const itemCls = "w-full text-left px-3 py-2 text-xs hover:bg-[color:var(--cream)] disabled:opacity-50";

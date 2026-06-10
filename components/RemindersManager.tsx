@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLoading } from "@/components/LoadingProvider";
 
 type Settings = {
   rsvpSubject?: string; rsvpTemplate?: string; rsvpIntervalDays?: number; autoRsvpReminders?: boolean;
@@ -22,6 +23,7 @@ export function RemindersManager({ slug, primary, accent, heading, cardRadius }:
   const [saved, setSaved] = useState(false);
   const [drafting, setDrafting] = useState<string | null>(null);
   const [sending, setSending] = useState<string | null>(null);
+  const overlay = useLoading();
 
   useEffect(() => { fetch(`/api/wedding/${slug}/reminders-config`).then((r) => r.json()).then((j) => setS(j.settings ?? {})).finally(() => setLoading(false)); }, [slug]);
 
@@ -32,20 +34,23 @@ export function RemindersManager({ slug, primary, accent, heading, cardRadius }:
   }
   async function aiDraft(kind: "rsvp" | "payment") {
     setDrafting(kind);
+    overlay.show("Drafting your reminder…", { messages: ["Writing your reminder…", "Polishing the wording…"] });
     try {
       const r = await fetch(`/api/wedding/${slug}/draft-reminder`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind }) });
       const j = await r.json();
-      if (j.ok) save(kind === "rsvp" ? { ...s, rsvpSubject: j.subject, rsvpTemplate: j.body } : { ...s, paymentSubject: j.subject, paymentTemplate: j.body });
-    } finally { setDrafting(null); }
+      if (j.ok) { save(kind === "rsvp" ? { ...s, rsvpSubject: j.subject, rsvpTemplate: j.body } : { ...s, paymentSubject: j.subject, paymentTemplate: j.body }); overlay.complete("Drafted ✓"); }
+      else overlay.hide();
+    } catch (e) { overlay.hide(); throw e; } finally { setDrafting(null); }
   }
   async function sendNow(kind: "rsvp" | "payment") {
     setSending(kind);
+    overlay.show("Sending your reminders…");
     try {
       const r = await fetch(`/api/wedding/${slug}/remind`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind }) });
       const j = await r.json();
-      if (j.ok) alert(`Sent ${j.sent} ${kind === "rsvp" ? "RSVP" : "payment"} reminder(s) by email.`);
-      else alert(j.error || "Could not send");
-    } finally { setSending(null); }
+      if (j.ok) { overlay.complete(`Sent ${j.sent} ✓`); alert(`Sent ${j.sent} ${kind === "rsvp" ? "RSVP" : "payment"} reminder(s) by email.`); }
+      else { overlay.hide(); alert(j.error || "Could not send"); }
+    } catch (e) { overlay.hide(); throw e; } finally { setSending(null); }
   }
 
   const card = (extra?: React.CSSProperties): React.CSSProperties => ({ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius, padding: 16, ...extra });

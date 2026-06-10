@@ -9,6 +9,7 @@ import {
   type TemplateTokens,
 } from "@/lib/portal/templates";
 import { saveVenuePortalDesign } from "@/app/venue/your-venue/actions";
+import { useLoading } from "@/components/LoadingProvider";
 
 export function PortalDesigner({
   venueId,
@@ -40,6 +41,7 @@ export function PortalDesigner({
   const [saved, setSaved] = useState(initiallySaved);
   const [isPending, startTransition] = useTransition();
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const loading = useLoading();
 
   const tokens = resolveTemplate(template);
   // What the preview shows: the venue's chosen cover, else the first gallery photo.
@@ -56,14 +58,18 @@ export function PortalDesigner({
     if (file.size > COVER_MAX_MB * 1024 * 1024) { setMsg(`Cover image is too large — keep it under ${COVER_MAX_MB} MB.`); return; }
     setMsg(null);
     setCoverUploading(true);
+    loading.show("Uploading your cover photo…", { messages: ["Uploading…", "Optimising…"] });
     try {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("venue_id", venueId);
       const res = await fetch("/api/venue/inventory/image", { method: "POST", body: fd });
       const j = await res.json();
-      if (res.ok && j.ok) setCoverUrl(j.url);
-      else setMsg(`Cover upload failed: ${j.error ?? "unknown"}`);
+      if (res.ok && j.ok) { setCoverUrl(j.url); loading.complete("Uploaded ✓"); }
+      else { setMsg(`Cover upload failed: ${j.error ?? "unknown"}`); loading.hide(); }
+    } catch (e) {
+      loading.hide();
+      setMsg(`Cover upload failed: ${e instanceof Error ? e.message : "unknown"}`);
     } finally {
       setCoverUploading(false);
     }
@@ -75,6 +81,7 @@ export function PortalDesigner({
     if (!website) { setMsg("Add your website URL in Settings first."); return; }
     setMsg(null);
     setBusy(true);
+    loading.show("Reading your website…", { messages: ["Reading your website…", "Finding your best images…"] });
     try {
       const res = await fetch("/api/venue/site-image", {
         method: "POST",
@@ -82,10 +89,11 @@ export function PortalDesigner({
         body: JSON.stringify({ url: website, venue_id: venueId }),
       });
       const j = await res.json();
-      if (res.ok && j.ok && j.url) { apply(j.url); setMsg("Image pulled from your website ✓ — replace it any time."); }
-      else setMsg(`Couldn't find a usable image on your site${j.error ? ` (${j.error})` : ""} — try uploading one.`);
+      if (res.ok && j.ok && j.url) { apply(j.url); setMsg("Image pulled from your website ✓ — replace it any time."); loading.complete("Pulled ✓"); }
+      else { setMsg(`Couldn't find a usable image on your site${j.error ? ` (${j.error})` : ""} — try uploading one.`); loading.hide(); }
     } catch {
       setMsg("Couldn't reach your website — try uploading instead.");
+      loading.hide();
     } finally {
       setBusy(false);
     }
@@ -95,6 +103,7 @@ export function PortalDesigner({
     setPulling(true);
     setMsg(null);
     setPulled([]);
+    loading.show("Reading your website…", { messages: ["Reading your website…", "Picking out your brand colours…"] });
     try {
       const res = await fetch("/api/venue/brand-extract", {
         method: "POST",
@@ -102,14 +111,16 @@ export function PortalDesigner({
         body: JSON.stringify({ url: website }),
       });
       const j = await res.json();
-      if (!res.ok) { setMsg(j.error || "Couldn't read the site."); return; }
+      if (!res.ok) { setMsg(j.error || "Couldn't read the site."); loading.hide(); return; }
       const colors: string[] = j.colors || [];
       setPulled(colors);
       if (colors[0]) setPrimary(colors[0]);
       if (colors[1]) setAccent(colors[1]);
       setMsg(colors.length ? `Found ${colors.length} colour${colors.length === 1 ? "" : "s"} from ${j.site} — click a swatch to apply.` : "No clear brand colours found — set them manually.");
+      loading.complete(colors.length ? "Done ✓" : "No colours found");
     } catch {
       setMsg("Couldn't reach the website.");
+      loading.hide();
     } finally {
       setPulling(false);
     }
@@ -117,14 +128,18 @@ export function PortalDesigner({
 
   async function uploadLogo(file: File) {
     setUploading(true);
+    loading.show("Uploading your logo…", { messages: ["Uploading…", "Optimising…"] });
     try {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("venue_id", venueId);
       const res = await fetch("/api/venue/inventory/image", { method: "POST", body: fd });
       const j = await res.json();
-      if (res.ok && j.ok) setLogoUrl(j.url);
-      else setMsg(`Logo upload failed: ${j.error ?? "unknown"}`);
+      if (res.ok && j.ok) { setLogoUrl(j.url); loading.complete("Uploaded ✓"); }
+      else { setMsg(`Logo upload failed: ${j.error ?? "unknown"}`); loading.hide(); }
+    } catch (e) {
+      loading.hide();
+      setMsg(`Logo upload failed: ${e instanceof Error ? e.message : "unknown"}`);
     } finally {
       setUploading(false);
     }
@@ -132,13 +147,16 @@ export function PortalDesigner({
 
   function save() {
     setMsg(null);
+    loading.show("Saving your design…");
     startTransition(async () => {
       try {
         await saveVenuePortalDesign({ template, primary, accent, logoUrl, coverUrl });
         setMsg("Design saved ✓");
         setSaved(true);
+        loading.complete("Saved ✓");
       } catch (e) {
         setMsg(e instanceof Error ? e.message : "Save failed");
+        loading.hide();
       }
     });
   }

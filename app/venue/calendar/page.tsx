@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { BookingsCalendar } from "@/components/BookingsCalendar";
 import { CalendarSubscribe } from "@/components/CalendarSubscribe";
 import { WeddingTimelineStrip, type TimelineWedding } from "@/components/WeddingTimelineStrip";
-import { CalendarOpsCards, type OpsStat, type OpsAction, type OpsCard } from "@/components/CalendarOpsCards";
+import { CalendarOpsCards, WeddingOverviewCards, type OpsStat, type OpsAction, type OpsCard } from "@/components/CalendarOpsCards";
 import { computeWeddingsProgress, HEALTH_LABEL } from "@/lib/venue/progress";
 import { getCalendarOps, getVenueCalToken, type CalendarWedding } from "./actions";
 
@@ -243,6 +243,8 @@ export default async function VenueCalendar() {
     setup_date: w.setup_date ?? null,
     breakdown_date: w.breakdown_date ?? null,
     status: w.status,
+    guests: w.guest_count ?? null,
+    couple_paid_at: w.couple_paid_at ?? null,
   }));
 
   // Overlays for the month grid (unchanged behaviour).
@@ -270,10 +272,10 @@ export default async function VenueCalendar() {
         </div>
       )}
 
-      {/* Stats strip + upcoming actions + filter chips + wedding cards (client). */}
-      <CalendarOpsCards stats={stats} actions={topActions} cards={cards} />
+      {/* Stats strip + upcoming actions. */}
+      <CalendarOpsCards stats={stats} actions={topActions} />
 
-      {/* Phase Gantt for the visible month. */}
+      {/* Phase timeline for the visible month. */}
       <WeddingTimelineStrip
         weddings={timelineWeddings}
         year={year}
@@ -282,7 +284,7 @@ export default async function VenueCalendar() {
         attentionIds={awaitingActionIds}
       />
 
-      {/* Month grid — unchanged BookingsCalendar with multi-day spans + clashes. */}
+      {/* Month grid — BookingsCalendar with multi-day spans + clashes. */}
       <BookingsCalendar
         bookings={weddings.map((w) => ({ slug: w.slug, couple_names: w.couple_names, wedding_date: w.wedding_date, wedding_end_date: w.wedding_end_date, status: w.status }))}
         months={6}
@@ -290,6 +292,9 @@ export default async function VenueCalendar() {
         rentalHolds={rentalHolds}
         weddingHref="/venue/calendar"
       />
+
+      {/* Wedding overview — the polished card row, at the bottom. */}
+      <WeddingOverviewCards cards={cards} />
 
       {feedUrl && (
         <section className="vy-card">
