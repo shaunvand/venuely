@@ -5,8 +5,41 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SetupVenueForm } from "@/components/SetupVenueForm";
 import type { SetupVenueState } from "@/app/onboarding/setup-venue/actions";
+import { addArea } from "@/app/venue/areas/actions";
 import { BulkUploader, type BulkUploaderHandle } from "@/components/BulkUploader";
 import { LogoMark } from "@/components/Logo";
+import { useLoading } from "@/components/LoadingProvider";
+
+// "Go to my dashboard" with the branded 4-second send-off: the shared logo-fill
+// overlay cycles "setting up" messages, then we land on /venue?welcome=1.
+function GoToDashboardButton() {
+  const router = useRouter();
+  const loading = useLoading();
+  const [going, setGoing] = useState(false);
+
+  function go() {
+    if (going) return;
+    setGoing(true);
+    loading.show("Setting up your dashboard…", {
+      messages: [
+        "Setting up your dashboard…",
+        "Arranging your weddings & calendar…",
+        "Polishing your couple portal…",
+        "Almost there…",
+      ],
+    });
+    setTimeout(() => {
+      loading.complete("Welcome to Venuely ✓");
+      router.push("/venue?welcome=1");
+    }, 4000);
+  }
+
+  return (
+    <button type="button" onClick={go} disabled={going} className="vy-btn vy-btn-primary">
+      {going ? "Setting up…" : "Go to my dashboard →"}
+    </button>
+  );
+}
 
 type WizardVenue = { id: string; slug: string; name: string };
 
@@ -331,7 +364,7 @@ export function WizardClient({
               <StepImport venue={venue} importDone={importDone} onBack={() => setStep(1)} onContinue={() => setStep(3)} />
             )}
             {step === 3 && (
-              <StepSpaces spacesDone={spacesDone} areasCount={setup?.areasCount ?? 0} onBack={() => setStep(2)} onContinue={() => setStep(4)} />
+              <StepSpaces venueId={venue?.id ?? null} spacesDone={spacesDone} areasCount={setup?.areasCount ?? 0} onBack={() => setStep(2)} onContinue={() => setStep(4)} />
             )}
             {step === 4 && (
               <StepReview setup={setup} previewHref={previewHref} onBack={() => setStep(3)} />
@@ -493,31 +526,74 @@ function StepImport({
 }
 
 function StepSpaces({
+  venueId,
   spacesDone,
   areasCount,
   onBack,
   onContinue,
 }: {
+  venueId: string | null;
   spacesDone: boolean;
   areasCount: number;
   onBack: () => void;
   onContinue: () => void;
 }) {
+  // In-wizard space creation — no detour to the dashboard areas page. After the
+  // FIRST space lands we auto-advance to Review (same beat as the Import step);
+  // venues can step back to add more any time.
+  const [added, setAdded] = useState<string[]>([]);
+  const [name, setName] = useState("");
+  const [kind, setKind] = useState("main");
+  const [price, setPrice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [advancing, setAdvancing] = useState(false);
+  const total = areasCount + added.length;
+  const done = spacesDone || added.length > 0;
+
+  async function add(e: React.FormEvent) {
+    e.preventDefault();
+    if (!venueId || !name.trim() || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const fd = new FormData();
+      fd.set("name", name.trim());
+      fd.set("area_kind", kind);
+      if (price.trim()) fd.set("price_wedding", price.replace(/[^\d.]/g, ""));
+      await addArea(venueId, fd);
+      const isFirst = added.length === 0 && !spacesDone;
+      setAdded((a) => [...a, name.trim()]);
+      setName("");
+      setPrice("");
+      if (isFirst) {
+        // First space in → glide to Review after a beat (they can come back).
+        setAdvancing(true);
+        setTimeout(() => onContinue(), 1400);
+      }
+    } catch (ex) {
+      setErr(ex instanceof Error ? ex.message : "Couldn't add that space — try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <StepShell
       eyebrow="Step 3 of 4 · Your spaces"
       title="Add the spaces couples can use"
-      intro="The main areas of your venue — ceremony lawn, reception hall, gardens — plus any optional extras. Each space is priced per day type (Meet & Greet / Wedding / Farewell) so couples see accurate totals."
+      intro="The main areas of your venue — ceremony lawn, reception hall, gardens — plus any optional extras. Add them right here; you can fine-tune per-day pricing later."
     >
-      <div className="rounded-xl p-4 flex items-start gap-3" style={{ border: "1px solid var(--line)", background: spacesDone ? "var(--leaf)" : "var(--cream)" }}>
-        <span className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center" style={{ background: "rgba(255,255,255,0.7)", color: spacesDone ? "#1f5d3e" : "var(--poppy-deep)" }}>
-          {spacesDone ? "✓" : "📍"}
+      {/* Status banner */}
+      <div className="rounded-xl p-4 flex items-start gap-3 mb-4" style={{ border: "1px solid var(--line)", background: done ? "var(--leaf)" : "var(--cream)" }}>
+        <span className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center" style={{ background: "rgba(255,255,255,0.7)", color: done ? "#1f5d3e" : "var(--poppy-deep)" }}>
+          {done ? "✓" : "📍"}
         </span>
         <div className="text-sm flex-1">
-          {spacesDone ? (
+          {done ? (
             <>
-              <div className="font-medium">{areasCount} space{areasCount === 1 ? "" : "s"} added</div>
-              <div style={{ color: "var(--ink-2)" }}>Manage pricing and add more from the areas page.</div>
+              <div className="font-medium">{total} space{total === 1 ? "" : "s"} added{advancing ? " — moving to review…" : ""}</div>
+              <div style={{ color: "var(--ink-2)" }}>Add more below, or continue — pricing per day type lives on the Areas page.</div>
             </>
           ) : (
             <>
@@ -526,10 +602,41 @@ function StepSpaces({
             </>
           )}
         </div>
-        <Link href="/venue/areas" className="vy-btn vy-btn-secondary whitespace-nowrap">
-          {spacesDone ? "Manage spaces" : "Add spaces"}
-        </Link>
       </div>
+
+      {/* Inline add form */}
+      <form onSubmit={add} className="rounded-xl p-4 grid gap-3 sm:grid-cols-[1fr_auto_auto_auto] items-end" style={{ border: "1px solid var(--line)", background: "#fff" }}>
+        <div className="space-y-1 min-w-0">
+          <label className="vy-label">Space name</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. Ceremony lawn, Reception hall" className="vy-input" />
+        </div>
+        <div className="space-y-1">
+          <label className="vy-label">Type</label>
+          <select value={kind} onChange={(e) => setKind(e.target.value)} className="vy-select">
+            <option value="main">Main (included)</option>
+            <option value="extra">Extra (paid)</option>
+            <option value="overflow">Overflow</option>
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="vy-label">Wedding-day price <span style={{ color: "var(--ink-2)", fontWeight: 400 }}>(R, optional)</span></label>
+          <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="0" className="vy-input w-28" />
+        </div>
+        <button type="submit" disabled={busy || !name.trim() || !venueId} className="vy-btn vy-btn-primary whitespace-nowrap">
+          {busy ? "Adding…" : "+ Add space"}
+        </button>
+      </form>
+      {err && <p className="text-sm mt-2" style={{ color: "#a3210e" }}>{err}</p>}
+
+      {/* What's been added this session */}
+      {added.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-3">
+          {added.map((n, i) => (
+            <span key={`${n}-${i}`} className="text-xs px-3 py-1.5 rounded-full" style={{ background: "var(--leaf)", color: "#1f5d3e" }}>✓ {n}</span>
+          ))}
+        </div>
+      )}
+
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
         <button type="button" onClick={onBack} className="vy-btn vy-btn-ghost">← Back</button>
         <button type="button" onClick={onContinue} className="vy-btn vy-btn-primary">Continue → Review</button>
@@ -601,8 +708,9 @@ function StepReview({
           {previewHref && (
             <Link href={previewHref} className="vy-btn vy-btn-secondary">Preview what couples see ↗</Link>
           )}
-          {/* welcome=1 plays the logo opener once on first dashboard arrival */}
-          <Link href="/venue?welcome=1" className="vy-btn vy-btn-primary">Go to my dashboard →</Link>
+          {/* 4s branded loading ("Setting up your dashboard…") then the dashboard
+              (welcome=1 plays the logo opener once on first arrival). */}
+          <GoToDashboardButton />
         </div>
       </div>
     </StepShell>
