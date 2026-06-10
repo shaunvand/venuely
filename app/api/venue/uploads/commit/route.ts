@@ -18,7 +18,7 @@ const ALLOWED_COLS: Record<string, Set<string>> = {
   catalogue_items: new Set(["venue_id", "category", "name", "description", "price", "price_unit", "image_url", "active", "sort_order", "commission_value", "commission_type", "item_code", "cost_treatment", "event_part", "import_batch_id"]),
   rental_items: new Set(["venue_id", "category", "name", "description", "price", "stock_total", "image_url", "active", "sort_order", "commission_value", "commission_type", "item_code", "cost_treatment", "import_batch_id"]),
   accommodation_rooms: new Set(["venue_id", "name", "room_type", "tier", "sleeps", "ideal_sleeps", "max_sleeps", "bridal_suite", "amenities", "price_per_night", "description", "image_url", "hero_image_url", "floor_plan_url", "active", "sort_order", "commission_value", "commission_type", "cost_treatment", "contact_name", "contact_phone", "contact_email", "website_url", "address", "import_batch_id"]),
-  vendor_partners: new Set(["venue_id", "vendor_type", "name", "description", "price_from", "image_url", "active", "sort_order", "commission_value", "commission_type", "cost_treatment", "contact_name", "contact_phone", "contact_email", "website_url", "import_batch_id"]),
+  vendor_partners: new Set(["venue_id", "vendor_type", "name", "description", "price_from", "image_url", "active", "sort_order", "commission_value", "commission_type", "cost_treatment", "contact_phone", "contact_email", "website_url", "import_batch_id"]),
 };
 function stripToColumns(table: string, row: Record<string, unknown>): Record<string, unknown> {
   const allow = ALLOWED_COLS[table];

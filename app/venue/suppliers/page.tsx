@@ -7,12 +7,15 @@ export const dynamic = "force-dynamic";
 export default async function VenueSuppliers() {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
-  const { data: rows } = await supabase
+  // NB: vendor_partners has no contact_name column (that's accommodation_rooms) —
+  // selecting it made this whole query 400 and the page silently showed "No suppliers".
+  const { data: rows, error } = await supabase
     .from("vendor_partners")
-    .select("id, vendor_type, name, description, price_from, image_url, contact_name, contact_phone, contact_email, website_url, active, commission_value, commission_type, cost_treatment, sort_order")
+    .select("id, vendor_type, name, description, price_from, image_url, contact_phone, contact_email, website_url, active, commission_value, commission_type, cost_treatment, sort_order")
     .eq("venue_id", venue.id)
     .order("vendor_type")
     .order("sort_order");
+  if (error) throw new Error(`Couldn't load suppliers: ${error.message}`);
 
   return (
     <div className="space-y-8">
