@@ -3,6 +3,7 @@ import { createClient as createAdmin } from "@supabase/supabase-js";
 import { portalAccess } from "@/lib/portal/access";
 import { sendEmail } from "@/lib/notifications";
 import { redactContacts } from "@/lib/messaging/redact";
+import { replyAddressFor } from "@/lib/messaging/emailReply";
 
 export const runtime = "nodejs";
 
@@ -107,8 +108,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
   type ThreadRow = {
     id: string; venue_id: string; status: string; reply_token: string;
     supplier_name: string; supplier_email: string | null;
+    email_subject: string | null; last_email_message_id: string | null;
   };
-  const THREAD_COLS = "id, venue_id, status, reply_token, supplier_name, supplier_email";
+  const THREAD_COLS = "id, venue_id, status, reply_token, supplier_name, supplier_email, email_subject, last_email_message_id";
   let thread: ThreadRow | null = null;
 
   if (b.threadId) {
@@ -222,6 +224,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     const venueName = venue?.name || "a Venuely venue";
     const firsts = firstNames(wedding?.couple_names);
     const link = `${SITE}/s/${thread.reply_token}`;
+    // Reply-by-email: per-thread reply_to routes the supplier's reply back into
+    // this exact thread; In-Reply-To keeps it in their mail client's conversation.
+    const replyTo = replyAddressFor(thread.reply_token);
+    const footer = replyTo
+      ? "Reply to this email or use the button — either way your message reaches the couple on Venuely. Contact details stay private until the couple books."
+      : "Replies happen on that page — please don't reply to this email. Contact details stay private until the couple books.";
     const html = `
       <div style="font-family:system-ui,-apple-system,sans-serif;max-width:560px;margin:0 auto;background:#FFF6F0;border-radius:16px;padding:36px">
         <div style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#1c1917;margin-bottom:16px">Venuely<span style="color:#FA523C">.</span></div>
@@ -229,11 +237,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
         <p style="color:#57534e;margin:0 0 16px">${esc(firsts)} sent you a message about their wedding at ${esc(venueName)}:</p>
         <div style="background:#fff;border-radius:12px;padding:16px 18px;color:#1c1917;white-space:pre-wrap;border:1px solid rgba(0,0,0,0.06)">${esc(red.body)}</div>
         <p style="margin:24px 0 0"><a href="${link}" style="background:#FA523C;color:#fff;text-decoration:none;border-radius:999px;padding:13px 28px;font-weight:600;display:inline-block">Read &amp; reply on Venuely</a></p>
-        <p style="color:#8a9a86;font-size:13px;margin:24px 0 0;border-top:1px solid #FFC6AD;padding-top:16px">
-          Replies happen on that page — please don't reply to this email. Contact details stay private until the couple books.
-        </p>
+        <p style="color:#8a9a86;font-size:13px;margin:24px 0 0;border-top:1px solid #FFC6AD;padding-top:16px">${footer}</p>
       </div>`;
-    await sendEmail(thread.supplier_email, `New message about a wedding at ${venueName}`, html);
+    const subject = thread.email_subject || `New message about a wedding at ${venueName}`;
+    await sendEmail(thread.supplier_email, thread.email_subject ? `Re: ${subject.replace(/^re:\s*/i, "")}` : subject, html, {
+      replyTo,
+      headers: thread.last_email_message_id
+        ? { "In-Reply-To": thread.last_email_message_id, References: thread.last_email_message_id }
+        : undefined,
+    });
+    if (!thread.email_subject) await db.from("message_threads").update({ email_subject: subject }).eq("id", thread.id);
   }
 
   return NextResponse.json({

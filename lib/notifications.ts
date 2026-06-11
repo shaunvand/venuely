@@ -28,7 +28,7 @@ export async function sendEmail(
   to: string | null | undefined,
   subject: string,
   html: string,
-  opts?: { replyTo?: string | null },
+  opts?: { replyTo?: string | null; headers?: Record<string, string> },
 ): Promise<SendEmailResult> {
   if (!process.env.RESEND_API_KEY) return { sent: false, reason: "no_api_key" };
   const recipient = (to ?? "").trim();
@@ -45,6 +45,7 @@ export async function sendEmail(
         from: FROM,
         to: recipient,
         ...(opts?.replyTo ? { reply_to: opts.replyTo } : {}),
+        ...(opts?.headers && Object.keys(opts.headers).length ? { headers: opts.headers } : {}),
         subject,
         html,
       }),
