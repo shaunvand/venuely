@@ -27,6 +27,7 @@ type WeddingState = {
   guests?: string[];
   roomAssignments?: Record<string, string[]>;
   suppliers?: Array<{ id: number; name: string; category?: string; status?: string; price?: string; fromVendorId?: string }>;
+  customRequests?: Array<{ id: string; name: string; note?: string }>;
 };
 
 function parseMoney(s: string | undefined | null): number {
@@ -349,6 +350,24 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
           </section>
         );
       })()}
+
+      {/* Couple's custom item requests — quote these and add them as charges. */}
+      {(state.customRequests ?? []).length > 0 && (
+        <section className="vy-card" style={{ border: "2px solid var(--peach)" }}>
+          <div className="vy-eyebrow">Custom requests from the couple</div>
+          <p className="text-sm mt-1 mb-3" style={{ color: "var(--ink-2)" }}>
+            Items they want that aren&apos;t in your catalogue — quote each one and add it as a charge in the proforma below.
+          </p>
+          <ul className="space-y-2">
+            {(state.customRequests ?? []).map((r) => (
+              <li key={r.id} className="rounded-lg px-3 py-2.5 text-sm" style={{ border: "1px solid var(--line)", background: "#fff" }}>
+                <span className="font-medium">{r.name}</span>
+                {r.note && <span className="ml-2" style={{ color: "var(--ink-2)" }}>— {r.note}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Link lifecycle: rotate the access code, or remove a couple's account access. */}
       <div className="vy-card space-y-3">

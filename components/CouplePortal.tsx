@@ -69,10 +69,12 @@ const DECOR_FIELDS: ListField[] = [
 ];
 
 type DaySel = { sel?: boolean; mg?: boolean; wed?: boolean; fb?: boolean };
+type CustomRequest = { id: string; name: string; note?: string };
 type WState = {
   catalogueSelections?: Record<string, DaySel>;
   rentalSelections?: Record<string, DaySel & { qty?: number }>;
   roomAssignments?: Record<string, string[]>;
+  customRequests?: CustomRequest[];
   [k: string]: unknown;
 };
 const DAY_TYPES: { key: "mg" | "wed" | "fb"; label: string }[] = [
@@ -182,6 +184,20 @@ export function CouplePortal({
   }, []);
   const [rentFilter, setRentFilter] = useState("All");
   const [rentFolder, setRentFolder] = useState<"all" | "included" | "extra">("all");
+  // "+ Add custom item" — a request to the venue (not self-priced; the venue
+  // quotes/adds it to the proforma properly). Stored in wedding_state.
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customNote, setCustomNote] = useState("");
+  function addCustomRequest() {
+    if (!customName.trim()) return;
+    const req = { id: crypto.randomUUID?.() ?? String(Date.now()), name: customName.trim(), note: customNote.trim() || undefined };
+    persist({ ...state, customRequests: [...(state.customRequests ?? []), req] });
+    setCustomName(""); setCustomNote(""); setCustomOpen(false);
+  }
+  function removeCustomRequest(id: string) {
+    persist({ ...state, customRequests: (state.customRequests ?? []).filter((r) => r.id !== id) });
+  }
   const [supFilter, setSupFilter] = useState("All");
   const router = useRouter();
   const [state, setState] = useState<WState>(initialState ?? {});
@@ -455,7 +471,8 @@ export function CouplePortal({
             (rentFilter === "All" || keyOf(m.item) === rentFilter));
           return (
             <Section heading={heading} tokens={tokens} primary={primary} title="Catalogue & Rentals" sub="Everything included with your booking, plus optional extras to add">
-              <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {([["all", "All", null], ["included", "Included with booking", "calendar"], ["extra", "To pay for", "dollar"]] as const).map(([k, label, icon]) => {
                   const on = rentFolder === k;
                   return (
@@ -479,7 +496,62 @@ export function CouplePortal({
                   );
                 })}
               </div>
+              {/* Custom item request + AI planner — per the dashboard mock */}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => setCustomOpen(true)}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, padding: "8px 16px", borderRadius: 999, background: "#fff", border: "1px solid rgba(0,0,0,0.12)", color: "var(--ink, #1c1917)", cursor: "pointer" }}
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M12 5v14M5 12h14" /></svg>
+                  Add custom item
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event("venuely:open-planner"))}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 700, padding: "8px 16px", borderRadius: 999, background: primary, border: "none", color: "#fff", cursor: "pointer" }}
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z" /><path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9z" /></svg>
+                  Plan with AI
+                </button>
+              </div>
+              </div>
               <FilterChips chip={filterChip} value={rentFilter} onChange={setRentFilter} options={cats} />
+
+              {/* The couple's custom requests — venue quotes these before they're billable */}
+              {(state.customRequests ?? []).length > 0 && (
+                <div style={{ margin: "12px 0", display: "grid", gap: 8 }}>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1.5, color: "#a8a29e", fontWeight: 700 }}>Your custom requests</div>
+                  {(state.customRequests ?? []).map((r) => (
+                    <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderLeft: `3px solid ${primary}`, borderRadius: 12, padding: "10px 12px" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink, #1c1917)" }}>{r.name}</div>
+                        {r.note && <div style={{ fontSize: 12, color: "#57534e" }}>{r.note}</div>}
+                      </div>
+                      <span style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: 1, color: "#8a6116", background: "#fdf0d4", borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap" }}>Awaiting venue quote</span>
+                      <button type="button" onClick={() => removeCustomRequest(r.id)} style={{ background: "none", border: "none", color: "#a8a29e", cursor: "pointer", fontSize: 14 }} aria-label={`Remove ${r.name}`}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add-custom-item dialog */}
+              {customOpen && (
+                <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setCustomOpen(false)}>
+                  <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 18, padding: 24, width: "min(440px,100%)" }}>
+                    <h3 style={{ ...heading, fontSize: 21, margin: "0 0 6px" }}>Request a custom item</h3>
+                    <p style={{ fontSize: 12.5, color: "#57534e", margin: "0 0 14px" }}>Not on the list? Tell {venue.name} what you&apos;d like — they&apos;ll quote it and add it to your booking.</p>
+                    <div style={{ display: "grid", gap: 10 }}>
+                      <input value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="What would you like? e.g. Fireworks display" style={{ width: "100%", border: "1px solid rgba(0,0,0,0.15)", borderRadius: 10, padding: "10px 12px", fontSize: 13.5 }} autoFocus />
+                      <textarea value={customNote} onChange={(e) => setCustomNote(e.target.value)} placeholder="Any details (quantity, timing, style…)" rows={3} style={{ width: "100%", border: "1px solid rgba(0,0,0,0.15)", borderRadius: 10, padding: "10px 12px", fontSize: 13.5, resize: "vertical" }} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+                      <button type="button" onClick={() => setCustomOpen(false)} style={{ background: "none", border: "none", color: "#57534e", fontSize: 13.5, cursor: "pointer", padding: "9px 12px" }}>Cancel</button>
+                      <button type="button" onClick={addCustomRequest} disabled={!customName.trim()} style={{ background: primary, color: "#fff", border: "none", borderRadius: 999, padding: "9px 18px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", opacity: customName.trim() ? 1 : 0.5 }}>Send request</button>
+                    </div>
+                  </div>
+                </div>
+              )}
               {shown.length === 0 ? <Empty radius={isClassic ? undefined : tokens.cardRadius}>Nothing in this folder.</Empty> : groupBy(shown, (m) => keyOf(m.item)).map(([catName, items]) => (
                 <div key={catName} style={{ marginBottom: 22 }}>
                   <div style={{ ...eyebrow, color: primary, marginBottom: 8 }}>{catName}</div>
