@@ -390,7 +390,7 @@ export function CouplePortal({
       {showAside && (
       <aside style={isMobile
         ? { width: 256, background: "#fffdfb", borderRight: "1px solid var(--line, #ece7e1)", display: "flex", flexDirection: "column", padding: "20px 14px", position: "fixed", top: 0, left: 0, height: "100vh", overflowY: "auto", zIndex: 60, transform: navOpen ? "translateX(0)" : "translateX(-100%)", transition: "transform 0.2s ease", boxShadow: navOpen ? "4px 0 24px rgba(0,0,0,0.18)" : "none" }
-        : { width: 248, flexShrink: 0, background: "#fffdfb", borderRight: "1px solid var(--line, #ece7e1)", display: "flex", flexDirection: "column", padding: "20px 14px", position: "sticky", top: 0, height: "100vh", overflowY: "auto" }}>
+        : { width: 240, flexShrink: 0, background: "#fffdfb", borderRight: "1px solid var(--line, #ece7e1)", display: "flex", flexDirection: "column", padding: "20px 13px", position: "sticky", top: 0, height: "100vh", overflowY: "auto" }}>
         <div style={{ padding: "0 6px 18px" }}>
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
