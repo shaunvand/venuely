@@ -17,12 +17,19 @@ function GoToDashboardButton() {
   const router = useRouter();
   const [going, setGoing] = useState(false);
 
+  function start() {
+    // Prefetch the dashboard so it's ready by the time the ~4s fill completes —
+    // the swap is then instant and the wizard never flashes behind the loader.
+    router.prefetch("/venue?welcome=1");
+    setGoing(true);
+  }
+
   return (
     <>
-      <button type="button" onClick={() => setGoing(true)} disabled={going} className="vy-btn vy-btn-primary">
+      <button type="button" onClick={start} disabled={going} className="vy-btn vy-btn-primary">
         {going ? "Setting up…" : "Go to my dashboard →"}
       </button>
-      {going && <VenuelyLoader onDone={() => router.push("/venue?welcome=1")} />}
+      {going && <VenuelyLoader onDone={() => router.replace("/venue?welcome=1")} />}
     </>
   );
 }

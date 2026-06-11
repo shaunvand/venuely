@@ -49,7 +49,6 @@ export function VenuelyLoader({
   onDone?: () => void;
 }) {
   const [t, setT] = useState(0);
-  const [exiting, setExiting] = useState(false);
   const doneRef = useRef(false);
 
   useEffect(() => {
@@ -63,9 +62,10 @@ export function VenuelyLoader({
       if (e <= END) {
         raf = requestAnimationFrame(step);
       } else if (!doneRef.current) {
+        // Navigate the instant the fill completes, while the full badge still
+        // covers the wizard — no fade-out, so the wizard never flashes back.
         doneRef.current = true;
-        setExiting(true);
-        setTimeout(() => onDone?.(), 500);
+        onDone?.();
       }
     };
     raf = requestAnimationFrame(step);
@@ -116,8 +116,6 @@ export function VenuelyLoader({
         position: "fixed", inset: 0, zIndex: 130,
         background: "#FFF6F0",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 28,
-        opacity: exiting ? 0 : 1,
-        transition: "opacity 0.5s ease",
       }}
     >
       <svg width="184" height="184" viewBox={`0 0 ${B} ${B}`} style={{ overflow: "visible" }}>
