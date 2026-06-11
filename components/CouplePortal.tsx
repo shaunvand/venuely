@@ -455,10 +455,28 @@ export function CouplePortal({
             (rentFilter === "All" || keyOf(m.item) === rentFilter));
           return (
             <Section heading={heading} tokens={tokens} primary={primary} title="Catalogue & Rentals" sub="Everything included with your booking, plus optional extras to add">
-              <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-                {([["all", "All"], ["included", "📁 Included with booking"], ["extra", "📁 To pay for"]] as const).map(([k, label]) => {
+              <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                {([["all", "All", null], ["included", "Included with booking", "calendar"], ["extra", "To pay for", "dollar"]] as const).map(([k, label, icon]) => {
                   const on = rentFolder === k;
-                  return <button key={k} onClick={() => setRentFolder(k)} style={{ fontSize: 12.5, padding: "7px 14px", ...folderChip(on) }}>{label}</button>;
+                  return (
+                    <button
+                      key={k}
+                      onClick={() => setRentFolder(k)}
+                      style={{ fontSize: 13, padding: "8px 16px", display: "inline-flex", alignItems: "center", gap: 7, ...folderChip(on), borderRadius: 999 }}
+                    >
+                      {icon === "calendar" && (
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          <rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" />
+                        </svg>
+                      )}
+                      {icon === "dollar" && (
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          <circle cx="12" cy="12" r="9" /><path d="M12 7v10M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.5 0-2.5.8-2.5 2s1 1.7 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1.1 0-2-.4-2.5-1.2" />
+                        </svg>
+                      )}
+                      {label}
+                    </button>
+                  );
                 })}
               </div>
               <FilterChips chip={filterChip} value={rentFilter} onChange={setRentFilter} options={cats} />
