@@ -8,36 +8,22 @@ import type { SetupVenueState } from "@/app/onboarding/setup-venue/actions";
 import { addArea } from "@/app/venue/areas/actions";
 import { BulkUploader, type BulkUploaderHandle } from "@/components/BulkUploader";
 import { LogoMark } from "@/components/Logo";
-import { useLoading } from "@/components/LoadingProvider";
+import { VenuelyLoader } from "@/components/VenuelyLoader";
 
-// "Go to my dashboard" with the branded 4-second send-off: the shared logo-fill
-// overlay cycles "setting up" messages, then we land on /venue?welcome=1.
+// "Go to my dashboard" → the Venuely Loader send-off: the coral liquid fills the
+// V badge bottom→top at standard speed (~2.8s + shimmer), then we land on the
+// dashboard (welcome=1 plays the logo opener once on first arrival).
 function GoToDashboardButton() {
   const router = useRouter();
-  const loading = useLoading();
   const [going, setGoing] = useState(false);
 
-  function go() {
-    if (going) return;
-    setGoing(true);
-    loading.show("Setting up your dashboard…", {
-      messages: [
-        "Setting up your dashboard…",
-        "Arranging your weddings & calendar…",
-        "Polishing your couple portal…",
-        "Almost there…",
-      ],
-    });
-    setTimeout(() => {
-      loading.complete("Welcome to Venuely ✓");
-      router.push("/venue?welcome=1");
-    }, 4000);
-  }
-
   return (
-    <button type="button" onClick={go} disabled={going} className="vy-btn vy-btn-primary">
-      {going ? "Setting up…" : "Go to my dashboard →"}
-    </button>
+    <>
+      <button type="button" onClick={() => setGoing(true)} disabled={going} className="vy-btn vy-btn-primary">
+        {going ? "Setting up…" : "Go to my dashboard →"}
+      </button>
+      {going && <VenuelyLoader onDone={() => router.push("/venue?welcome=1")} />}
+    </>
   );
 }
 
