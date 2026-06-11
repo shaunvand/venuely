@@ -81,7 +81,7 @@ const DAY_TYPES: { key: "mg" | "wed" | "fb"; label: string }[] = [
   { key: "mg", label: "M&G" }, { key: "wed", label: "Wedding" }, { key: "fb", label: "Farewell" },
 ];
 
-type CatItem = { id: string; category: string; name: string; description: string; img: string | null; included: boolean; eventPart?: string | null };
+type CatItem = { id: string; category: string; name: string; description: string; img: string | null; price?: number; included: boolean; eventPart?: string | null };
 type RentItem = CatItem & { price: number };
 type RoomItem = { id: string; name: string; type: string; sleeps: number; description: string; img: string | null; price: number };
 type VendorItem = { id: string; type: string; name: string; description: string; img: string | null; price: number | null; email: string | null; phone: string | null; website: string | null };
@@ -556,9 +556,9 @@ export function CouplePortal({
                 <div key={catName} style={{ marginBottom: 22 }}>
                   <div style={{ ...eyebrow, color: primary, marginBottom: 8 }}>{catName}</div>
                   <div style={grid}>{items.map((m) => m.kind === "cat" ? (
-                    <PortalItemCard key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} badge={m.item.included ? "Included" : undefined} selected={catIsSelected(m.item)} onToggle={() => toggleCat(m.item)} days={catSel[m.item.id]} onDay={(d) => toggleCatDay(m.item, d)} {...itemProps} />
+                    <PortalItemCard key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} paidItem={!m.item.included} selected={catIsSelected(m.item)} onToggle={() => toggleCat(m.item)} days={catSel[m.item.id]} onDay={(d) => toggleCatDay(m.item, d)} {...itemProps} />
                   ) : (
-                    <PortalItemCard key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} selected={!!rentSel[m.item.id]?.sel} onToggle={() => toggleRent(m.item.id)} days={rentSel[m.item.id]} onDay={(d) => toggleRentDay(m.item.id, d)} qty={rentSel[m.item.id]?.qty} onQty={(n) => setRentQty(m.item.id, n)} {...itemProps} />
+                    <PortalItemCard key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} paidItem={!m.item.included} selected={!!rentSel[m.item.id]?.sel} onToggle={() => toggleRent(m.item.id)} days={rentSel[m.item.id]} onDay={(d) => toggleRentDay(m.item.id, d)} qty={rentSel[m.item.id]?.qty} onQty={(n) => setRentQty(m.item.id, n)} {...itemProps} />
                   ))}</div>
                 </div>
               ))}
@@ -767,18 +767,20 @@ function PortalLogo({ logoUrl, venueName, heading, light }: { logoUrl: string | 
   return <span style={{ ...heading, color: light ? "#fff" : "var(--ink)", fontWeight: 700 }}>{venueName}</span>;
 }
 
-function PortalItemCard({ name, description, img, price, badge, selected, onToggle, days, onDay, qty, onQty, primary, accent, heading, cardRadius, cardBorder }: {
-  name: string; description: string; img: string | null; price?: number; badge?: string;
+function PortalItemCard({ name, description, img, price, badge, paidItem, selected, onToggle, days, onDay, qty, onQty, primary, accent, heading, cardRadius, cardBorder }: {
+  name: string; description: string; img: string | null; price?: number; badge?: string; paidItem?: boolean;
   selected?: boolean; onToggle?: () => void;
   days?: DaySel; onDay?: (d: "mg" | "wed" | "fb") => void;
   qty?: number; onQty?: (n: number) => void;
   primary: string; accent: string; heading: React.CSSProperties; cardRadius: string; cardBorder?: string;
 }) {
   // Included vs paid treatment (per the dashboard mock): badge rides the image
-  // top-left; paid items show their coral price; footers read "✓ Included"
-  // (neutral) vs "+ Add to my wedding" (peach tint).
+  // top-left; paid items show their coral price (or "Price on request" when the
+  // venue hasn't priced them yet); footers read "✓ Included" (neutral) vs
+  // "+ Add to my wedding" (peach tint). `paidItem` marks catalogue/rental extras
+  // explicitly so rooms/vendors keep their plain price display.
   const included = badge === "Included";
-  const paid = !included && price != null && price > 0;
+  const paid = paidItem ?? (!included && price != null && price > 0);
   const overlay = included ? "Included" : paid ? "To pay for" : null;
   return (
     <div className="hover-lift" style={{ background: "#fff", border: selected ? `2px solid ${primary}` : (cardBorder ?? "1px solid rgba(0,0,0,0.08)"), borderRadius: cardRadius, overflow: "hidden", display: "flex", flexDirection: "column" }}>
@@ -804,7 +806,11 @@ function PortalItemCard({ name, description, img, price, badge, selected, onTogg
       <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
         <div style={{ ...heading, fontWeight: 700, fontSize: 16 }}>{name}</div>
         {description && <div style={{ fontSize: 12.5, color: "#57534e", lineHeight: 1.5, flex: 1 }}>{description}</div>}
-        {paid && <div style={{ color: primary, fontWeight: 700, fontSize: 15, marginTop: 6 }}>{rZA(price!)}</div>}
+        {paid && (
+          (price ?? 0) > 0
+            ? <div style={{ color: primary, fontWeight: 700, fontSize: 15, marginTop: 6 }}>{rZA(price!)}</div>
+            : <div style={{ color: "#8a6116", fontWeight: 600, fontSize: 12.5, marginTop: 6 }}>Price on request</div>
+        )}
         {onToggle && (
           included ? (
             <button onClick={onToggle} style={{ marginTop: 8, padding: "8px 0", width: "100%", borderRadius: cardRadius, border: "1px solid rgba(0,0,0,0.1)", background: selected ? "#eef0e9" : "#fff", color: selected ? "var(--ink, #1c1917)" : "#57534e", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
