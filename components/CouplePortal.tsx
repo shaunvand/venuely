@@ -774,25 +774,47 @@ function PortalItemCard({ name, description, img, price, badge, selected, onTogg
   qty?: number; onQty?: (n: number) => void;
   primary: string; accent: string; heading: React.CSSProperties; cardRadius: string; cardBorder?: string;
 }) {
+  // Included vs paid treatment (per the dashboard mock): badge rides the image
+  // top-left; paid items show their coral price; footers read "✓ Included"
+  // (neutral) vs "+ Add to my wedding" (peach tint).
+  const included = badge === "Included";
+  const paid = !included && price != null && price > 0;
+  const overlay = included ? "Included" : paid ? "To pay for" : null;
   return (
     <div className="hover-lift" style={{ background: "#fff", border: selected ? `2px solid ${primary}` : (cardBorder ?? "1px solid rgba(0,0,0,0.08)"), borderRadius: cardRadius, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-      {img ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={img} alt="" style={{ width: "100%", height: 120, objectFit: "cover" }} />
-      ) : (
-        <div style={{ width: "100%", height: 120, background: `${accent}33`, display: "flex", alignItems: "center", justifyContent: "center", color: "#9a8", fontSize: 12 }}>No image</div>
-      )}
+      <div style={{ position: "relative" }}>
+        {img ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={img} alt="" style={{ width: "100%", height: 120, objectFit: "cover", display: "block" }} />
+        ) : (
+          <div style={{ width: "100%", height: 120, background: `${accent}33`, display: "flex", alignItems: "center", justifyContent: "center", color: "#9a8", fontSize: 12 }}>No image</div>
+        )}
+        {overlay && (
+          <span
+            style={{
+              position: "absolute", top: 8, left: 8, fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 999,
+              background: included ? "rgba(255,253,251,0.92)" : "rgba(28,25,23,0.78)",
+              color: included ? "var(--ink, #1c1917)" : "#fff",
+            }}
+          >
+            {overlay}
+          </span>
+        )}
+      </div>
       <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
         <div style={{ ...heading, fontWeight: 700, fontSize: 16 }}>{name}</div>
         {description && <div style={{ fontSize: 12.5, color: "#57534e", lineHeight: 1.5, flex: 1 }}>{description}</div>}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
-          {price != null ? <span style={{ color: primary, fontWeight: 700 }}>{price > 0 ? rZA(price) : "Included"}</span> : <span />}
-          {badge && <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, background: `${accent}40`, color: "#5a4", padding: "2px 8px", borderRadius: 999 }}>{badge}</span>}
-        </div>
+        {paid && <div style={{ color: primary, fontWeight: 700, fontSize: 15, marginTop: 6 }}>{rZA(price!)}</div>}
         {onToggle && (
-          <button onClick={onToggle} style={{ marginTop: 8, padding: "7px 0", width: "100%", borderRadius: cardRadius, border: `1.5px solid ${primary}`, background: selected ? primary : "transparent", color: selected ? "#fff" : primary, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
-            {selected ? "✓ Added" : "+ Add to my wedding"}
-          </button>
+          included ? (
+            <button onClick={onToggle} style={{ marginTop: 8, padding: "8px 0", width: "100%", borderRadius: cardRadius, border: "1px solid rgba(0,0,0,0.1)", background: selected ? "#eef0e9" : "#fff", color: selected ? "var(--ink, #1c1917)" : "#57534e", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+              {selected ? "✓ Included" : "+ Include"}
+            </button>
+          ) : (
+            <button onClick={onToggle} style={{ marginTop: 8, padding: "8px 0", width: "100%", borderRadius: cardRadius, border: selected ? "none" : `1px solid ${primary}40`, background: selected ? primary : `${primary}14`, color: selected ? "#fff" : primary, fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>
+              {selected ? "✓ Added" : "+ Add to my wedding"}
+            </button>
+          )
         )}
         {selected && onDay && (
           <div style={{ display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" }}>
