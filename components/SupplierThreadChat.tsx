@@ -34,12 +34,38 @@ const fmtTime = (s: string) => {
 
 export function SupplierThreadChat({ token, thread }: { token: string; thread: Thread }) {
   const [messages, setMessages] = useState<Msg[]>(thread.messages);
+  const [status, setStatus] = useState(thread.status);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages.length]);
+
+  // Live updates: the server render is a snapshot, so poll while visible (and on
+  // focus) for new couple/venue messages. Optimistic "tmp-" sends are kept until
+  // their server copy lands.
+  useEffect(() => {
+    let stop = false;
+    async function refresh() {
+      try {
+        const r = await fetch(`/api/supplier/thread/${token}`, { cache: "no-store" });
+        if (!r.ok || stop) return;
+        const j = (await r.json()) as { thread?: Thread };
+        if (!j.thread || stop) return;
+        setStatus(j.thread.status);
+        setMessages((cur) => {
+          const pending = cur.filter((m) => m.id.startsWith("tmp-"));
+          return [...j.thread!.messages, ...pending];
+        });
+      } catch { /* transient — next poll retries */ }
+    }
+    const id = window.setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 8000);
+    const onFocus = () => refresh();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => { stop = true; window.clearInterval(id); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus); };
+  }, [token]);
 
   async function send() {
     const t = text.trim();
@@ -116,7 +142,7 @@ export function SupplierThreadChat({ token, thread }: { token: string; thread: T
             Venuely<span style={{ color: POPPY }}>.</span>
           </div>
           <div style={{ fontSize: 13.5, color: INK2, marginTop: 2 }}>{headerLine}</div>
-          {thread.status === "booked" && (
+          {status === "booked" && (
             <div style={{ display: "inline-block", marginTop: 6, fontSize: 11.5, fontWeight: 700, color: "#3f6212", background: "#ecfccb", borderRadius: 999, padding: "3px 10px" }}>
               Booked — contact details unlocked
             </div>

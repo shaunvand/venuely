@@ -100,8 +100,11 @@ export function CoupleMessages({ slug, initialThreads = [], startVendor = null, 
 
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => {
-    const id = window.setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 30000);
-    return () => window.clearInterval(id);
+    const id = window.setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 8000);
+    const onFocus = () => refresh();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => { window.clearInterval(id); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus); };
   }, [refresh]);
 
   const openThread = useCallback((id: string) => {
