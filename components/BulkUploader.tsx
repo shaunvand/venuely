@@ -150,11 +150,15 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
   const finishRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Abort plumbing for the parse fetch: a 240s safety timeout stops the bar
-  // hanging at ~98% forever, and the Cancel button aborts the in-flight read.
+  // Abort plumbing for the parse fetch. We do NOT cut large imports off at 4
+  // minutes — instead, at LONG_NOTICE_MS we reassure ("taking longer than usual,
+  // almost done") and keep waiting; PARSE_HARD_TIMEOUT_MS is only a far backstop
+  // so a truly dead connection can't hang forever. The Cancel button still aborts.
   const abortRef = useRef<AbortController | null>(null);
   const cancelledRef = useRef(false);
-  const PARSE_TIMEOUT_MS = 240_000;
+  const noticeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const LONG_NOTICE_MS = 240_000;       // 4 min → switch to the "almost done" notice
+  const PARSE_HARD_TIMEOUT_MS = 1_200_000; // 20 min hard backstop only
 
   function cancelParse() {
     cancelledRef.current = true;
@@ -253,12 +257,15 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
     setBusy(true); setPhase("reading"); setProgress(4); startProgress(totalBytes);
     setStatus({ tone: "info", text: `Reading ${toParse.length} file${toParse.length === 1 ? "" : "s"} — this can take 30-60 seconds for large PDFs.` });
     setMsg(null); setItems([]); setImported(false); setCommitResults(null); setUndo(null);
-    // Abortable fetch: Cancel button aborts immediately; the 240s timeout stops
-    // the bar from hanging at ~98% forever when the server never responds.
+    // Abortable fetch: Cancel aborts immediately. At 4 minutes we reassure and
+    // keep waiting (no abort); only the far backstop aborts a truly dead request.
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     cancelledRef.current = false;
-    const timeoutId = setTimeout(() => ctrl.abort(), PARSE_TIMEOUT_MS);
+    noticeRef.current = setTimeout(() => {
+      setStatus({ tone: "info", text: "This is taking a little longer than usual — almost done. Please keep this tab open; we'll finish your import." });
+    }, LONG_NOTICE_MS);
+    const timeoutId = setTimeout(() => ctrl.abort(), PARSE_HARD_TIMEOUT_MS);
     try {
       const fd = new FormData();
       toParse.forEach((f) => fd.append("files", f));
@@ -303,12 +310,13 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
         // User pressed Cancel — back to the pick step, no scary error.
         setStatus({ tone: "info", text: "Reading cancelled. Your files are still selected — press Retry to read them again, or change files." });
       } else if (e instanceof DOMException && e.name === "AbortError") {
-        setStatus({ tone: "error", text: "Reading timed out after 4 minutes — the server may be busy or the files very large. Press Retry, or try fewer / smaller files." });
+        setStatus({ tone: "error", text: "We couldn't reach the server for a while — your connection may have dropped. Press Retry; your files are still selected." });
       } else {
         setStatus({ tone: "error", text: `Reading failed: ${e instanceof Error ? e.message : String(e)}. Check your connection and press Retry.` });
       }
     } finally {
       clearTimeout(timeoutId);
+      if (noticeRef.current) { clearTimeout(noticeRef.current); noticeRef.current = null; }
       abortRef.current = null;
       setBusy(false);
     }

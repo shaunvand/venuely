@@ -9,7 +9,11 @@ import { searchOneImage, mapWithConcurrency } from "@/lib/imports/image-search";
 import { requireVenueMember } from "@/lib/security/guards";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+// Large multi-file imports (many big PDFs) can legitimately run several minutes.
+// Render runs this as a long-lived Node server (Next maxDuration is a Vercel
+// concept), so this is just a generous ceiling — the client no longer cuts off
+// at 4 min; it waits with an "almost done" notice.
+export const maxDuration = 800;
 
 // `unsupported` marks a file we recognised but cannot read as text (e.g. legacy .doc).
 type Extract = {
