@@ -6,7 +6,7 @@ export type Supplier = {
   id: string; category: string; name: string; email?: string; phone?: string;
   price?: string; status?: string; dueDate?: string; description?: string; fromVendorId?: string; img?: string | null;
 };
-type VenuePartner = { id: string; type: string; name: string; description: string; price: number | null; email: string | null; phone: string | null; img?: string | null };
+type VenuePartner = { id: string; type: string; name: string; description: string; price: number | null; email: string | null; phone: string | null; website?: string | null; img?: string | null };
 
 const serif: React.CSSProperties = { fontFamily: "'Fraunces', Georgia, serif" };
 const CATEGORIES = ["Venue", "Catering", "Photography", "Flowers", "Music", "Hair & Makeup", "Cake", "Waiter/Bar Staff", "Beverages", "Other"];
@@ -49,7 +49,8 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
   const card: React.CSSProperties = { background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius };
   // Shared card chrome matching the Accommodation / Catalogue cards.
   const cardChrome: React.CSSProperties = { background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderLeft: `3px solid ${primary}`, borderRadius: cardRadius, overflow: "hidden", boxShadow: "0 2px 8px rgba(28,25,23,0.08)" };
-  const chipStyle: React.CSSProperties = { display: "inline-block", fontSize: 10.5, textTransform: "uppercase", letterSpacing: 1, color: "#57534e", background: `${accent}33`, borderRadius: 999, padding: "3px 9px" };
+  // Chip matches the venue-side Suppliers page exactly (cream + poppy-deep).
+  const chipStyle: React.CSSProperties = { display: "inline-block", fontSize: 10.5, textTransform: "uppercase", letterSpacing: 1, color: "var(--poppy-deep, #c2371f)", background: "var(--cream, #FBF7F2)", borderRadius: 999, padding: "3px 9px" };
   const chip = (active: boolean): React.CSSProperties => ({ border: `1px solid ${active ? primary : "rgba(0,0,0,0.15)"}`, background: active ? primary : "#fff", color: active ? "#fff" : "#57534e", borderRadius: 999, padding: "5px 13px", fontSize: 12, fontWeight: 600, cursor: "pointer" });
   const btnSolid: React.CSSProperties = { background: primary, color: "#fff", border: "none", borderRadius: 999, padding: "9px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer", letterSpacing: 0.5 };
   const field: React.CSSProperties = { width: "100%", border: "1px solid rgba(0,0,0,0.15)", borderRadius: 8, padding: "9px 11px", fontSize: 13.5, marginTop: 4 };
@@ -112,7 +113,17 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
                     <span style={chipStyle}>{labelFor(v.type)}</span>
                     <div style={{ ...serif, fontSize: 16, fontWeight: 700, marginTop: 6 }}>{v.name}</div>
                     {v.description && <div style={{ fontSize: 12.5, color: "#57534e", fontStyle: "italic", margin: "6px 0" }}>{v.description}</div>}
-                    {v.price != null && <div style={{ color: primary, fontWeight: 700, fontSize: 13 }}>From {rZA(v.price)}</div>}
+                    {(v.phone || v.email) && (
+                      <div style={{ fontSize: 12, color: "#57534e", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {[v.phone, v.email].filter(Boolean).join(" · ")}
+                      </div>
+                    )}
+                    {v.website && (
+                      <a href={/^https?:\/\//i.test(v.website) ? v.website : `https://${v.website}`} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ display: "inline-block", fontSize: 12, color: primary, marginTop: 3 }}>
+                        Visit website ↗
+                      </a>
+                    )}
+                    {v.price != null && <div style={{ color: primary, fontWeight: 700, fontSize: 13, marginTop: 4 }}>From {rZA(v.price)}</div>}
                     <button onClick={() => addFromVenue(v)} disabled={added} style={{ marginTop: 10, width: "100%", border: `1px solid ${added ? "#1a7f4b" : primary}`, background: added ? "#1a7f4b" : "#fff", color: added ? "#fff" : primary, borderRadius: 999, padding: "7px", fontWeight: 600, fontSize: 12.5, cursor: added ? "default" : "pointer" }}>{added ? "✓ Added to my vendors" : "+ Add to my vendors"}</button>
                   </div>
                 </div>

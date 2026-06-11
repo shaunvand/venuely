@@ -17,11 +17,13 @@ function isCancelledStatus(status: string | null | undefined): boolean {
 // Booking shape here, so we key off status alone (+ cancelled de-emphasis).
 type StatusStyle = { fill: string; text: string; dot: string };
 function statusStyle(status: string | null | undefined): StatusStyle {
+  // Same palette as WeddingTimelineStrip's TONE_STYLE so both calendar views
+  // read identically — solid pre-mixed tints (low-alpha fills washed out grey).
   const s = (status ?? "").toLowerCase();
-  if (s === "cancelled" || s === "lost") return { fill: "rgba(236,233,231,0.7)", text: "#a39e99", dot: "#d6d2cf" };
-  if (s === "completed" || s === "paid") return { fill: "rgba(191,218,211,0.55)", text: "#1f5d3e", dot: "#1f5d3e" }; // leaf / paid
-  if (s === "booked" || s === "confirmed") return { fill: "rgba(138,154,134,0.28)", text: "#3f4a3c", dot: "#8a9a86" }; // sage / confirmed
-  return { fill: "var(--cream)", text: "var(--ink-2)", dot: "var(--bone)" }; // tentative / inquiry
+  if (s === "cancelled" || s === "lost") return { fill: "#f4f2f0", text: "#a39e99", dot: "#d6d2cf" };
+  if (s === "completed" || s === "paid") return { fill: "#dcebd8", text: "#1f5d3e", dot: "#8fae8a" }; // paid / sage-leaf
+  if (s === "booked" || s === "confirmed") return { fill: "#d6e4da", text: "#2f5a43", dot: "#3f6e54" }; // confirmed / deep green
+  return { fill: "#eee5d4", text: "#6b5d44", dot: "#d2c2a4" }; // tentative / warm taupe
 }
 
 // Expand a booking's wedding_date..wedding_end_date span into one ISO key per
@@ -167,13 +169,13 @@ export function BookingsCalendar({
 
       <div className="flex flex-wrap items-center gap-4 text-xs mb-5" style={{ color: "var(--ink-2)" }}>
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#8a9a86" }} /> Confirmed
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#3f6e54" }} /> Confirmed
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#1f5d3e" }} /> Paid in full
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#8fae8a" }} /> Paid in full
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "var(--bone)", border: "1px solid var(--line)" }} /> Tentative
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#d2c2a4" }} /> Tentative
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#b91c1c" }} /> Clash
