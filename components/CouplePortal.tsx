@@ -92,14 +92,18 @@ type Venue = { name: string; region: string | null; address: string | null; desc
 const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Invites", "Reminders", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Payments", "Documents"] as const;
 type Tab = (typeof TABS)[number];
 
-// Couple sidebar — flat, curated order + display labels (tab keys unchanged).
-const COUPLE_NAV: { key: Tab; label: string; icon: string }[] = [
+type NavLeaf = { key: Tab; label: string; icon: string };
+type NavGroup = { group: string; icon: string; children: NavLeaf[] };
+type NavEntry = NavLeaf | NavGroup;
+const isGroup = (e: NavEntry): e is NavGroup => "group" in e;
+
+// Couple sidebar — leaves + one collapsible "For the Vibes" group bundling the
+// mood/styling tabs (Inspiration, Invites, Flowers, Dress, Décor, Music, Contacts).
+const COUPLE_NAV: NavEntry[] = [
   { key: "Overview", label: "Overview", icon: "home" },
   { key: "Our Venue", label: "Our Venue", icon: "venue" },
   { key: "Guests", label: "Guest List", icon: "users" },
   { key: "Accommodation", label: "Accommodation", icon: "bed" },
-  { key: "Inspiration", label: "Inspiration", icon: "sparkle" },
-  { key: "Invites", label: "Invites", icon: "mail" },
   { key: "Suppliers", label: "Suppliers", icon: "store" },
   { key: "Catalogue & Rentals", label: "Venue stock / Rentals", icon: "box" },
   { key: "Budget", label: "Budget", icon: "wallet" },
@@ -107,12 +111,21 @@ const COUPLE_NAV: { key: Tab; label: string; icon: string }[] = [
   { key: "Seating", label: "Seating plan", icon: "seat" },
   { key: "Timeline", label: "Wedding day Timeline", icon: "clock" },
   { key: "Checklist", label: "Checklist", icon: "check" },
-  { key: "Flowers", label: "Flowers", icon: "flower" },
-  { key: "Dress", label: "The Dress", icon: "dress" },
-  { key: "Décor", label: "Décor", icon: "decor" },
-  { key: "Music", label: "Music", icon: "music" },
-  { key: "Contacts", label: "Contacts", icon: "phone" },
+  {
+    group: "For the Vibes", icon: "sparkle", children: [
+      { key: "Inspiration", label: "Inspiration", icon: "sparkle" },
+      { key: "Invites", label: "Invites", icon: "mail" },
+      { key: "Flowers", label: "Flowers", icon: "flower" },
+      { key: "Dress", label: "The Dress", icon: "dress" },
+      { key: "Décor", label: "Décor", icon: "decor" },
+      { key: "Music", label: "Music", icon: "music" },
+      { key: "Contacts", label: "Contacts", icon: "phone" },
+    ],
+  },
 ];
+// Flattened (leaves + group children, in order) — for the horizontal top-nav
+// variants where a collapsible group doesn't apply.
+const COUPLE_NAV_FLAT: NavLeaf[] = COUPLE_NAV.flatMap((e) => (isGroup(e) ? e.children : [e]));
 
 // Thin line icons (Venuely style) for the couple sidebar. Plain function (not a
 // component) so it can be called inline without remount/lint issues.
@@ -184,6 +197,7 @@ export function CouplePortal({
   }, []);
   const [rentFilter, setRentFilter] = useState("All");
   const [rentFolder, setRentFolder] = useState<"all" | "included" | "extra">("all");
+  const [vibesOpen, setVibesOpen] = useState(false); // "For the Vibes" sidebar group
   // "+ Add custom item" — a request to the venue (not self-priced; the venue
   // quotes/adds it to the proforma properly). Stored in wedding_state.
   const [customOpen, setCustomOpen] = useState(false);
@@ -393,9 +407,30 @@ export function CouplePortal({
           </div>
         </div>
         <nav style={{ display: "grid", gap: 2, flex: 1 }}>
-          {COUPLE_NAV.map(({ key, label, icon }) => {
-            const active = key === tab;
-            return <button key={key} onClick={() => { setTab(key); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{navIcon(icon)}<span>{label}</span></button>;
+          {COUPLE_NAV.map((entry) => {
+            if (!isGroup(entry)) {
+              const active = entry.key === tab;
+              return <button key={entry.key} onClick={() => { setTab(entry.key); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{navIcon(entry.icon)}<span>{entry.label}</span></button>;
+            }
+            const childActive = entry.children.some((c) => c.key === tab);
+            const open = vibesOpen || childActive;
+            return (
+              <div key={entry.group}>
+                <button onClick={() => setVibesOpen((o) => !o)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: childActive ? 700 : 500, background: "transparent", color: childActive ? "var(--poppy,#FA523C)" : "#44403c" }}>
+                  {navIcon(entry.icon)}
+                  <span style={{ flex: 1 }}>{entry.group}</span>
+                  <svg viewBox="0 0 12 12" width="11" height="11" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} aria-hidden><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+                {open && (
+                  <div style={{ display: "grid", gap: 2, marginLeft: 12, paddingLeft: 10, borderLeft: "1px solid rgba(0,0,0,0.08)" }}>
+                    {entry.children.map((c) => {
+                      const active = c.key === tab;
+                      return <button key={c.key} onClick={() => { setTab(c.key); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#57534e" }}>{navIcon(c.icon)}<span>{c.label}</span></button>;
+                    })}
+                  </div>
+                )}
+              </div>
+            );
           })}
         </nav>
         <div style={{ marginTop: 14, background: "var(--bone,#FFF6F0)", borderRadius: 12, padding: 12 }}>
@@ -689,7 +724,7 @@ function TopNavBar({ tokens, primary, accent, tab, onTab }: { tokens: TemplateTo
     return (
       <div style={{ padding: "0 16px 12px", overflowX: "auto" }}>
         <div style={{ display: "inline-flex", border: tokens.cardBorder, borderRadius: "0.75rem", overflow: "hidden", background: "#fff" }}>
-          {COUPLE_NAV.map(({ key, label }, i) => {
+          {COUPLE_NAV_FLAT.map(({ key, label }, i) => {
             const active = key === tab;
             return (
               <button key={key} onClick={() => onTab(key)} style={{ border: "none", borderLeft: i === 0 ? "none" : tokens.divider, padding: "8px 13px", fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer", fontWeight: active ? 700 : 500, background: active ? primary : "transparent", color: active ? "#fff" : "#57534e" }}>{label}</button>
@@ -703,7 +738,7 @@ function TopNavBar({ tokens, primary, accent, tab, onTab }: { tokens: TemplateTo
     // Romantic — soft pill tabs, accent tint when active.
     return (
       <div style={{ display: "flex", gap: 6, padding: "0 16px 12px", overflowX: "auto" }}>
-        {COUPLE_NAV.map(({ key, label }) => {
+        {COUPLE_NAV_FLAT.map(({ key, label }) => {
           const active = key === tab;
           return (
             <button key={key} onClick={() => onTab(key)} style={{ borderRadius: 999, padding: "7px 14px", fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer", fontWeight: active ? 700 : 500, border: `1px solid ${active ? `${primary}55` : "rgba(0,0,0,0.10)"}`, background: active ? `${accent}55` : "rgba(255,255,255,0.65)", color: active ? primary : "#57534e" }}>{label}</button>
@@ -715,7 +750,7 @@ function TopNavBar({ tokens, primary, accent, tab, onTab }: { tokens: TemplateTo
   // Editorial — numbered uppercase text tabs over a hairline ink rule.
   return (
     <div style={{ display: "flex", gap: 22, padding: "0 16px", overflowX: "auto", borderBottom: tokens.divider }}>
-      {COUPLE_NAV.map(({ key, label }, i) => {
+      {COUPLE_NAV_FLAT.map(({ key, label }, i) => {
         const active = key === tab;
         return (
           <button key={key} onClick={() => onTab(key)} style={{ border: "none", background: "transparent", cursor: "pointer", padding: "4px 0 10px", whiteSpace: "nowrap", fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: active ? 700 : 500, color: active ? "#1c1917" : "#78716c", boxShadow: active ? "inset 0 -2px 0 #1c1917" : "none" }}>
