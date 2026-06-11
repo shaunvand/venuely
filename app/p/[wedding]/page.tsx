@@ -3,6 +3,7 @@ import { portalAccess } from "@/lib/portal/access";
 import { createAdminClient } from "@/lib/supabase/server";
 import { resolveTemplate, resolveTheme } from "@/lib/portal/templates";
 import { applyMarkup } from "@/lib/billing/compute";
+import { seasonForDate, resolveAreaPrice, type Season, type AreaPriceRow } from "@/lib/venue/seasons";
 import { getWeddingTotals } from "@/app/venue/weddings/actions";
 import { CouplePortal } from "@/components/CouplePortal";
 
@@ -26,7 +27,7 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
   const wId = access.wedding.id;
   const vId = access.wedding.venue_id;
 
-  const [wedRes, venRes, catRes, rentRes, roomRes, vendRes, galRes, tableRes, areaRes, areaPriceRes, areaImgRes] = await Promise.all([
+  const [wedRes, venRes, catRes, rentRes, roomRes, vendRes, galRes, tableRes, areaRes, areaPriceRes, areaImgRes, areaGroupRes, seasonRes] = await Promise.all([
     db.from("weddings").select("id, slug, couple_names, wedding_date, wedding_end_date, wedding_state, area_selections").eq("id", wId).single(),
     db.from("venues").select("name, region, address, portal_template, portal_theme, branding_logo_url, contact_email, contact_phone, google_maps_url, description").eq("id", vId).single(),
     db.from("catalogue_items").select("id, category, name, description, price, image_url, cost_treatment, commission_value, commission_type, event_part, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
@@ -35,9 +36,11 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
     db.from("vendor_partners").select("id, vendor_type, name, description, price_from, image_url, contact_email, contact_phone, website_url, commission_value, commission_type, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
     db.from("media_assets").select("url, category, kind, label, sort_order").eq("venue_id", vId).eq("owner_type", "venue").in("kind", ["photo", "video", "hero"]).order("sort_order"),
     db.from("venue_tables").select("id, label, shape, seats, quantity").eq("venue_id", vId).eq("active", true).order("sort_order"),
-    db.from("venue_areas").select("id, name, description, area_kind, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
-    db.from("area_pricing").select("area_id, day_type, price"),
+    db.from("venue_areas").select("id, name, description, area_kind, group_id, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
+    db.from("area_pricing").select("area_id, day_type, price, season_id"),
     db.from("media_assets").select("owner_id, url, sort_order").eq("venue_id", vId).eq("owner_type", "area").order("sort_order"),
+    db.from("venue_area_groups").select("id, name, included, location, sort_order").eq("venue_id", vId).order("sort_order"),
+    db.from("venue_seasons").select("id, name, start_month, start_day, end_month, end_day, sort_order").eq("venue_id", vId),
   ]);
 
   const wedding = wedRes.data;
@@ -54,12 +57,35 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
     /floor\s*-?\s*plan|venue\s+layout|site\s*map|floorplan/i.test(`${g.category} ${g.label}`);
   const cover = theme.coverUrl || gallery.find((g) => !floorplanish(g))?.url || gallery[0]?.url || null;
 
-  // Venue spaces (areas) → couple portal "Our Venue" tab.
-  const areaPriceMap: Record<string, Record<string, number>> = {};
-  (areaPriceRes.data ?? []).forEach((p) => { (areaPriceMap[p.area_id as string] ??= {})[p.day_type as string] = Number(p.price) || 0; });
+  // Venue spaces (areas) → couple portal "Our Venue" tab. Prices are resolved for
+  // THIS wedding's season: the wedding-day price uses the season containing the
+  // wedding date (mg/farewell keep their single null-season price). Areas carry
+  // their venue-named sub-category group (Included/Extra; venue/offsite).
+  const seasons = (seasonRes.data ?? []) as Season[];
+  const weddingSeason = seasonForDate(seasons, wedding.wedding_date as string | null);
+  const seasonId = weddingSeason?.id ?? null;
+  const priceRows = (areaPriceRes.data ?? []) as AreaPriceRow[];
   const areaImgMap: Record<string, string> = {};
   (areaImgRes.data ?? []).forEach((m) => { const k = String(m.owner_id); if (!areaImgMap[k] && isImg(m.url)) areaImgMap[k] = String(m.url); });
-  const areas = (areaRes.data ?? []).map((a) => ({ id: a.id as string, name: a.name as string, description: (a.description as string) ?? null, kind: (a.area_kind as string) ?? "extra", img: areaImgMap[a.id as string] ?? null, prices: areaPriceMap[a.id as string] ?? {} }));
+  const groupMap = new Map<string, { id: string; name: string; included: boolean; location: "venue" | "offsite" }>();
+  (areaGroupRes.data ?? []).forEach((g) => groupMap.set(String(g.id), {
+    id: String(g.id), name: String(g.name), included: !!g.included,
+    location: (g.location as "venue" | "offsite") ?? "venue",
+  }));
+  const areas = (areaRes.data ?? []).map((a) => {
+    const aid = a.id as string;
+    const prices: Record<string, number> = {
+      mg: resolveAreaPrice(priceRows, aid, "mg", seasonId),
+      wedding: resolveAreaPrice(priceRows, aid, "wedding", seasonId),
+      farewell: resolveAreaPrice(priceRows, aid, "farewell", seasonId),
+    };
+    const group = a.group_id ? groupMap.get(String(a.group_id)) ?? null : null;
+    return {
+      id: aid, name: a.name as string, description: (a.description as string) ?? null,
+      kind: (a.area_kind as string) ?? "extra", img: areaImgMap[aid] ?? null,
+      prices, group, seasonName: weddingSeason?.name ?? null,
+    };
+  });
   const initialAreaSelections = (wedding.area_selections ?? []) as Array<{ area_id: string; day_type: string }>;
 
   const num = (n: unknown) => Number(n ?? 0);

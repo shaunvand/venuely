@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SetupVenueForm } from "@/components/SetupVenueForm";
 import type { SetupVenueState } from "@/app/onboarding/setup-venue/actions";
-import { addArea } from "@/app/venue/areas/actions";
+import { addArea, getVenueGroupsAndSeasons, addAreaGroup } from "@/app/venue/areas/actions";
 import { BulkUploader, type BulkUploaderHandle } from "@/components/BulkUploader";
 import { LogoMark } from "@/components/Logo";
 import { VenuelyLoader } from "@/components/VenuelyLoader";
@@ -538,11 +538,26 @@ function StepSpaces({
   const [name, setName] = useState("");
   const [kind, setKind] = useState("main");
   const [price, setPrice] = useState("");
+  const [groupId, setGroupId] = useState("none");
+  const [newGroup, setNewGroup] = useState("");
+  const [seasonPrices, setSeasonPrices] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [advancing, setAdvancing] = useState(false);
+  // Venue's groups + seasons (loaded on mount so the wizard can capture them).
+  const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
+  const [seasons, setSeasons] = useState<{ id: string; name: string }[]>([]);
   const total = areasCount + added.length;
   const done = spacesDone || added.length > 0;
+
+  useEffect(() => {
+    if (!venueId) return;
+    let cancelled = false;
+    getVenueGroupsAndSeasons(venueId)
+      .then((r) => { if (!cancelled) { setGroups(r.groups as { id: string; name: string }[]); setSeasons(r.seasons as { id: string; name: string }[]); } })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [venueId]);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -550,15 +565,41 @@ function StepSpaces({
     setBusy(true);
     setErr(null);
     try {
+      // Optionally create a new sub-category inline, then assign the space to it.
+      let assignGroup = groupId;
+      if (groupId === "__new" && newGroup.trim()) {
+        const gfd = new FormData();
+        gfd.set("name", newGroup.trim());
+        gfd.set("location", "venue");
+        gfd.set("included", "true");
+        await addAreaGroup(venueId, gfd);
+        const refreshed = await getVenueGroupsAndSeasons(venueId);
+        setGroups(refreshed.groups as { id: string; name: string }[]);
+        const match = (refreshed.groups as { id: string; name: string }[]).find((g) => g.name === newGroup.trim());
+        assignGroup = match?.id ?? "none";
+      }
       const fd = new FormData();
       fd.set("name", name.trim());
       fd.set("area_kind", kind);
-      if (price.trim()) fd.set("price_wedding", price.replace(/[^\d.]/g, ""));
+      if (assignGroup && assignGroup !== "none" && assignGroup !== "__new") fd.set("group_id", assignGroup);
+      if (seasons.length) {
+        // Per-season wedding-day prices (fall back to the single price for blanks).
+        const fallback = price.trim() ? price.replace(/[^\d.]/g, "") : "";
+        for (const s of seasons) {
+          const v = (seasonPrices[s.id] ?? "").trim();
+          const num = (v || fallback).replace(/[^\d.]/g, "");
+          if (num) fd.set(`price_wedding_season_${s.id}`, num);
+        }
+      } else if (price.trim()) {
+        fd.set("price_wedding", price.replace(/[^\d.]/g, ""));
+      }
       await addArea(venueId, fd);
       const isFirst = added.length === 0 && !spacesDone;
       setAdded((a) => [...a, name.trim()]);
       setName("");
       setPrice("");
+      setSeasonPrices({});
+      setNewGroup("");
       if (isFirst) {
         // First space in → glide to Review after a beat (they can come back).
         setAdvancing(true);
@@ -598,26 +639,71 @@ function StepSpaces({
       </div>
 
       {/* Inline add form */}
-      <form onSubmit={add} className="rounded-xl p-4 grid gap-3 sm:grid-cols-[1fr_auto_auto_auto] items-end" style={{ border: "1px solid var(--line)", background: "#fff" }}>
-        <div className="space-y-1 min-w-0">
-          <label className="vy-label">Space name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. Ceremony lawn, Reception hall" className="vy-input" />
+      <form onSubmit={add} className="rounded-xl p-4 space-y-3" style={{ border: "1px solid var(--line)", background: "#fff" }}>
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] items-end">
+          <div className="space-y-1 min-w-0">
+            <label className="vy-label">Space name</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. Ceremony lawn, Reception hall" className="vy-input" />
+          </div>
+          <div className="space-y-1">
+            <label className="vy-label">Type</label>
+            <select value={kind} onChange={(e) => setKind(e.target.value)} className="vy-select">
+              <option value="main">Main (included)</option>
+              <option value="extra">Extra (paid)</option>
+              <option value="overflow">Overflow</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="vy-label">Sub-category <span style={{ color: "var(--ink-2)", fontWeight: 400 }}>(optional)</span></label>
+            <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className="vy-select">
+              <option value="none">No group</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+              <option value="__new">+ New sub-category…</option>
+            </select>
+          </div>
         </div>
-        <div className="space-y-1">
-          <label className="vy-label">Type</label>
-          <select value={kind} onChange={(e) => setKind(e.target.value)} className="vy-select">
-            <option value="main">Main (included)</option>
-            <option value="extra">Extra (paid)</option>
-            <option value="overflow">Overflow</option>
-          </select>
+
+        {groupId === "__new" && (
+          <div className="space-y-1 max-w-xs">
+            <label className="vy-label">New sub-category name</label>
+            <input value={newGroup} onChange={(e) => setNewGroup(e.target.value)} placeholder="Gardens" className="vy-input" />
+          </div>
+        )}
+
+        {/* Wedding-day price: per season when seasons exist, else a single field. */}
+        {seasons.length ? (
+          <div className="space-y-1">
+            <label className="vy-label">Wedding-day price per season <span style={{ color: "var(--ink-2)", fontWeight: 400 }}>(R, optional)</span></label>
+            <div className="flex flex-wrap gap-3">
+              {seasons.map((s) => (
+                <div key={s.id} className="space-y-0.5">
+                  <span className="text-[11px]" style={{ color: "var(--ink-2)" }}>{s.name}</span>
+                  <input
+                    value={seasonPrices[s.id] ?? ""}
+                    onChange={(e) => setSeasonPrices((p) => ({ ...p, [s.id]: e.target.value }))}
+                    inputMode="numeric"
+                    placeholder="0"
+                    className="vy-input w-24 block"
+                  />
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px]" style={{ color: "var(--ink-2)" }}>Leave a season blank to reuse the first filled price.</p>
+          </div>
+        ) : (
+          <div className="space-y-1 max-w-xs">
+            <label className="vy-label">Wedding-day price <span style={{ color: "var(--ink-2)", fontWeight: 400 }}>(R, optional)</span></label>
+            <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="0" className="vy-input w-28" />
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <button type="submit" disabled={busy || !name.trim() || !venueId} className="vy-btn vy-btn-primary whitespace-nowrap">
+            {busy ? "Adding…" : "+ Add space"}
+          </button>
         </div>
-        <div className="space-y-1">
-          <label className="vy-label">Wedding-day price <span style={{ color: "var(--ink-2)", fontWeight: 400 }}>(R, optional)</span></label>
-          <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="0" className="vy-input w-28" />
-        </div>
-        <button type="submit" disabled={busy || !name.trim() || !venueId} className="vy-btn vy-btn-primary whitespace-nowrap">
-          {busy ? "Adding…" : "+ Add space"}
-        </button>
       </form>
       {err && <p className="text-sm mt-2" style={{ color: "#a3210e" }}>{err}</p>}
 

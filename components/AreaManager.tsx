@@ -4,43 +4,95 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   updateArea, updateAreaPrice, toggleAreaActive, deleteArea,
-  addAreaImages, deleteAreaImage,
+  addAreaImages, deleteAreaImage, assignAreaGroup,
 } from "@/app/venue/areas/actions";
+import { type SeasonRow, type GroupRow, seasonRangeLabel, GroupBadges } from "@/components/SeasonsManager";
 
 export type AreaImage = { id: string; url: string };
 export type GalleryPhoto = { url: string; label?: string | null; category?: string | null };
+export type AreaPriceRowLite = { day_type: string; price: number; season_id: string | null };
 export type AreaRow = {
   id: string;
   name: string;
   area_kind: string;
   description: string | null;
   active: boolean;
-  prices: Record<string, number>;
+  group_id: string | null;
+  priceRows: AreaPriceRowLite[];
   images: AreaImage[];
 };
 
-const DAY_TYPES = [
-  { key: "wedding", label: "Wedding" },
-  { key: "mg", label: "M&G" },
-  { key: "farewell", label: "Farewell" },
-];
-
 const KIND_LABEL: Record<string, string> = { main: "Main (included)", extra: "Extra (paid)", overflow: "Overflow" };
 
-export function AreaManager({ venueId, areas, gallery }: { venueId: string; areas: AreaRow[]; gallery: GalleryPhoto[] }) {
+// Resolve a stored price for a day type + optional season from the flat rows.
+function priceFor(rows: AreaPriceRowLite[], dayType: string, seasonId: string | null): number {
+  if (dayType === "wedding" && seasonId) {
+    const seasonal = rows.find((r) => r.day_type === "wedding" && r.season_id === seasonId);
+    if (seasonal) return seasonal.price;
+  }
+  const fallback = rows.find((r) => r.day_type === dayType && r.season_id == null);
+  if (fallback) return fallback.price;
+  const any = rows.find((r) => r.day_type === dayType);
+  return any?.price ?? 0;
+}
+
+export function AreaManager({
+  venueId,
+  areas,
+  gallery,
+  seasons,
+  groups,
+}: {
+  venueId: string;
+  areas: AreaRow[];
+  gallery: GalleryPhoto[];
+  seasons: SeasonRow[];
+  groups: GroupRow[];
+}) {
   if (areas.length === 0) {
     return <div className="vy-empty">No areas yet. Add Oak Tree, Hall/Lapa, Pool, etc. above.</div>;
   }
+  // Group areas by sub-category; "No group" areas land in a trailing bucket.
+  const byGroup: { group: GroupRow | null; areas: AreaRow[] }[] = [];
+  for (const g of groups) {
+    const inGroup = areas.filter((a) => a.group_id === g.id);
+    if (inGroup.length) byGroup.push({ group: g, areas: inGroup });
+  }
+  const ungrouped = areas.filter((a) => !a.group_id || !groups.some((g) => g.id === a.group_id));
+  if (ungrouped.length) byGroup.push({ group: null, areas: ungrouped });
+
   return (
-    <div className="space-y-4">
-      {areas.map((a) => (
-        <AreaCard key={a.id} venueId={venueId} area={a} gallery={gallery} />
+    <div className="space-y-8">
+      {byGroup.map(({ group, areas: groupAreas }) => (
+        <section key={group?.id ?? "__ungrouped"} className="space-y-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="font-serif text-xl" style={{ fontWeight: 700 }}>{group ? group.name : "Ungrouped"}</h2>
+            {group ? <GroupBadges group={group} /> : (
+              <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md" style={{ background: "var(--bone)", color: "var(--ink-2)" }}>No sub-category</span>
+            )}
+          </div>
+          {groupAreas.map((a) => (
+            <AreaCard key={a.id} venueId={venueId} area={a} gallery={gallery} seasons={seasons} groups={groups} />
+          ))}
+        </section>
       ))}
     </div>
   );
 }
 
-function AreaCard({ venueId, area, gallery }: { venueId: string; area: AreaRow; gallery: GalleryPhoto[] }) {
+function AreaCard({
+  venueId,
+  area,
+  gallery,
+  seasons,
+  groups,
+}: {
+  venueId: string;
+  area: AreaRow;
+  gallery: GalleryPhoto[];
+  seasons: SeasonRow[];
+  groups: GroupRow[];
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -195,6 +247,15 @@ function AreaCard({ venueId, area, gallery }: { venueId: string; area: AreaRow; 
               <option value="overflow">Overflow</option>
             </select>
           </div>
+          <div className="space-y-1">
+            <label className="vy-label">Sub-category</label>
+            <select name="__group_select" className="vy-select" defaultValue={area.group_id ?? "none"} onChange={(e) => { const v = e.target.value; startTransition(async () => { await assignAreaGroup(area.id, v === "none" ? null : v); router.refresh(); }); }}>
+              <option value="none">No group</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
           <div className="md:col-span-2 space-y-1">
             <label className="vy-label">Description</label>
             <input name="description" defaultValue={area.description ?? ""} placeholder="Short description" className="vy-input" />
@@ -207,13 +268,38 @@ function AreaCard({ venueId, area, gallery }: { venueId: string; area: AreaRow; 
 
       {/* Costing */}
       <div className="pt-2 border-t" style={{ borderColor: "var(--line)" }}>
-        <div className="vy-label mb-2">Costing — hire fee per day type</div>
-        <div className="grid gap-3 md:grid-cols-3">
-          {DAY_TYPES.map((dt) => (
-            <form key={dt.key} action={updateAreaPrice.bind(null, area.id, dt.key)} className="space-y-1">
+        {/* Wedding-day price — one input per season when seasons exist. */}
+        <div className="vy-label mb-2">Wedding-day price{seasons.length ? " · per season" : ""}</div>
+        {seasons.length === 0 ? (
+          <form action={updateAreaPrice.bind(null, area.id, "wedding", null)} className="space-y-1 max-w-xs">
+            <label className="vy-label">Wedding (R)</label>
+            <div className="flex gap-2">
+              <input name="price" type="number" step="0.01" min="0" defaultValue={priceFor(area.priceRows, "wedding", null)} className="vy-input" />
+              <button className="vy-btn vy-btn-secondary text-xs whitespace-nowrap">Save</button>
+            </div>
+          </form>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+            {seasons.map((s) => (
+              <form key={s.id} action={updateAreaPrice.bind(null, area.id, "wedding", s.id)} className="space-y-1">
+                <label className="vy-label">{s.name} <span style={{ color: "var(--ink-2)", fontWeight: 400 }}>· {seasonRangeLabel(s)}</span></label>
+                <div className="flex gap-2">
+                  <input name="price" type="number" step="0.01" min="0" defaultValue={priceFor(area.priceRows, "wedding", s.id)} className="vy-input" />
+                  <button className="vy-btn vy-btn-secondary text-xs whitespace-nowrap">Save</button>
+                </div>
+              </form>
+            ))}
+          </div>
+        )}
+
+        {/* Meet & Greet + Farewell — single price each (not seasonal). */}
+        <div className="vy-label mt-4 mb-2">Meet &amp; Greet / Farewell — single price</div>
+        <div className="grid gap-3 sm:grid-cols-2 max-w-lg">
+          {[{ key: "mg", label: "Meet & Greet" }, { key: "farewell", label: "Farewell" }].map((dt) => (
+            <form key={dt.key} action={updateAreaPrice.bind(null, area.id, dt.key, null)} className="space-y-1">
               <label className="vy-label">{dt.label} (R)</label>
               <div className="flex gap-2">
-                <input name="price" type="number" step="0.01" min="0" defaultValue={area.prices[dt.key] ?? 0} className="vy-input" />
+                <input name="price" type="number" step="0.01" min="0" defaultValue={priceFor(area.priceRows, dt.key, null)} className="vy-input" />
                 <button className="vy-btn vy-btn-secondary text-xs whitespace-nowrap">Save</button>
               </div>
             </form>

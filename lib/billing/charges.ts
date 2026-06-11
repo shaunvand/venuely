@@ -11,6 +11,7 @@ import {
   loadRules, computeTotals, applyMarkup,
   type Charge, type Payment, type Computed,
 } from "@/lib/billing/compute";
+import { buildAreaPriceMap, type Season, type AreaPriceRow } from "@/lib/venue/seasons";
 
 type WeddingState = {
   rentalSelections?: Record<string, { sel?: boolean; qty?: number; mg?: boolean; wed?: boolean; fb?: boolean }>;
@@ -75,13 +76,14 @@ export async function buildWeddingCharges(
   const state = (wedding.wedding_state ?? {}) as WeddingState;
   const rules = await loadRules(supabase, venueId);
 
-  const [rentalsRes, cataRes, accomRes, vendorsRes, areasRes, areaPricingRes, paymentsRes, chargesRes] = await Promise.all([
+  const [rentalsRes, cataRes, accomRes, vendorsRes, areasRes, areaPricingRes, seasonsRes, paymentsRes, chargesRes] = await Promise.all([
     supabase.from("rental_items").select("id, name, price, commission_value, commission_type, item_code, cost_treatment").eq("venue_id", venueId),
     supabase.from("catalogue_items").select("id, name, price, commission_value, commission_type, cost_treatment").eq("venue_id", venueId),
     supabase.from("accommodation_rooms").select("id, name, price_per_night, commission_value, commission_type, cost_treatment").eq("venue_id", venueId),
     supabase.from("vendor_partners").select("id, name, vendor_type, price_from, commission_value, commission_type, cost_treatment").eq("venue_id", venueId),
     supabase.from("venue_areas").select("id, name, slug, area_kind").eq("venue_id", venueId).eq("active", true),
-    supabase.from("area_pricing").select("area_id, day_type, price"),
+    supabase.from("area_pricing").select("area_id, day_type, price, season_id"),
+    supabase.from("venue_seasons").select("id, name, start_month, start_day, end_month, end_day, sort_order").eq("venue_id", venueId),
     supabase.from("payment_ledger").select("id, amount, direction, kind, paid_at").eq("wedding_id", weddingId),
     supabase.from("wedding_charges").select("id, kind, label, qty, unit_price, amount, is_refundable, day_type").eq("wedding_id", weddingId),
   ]);
@@ -91,11 +93,14 @@ export async function buildWeddingCharges(
   const accomMap = new Map((accomRes.data ?? []).map((r) => [r.id, r]));
   const vendorMap = new Map((vendorsRes.data ?? []).map((v) => [v.id, v]));
   const areas = areasRes.data ?? [];
-  const areaPriceMap: Record<string, Record<string, number>> = {};
-  (areaPricingRes.data ?? []).forEach((p) => {
-    areaPriceMap[p.area_id] = areaPriceMap[p.area_id] || {};
-    areaPriceMap[p.area_id][p.day_type] = Number(p.price);
-  });
+  // Season-aware area prices: the wedding-day price is resolved for the season
+  // containing the wedding's date (mg/farewell keep a single null-season price).
+  const seasons = (seasonsRes.data ?? []) as Season[];
+  const areaPriceMap = buildAreaPriceMap(
+    (areaPricingRes.data ?? []) as AreaPriceRow[],
+    seasons,
+    wedding.wedding_date as string | null,
+  );
 
   const charges: Charge[] = [];
 
