@@ -123,9 +123,6 @@ const COUPLE_NAV: NavEntry[] = [
     ],
   },
 ];
-// Flattened (leaves + group children, in order) — for the horizontal top-nav
-// variants where a collapsible group doesn't apply.
-const COUPLE_NAV_FLAT: NavLeaf[] = COUPLE_NAV.flatMap((e) => (isGroup(e) ? e.children : [e]));
 
 // Thin line icons (Venuely style) for the couple sidebar. Plain function (not a
 // component) so it can be called inline without remount/lint issues.
@@ -716,50 +713,71 @@ export function CouplePortal({
   );
 }
 
-// Top nav strip for the non-sidebar templates (desktop only — mobile uses the drawer).
-// Same items + behaviour as the sidebar, different clothes per template.
+// Top nav strip for the non-sidebar templates (desktop only — mobile uses the
+// drawer). Renders the SAME grouped nav as the sidebar: leaves as tabs, and "For
+// the Vibes" as one tab that opens a dropdown of its children.
 function TopNavBar({ tokens, primary, accent, tab, onTab }: { tokens: TemplateTokens; primary: string; accent: string; tab: Tab; onTab: (t: Tab) => void }) {
-  if (tokens.navStyle === "segmented") {
-    // Modern — one joined pill-group control, horizontally scrollable.
+  const [vibesOpen, setVibesOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!vibesOpen) return;
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setVibesOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [vibesOpen]);
+
+  const variant = tokens.navStyle === "segmented" ? "segmented" : tokens.navStyle === "pills" ? "pills" : "editorial";
+
+  // Per-variant button style for a single tab.
+  const tabStyle = (active: boolean, i: number): React.CSSProperties => {
+    if (variant === "segmented") return { border: "none", borderLeft: i === 0 ? "none" : tokens.divider, padding: "8px 13px", fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer", fontWeight: active ? 700 : 500, background: active ? primary : "transparent", color: active ? "#fff" : "#57534e" };
+    if (variant === "pills") return { borderRadius: 999, padding: "7px 14px", fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer", fontWeight: active ? 700 : 500, border: `1px solid ${active ? `${primary}55` : "rgba(0,0,0,0.10)"}`, background: active ? `${accent}55` : "rgba(255,255,255,0.65)", color: active ? primary : "#57534e", display: "inline-flex", alignItems: "center", gap: 5 };
+    return { border: "none", background: "transparent", cursor: "pointer", padding: "4px 0 10px", whiteSpace: "nowrap", fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: active ? 700 : 500, color: active ? "#1c1917" : "#78716c", boxShadow: active ? "inset 0 -2px 0 #1c1917" : "none", display: "inline-flex", alignItems: "center", gap: 5 };
+  };
+
+  // Flatten leaves + a single "vibes" group token, preserving order + numbering.
+  let n = 0;
+  const entries = COUPLE_NAV.map((e) => isGroup(e) ? { kind: "group" as const, group: e } : { kind: "leaf" as const, leaf: e, num: n++ });
+
+  const wrapStyle: React.CSSProperties =
+    variant === "segmented" ? { padding: "0 16px 12px", overflowX: "auto" }
+    : variant === "pills" ? { display: "flex", gap: 6, padding: "0 16px 12px", overflowX: "auto", position: "relative" }
+    : { display: "flex", gap: 22, padding: "0 16px", overflowX: "auto", borderBottom: tokens.divider, position: "relative" };
+  const innerStyle: React.CSSProperties | undefined =
+    variant === "segmented" ? { display: "inline-flex", border: tokens.cardBorder, borderRadius: "0.75rem", overflow: "hidden", background: "#fff", position: "relative" } : undefined;
+
+  const renderTabs = entries.map((it) => {
+    if (it.kind === "leaf") {
+      const active = it.leaf.key === tab;
+      return (
+        <button key={it.leaf.key} onClick={() => onTab(it.leaf.key)} style={tabStyle(active, it.num)}>
+          {variant === "editorial" && <span style={{ fontSize: 9.5, color: active ? primary : "#a8a29e" }}>{String(it.num + 1).padStart(2, "0")}</span>}
+          {it.leaf.label}
+        </button>
+      );
+    }
+    const g = it.group;
+    const childActive = g.children.some((c) => c.key === tab);
     return (
-      <div style={{ padding: "0 16px 12px", overflowX: "auto" }}>
-        <div style={{ display: "inline-flex", border: tokens.cardBorder, borderRadius: "0.75rem", overflow: "hidden", background: "#fff" }}>
-          {COUPLE_NAV_FLAT.map(({ key, label }, i) => {
-            const active = key === tab;
-            return (
-              <button key={key} onClick={() => onTab(key)} style={{ border: "none", borderLeft: i === 0 ? "none" : tokens.divider, padding: "8px 13px", fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer", fontWeight: active ? 700 : 500, background: active ? primary : "transparent", color: active ? "#fff" : "#57534e" }}>{label}</button>
-            );
-          })}
-        </div>
+      <div key="vibes" ref={ref} style={{ position: "relative", display: "inline-flex" }}>
+        <button onClick={() => setVibesOpen((o) => !o)} style={tabStyle(childActive, n)}>
+          {variant === "editorial" && <span style={{ fontSize: 9.5, color: childActive ? primary : "#a8a29e" }}>✦</span>}
+          {g.group}
+          <svg viewBox="0 0 12 12" width="10" height="10" style={{ transform: vibesOpen ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} aria-hidden><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
+        {vibesOpen && (
+          <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 30, background: "#fff", border: "1px solid var(--line, #ece7e1)", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", padding: 6, minWidth: 170 }}>
+            {g.children.map((c) => {
+              const active = c.key === tab;
+              return <button key={c.key} onClick={() => { onTab(c.key); setVibesOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", border: "none", cursor: "pointer", borderRadius: 8, padding: "8px 10px", fontSize: 13, whiteSpace: "nowrap", fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{navIcon(c.icon)}<span>{c.label}</span></button>;
+            })}
+          </div>
+        )}
       </div>
     );
-  }
-  if (tokens.navStyle === "pills") {
-    // Romantic — soft pill tabs, accent tint when active.
-    return (
-      <div style={{ display: "flex", gap: 6, padding: "0 16px 12px", overflowX: "auto" }}>
-        {COUPLE_NAV_FLAT.map(({ key, label }) => {
-          const active = key === tab;
-          return (
-            <button key={key} onClick={() => onTab(key)} style={{ borderRadius: 999, padding: "7px 14px", fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer", fontWeight: active ? 700 : 500, border: `1px solid ${active ? `${primary}55` : "rgba(0,0,0,0.10)"}`, background: active ? `${accent}55` : "rgba(255,255,255,0.65)", color: active ? primary : "#57534e" }}>{label}</button>
-          );
-        })}
-      </div>
-    );
-  }
-  // Editorial — numbered uppercase text tabs over a hairline ink rule.
-  return (
-    <div style={{ display: "flex", gap: 22, padding: "0 16px", overflowX: "auto", borderBottom: tokens.divider }}>
-      {COUPLE_NAV_FLAT.map(({ key, label }, i) => {
-        const active = key === tab;
-        return (
-          <button key={key} onClick={() => onTab(key)} style={{ border: "none", background: "transparent", cursor: "pointer", padding: "4px 0 10px", whiteSpace: "nowrap", fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: active ? 700 : 500, color: active ? "#1c1917" : "#78716c", boxShadow: active ? "inset 0 -2px 0 #1c1917" : "none" }}>
-            <span style={{ fontSize: 9.5, marginRight: 5, color: active ? primary : "#a8a29e" }}>{String(i + 1).padStart(2, "0")}</span>{label}
-          </button>
-        );
-      })}
-    </div>
-  );
+  });
+
+  return <div style={wrapStyle}>{innerStyle ? <div style={innerStyle}>{renderTabs}</div> : renderTabs}</div>;
 }
 
 function Section({ title, sub, heading, tokens, primary, children }: { title: string; sub?: string; heading: React.CSSProperties; tokens: TemplateTokens; primary: string; children: React.ReactNode }) {
