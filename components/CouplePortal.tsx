@@ -21,6 +21,7 @@ import { TimelineBoard } from "@/components/TimelineBoard";
 import { SeatingPlan } from "@/components/SeatingPlan";
 import { BudgetBoard } from "@/components/BudgetBoard";
 import { SpacesSection, type AreaItem } from "@/components/SpacesSection";
+import { CoupleMessages, type MessageThread, type StartVendor } from "@/components/CoupleMessages";
 
 const TIMELINE_FIELDS: ListField[] = [
   { key: "start_time", label: "Time", width: 90 },
@@ -89,7 +90,7 @@ type GalleryItem = { url: string; category: string; label: string };
 type TableItem = { id: string; label: string; shape: string; seats: number; quantity: number };
 type Venue = { name: string; region: string | null; address: string | null; description: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
 
-const TABS = ["Overview", "Our Venue", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Invites", "Reminders", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Payments", "Documents"] as const;
+const TABS = ["Overview", "Our Venue", "Messages", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Invites", "Reminders", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Payments", "Documents"] as const;
 type Tab = (typeof TABS)[number];
 
 type NavLeaf = { key: Tab; label: string; icon: string };
@@ -102,6 +103,7 @@ const isGroup = (e: NavEntry): e is NavGroup => "group" in e;
 const COUPLE_NAV: NavEntry[] = [
   { key: "Overview", label: "Overview", icon: "home" },
   { key: "Our Venue", label: "Our Venue", icon: "venue" },
+  { key: "Messages", label: "Messages", icon: "chat" },
   { key: "Guests", label: "Guest List", icon: "users" },
   { key: "Accommodation", label: "Accommodation", icon: "bed" },
   { key: "Suppliers", label: "Suppliers", icon: "store" },
@@ -146,6 +148,7 @@ function navIcon(name: string) {
     decor: <><path d="M3 5c3 4.5 15 4.5 18 0" /><path d="M6.5 7.3L8 11M17.5 7.3L16 11M12 8.4V12" /></>,
     music: <><path d="M9 18V6l10-2v12" /><circle cx="6.5" cy="18" r="2.5" /><circle cx="16.5" cy="16" r="2.5" /></>,
     phone: <><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" /></>,
+    chat: <><path d="M21 11.5c0 4.1-4 7.5-9 7.5-1.2 0-2.3-.2-3.3-.5L3 20l1.4-3.4C3.5 15.4 3 13.5 3 11.5 3 7.4 7 4 12 4s9 3.4 9 7.5z" /><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01" /></>,
   };
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{P[name] ?? null}</svg>;
 }
@@ -160,7 +163,7 @@ function groupBy<T>(items: T[], key: (t: T) => string): [string, T[]][] {
 }
 
 export function CouplePortal({
-  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, weddingDate, weddingEndDate, totalDue, initialState, catalogue, rentals, rooms, vendors, introducedVendorIds = [], gallery, tables, areas = [], initialAreaSelections = [],
+  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, weddingDate, weddingEndDate, totalDue, initialState, catalogue, rentals, rooms, vendors, introducedVendorIds = [], gallery, tables, areas = [], initialAreaSelections = [], messageThreads = [],
 }: {
   slug: string;
   tokens: TemplateTokens;
@@ -184,6 +187,7 @@ export function CouplePortal({
   tables: TableItem[];
   areas?: AreaItem[];
   initialAreaSelections?: Array<{ area_id: string; day_type: string }>;
+  messageThreads?: MessageThread[];
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
   const [navOpen, setNavOpen] = useState(false);
@@ -211,6 +215,20 @@ export function CouplePortal({
     persist({ ...state, customRequests: (state.customRequests ?? []).filter((r) => r.id !== id) });
   }
   const [supFilter, setSupFilter] = useState("All");
+  // Mediated supplier messaging — unread badge on the nav item + the supplier a
+  // "venuely:message-supplier" event asked to open (SuppliersManager dispatches
+  // it; the portal owns tab state so it ALSO switches to the Messages tab).
+  const [msgUnread, setMsgUnread] = useState(() => messageThreads.reduce((s, t) => s + (Number(t.coupleUnread) || 0), 0));
+  const [msgStartVendor, setMsgStartVendor] = useState<StartVendor>(null);
+  useEffect(() => {
+    function onMessageSupplier(e: Event) {
+      const d = (e as CustomEvent).detail as { vendorId?: string; name?: string; type?: string } | undefined;
+      if (d?.name) setMsgStartVendor({ vendorId: d.vendorId, name: d.name, type: d.type });
+      setTab("Messages");
+    }
+    window.addEventListener("venuely:message-supplier", onMessageSupplier);
+    return () => window.removeEventListener("venuely:message-supplier", onMessageSupplier);
+  }, []);
   const router = useRouter();
   const [state, setState] = useState<WState>(initialState ?? {});
   const [busy, setBusy] = useState(false);
@@ -408,7 +426,7 @@ export function CouplePortal({
           {COUPLE_NAV.map((entry) => {
             if (!isGroup(entry)) {
               const active = entry.key === tab;
-              return <button key={entry.key} onClick={() => { setTab(entry.key); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{navIcon(entry.icon)}<span>{entry.label}</span></button>;
+              return <button key={entry.key} onClick={() => { setTab(entry.key); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{navIcon(entry.icon)}<span style={{ flex: 1 }}>{entry.label}</span>{entry.key === "Messages" && msgUnread > 0 && <span style={{ background: active ? "#fff" : "var(--poppy,#FA523C)", color: active ? "var(--poppy,#FA523C)" : "#fff", borderRadius: 999, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", lineHeight: 1.5 }}>{msgUnread}</span>}</button>;
             }
             const childActive = entry.children.some((c) => c.key === tab);
             const open = vibesOpen || childActive;
@@ -448,7 +466,7 @@ export function CouplePortal({
             <span style={{ fontSize: 13, color: "#78716c", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, textAlign: isMobile ? "center" : "right" }}>{venue.name} · {dateLabel}</span>
             {!isMobile && <span style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>{coupleNames}</span>}
           </div>
-          {topNav && !isMobile && <TopNavBar tokens={tokens} primary={primary} accent={accent} tab={tab} onTab={setTab} />}
+          {topNav && !isMobile && <TopNavBar tokens={tokens} primary={primary} accent={accent} tab={tab} onTab={setTab} msgUnread={msgUnread} />}
         </div>
 
         {/* BODY */}
@@ -637,6 +655,16 @@ export function CouplePortal({
           />
         )}
 
+        {tab === "Messages" && (
+          <CoupleMessages
+            slug={slug}
+            initialThreads={messageThreads}
+            startVendor={msgStartVendor}
+            onUnreadChange={setMsgUnread}
+            primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius}
+          />
+        )}
+
         {tab === "Guests" && (
           <GuestManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} rooms={rooms.map((r) => ({ id: r.id, name: r.name }))} />
         )}
@@ -720,7 +748,7 @@ export function CouplePortal({
 // Top nav strip for the non-sidebar templates (desktop only — mobile uses the
 // drawer). Renders the SAME grouped nav as the sidebar: leaves as tabs, and "For
 // the Vibes" as one tab that opens a dropdown of its children.
-function TopNavBar({ tokens, primary, accent, tab, onTab }: { tokens: TemplateTokens; primary: string; accent: string; tab: Tab; onTab: (t: Tab) => void }) {
+function TopNavBar({ tokens, primary, accent, tab, onTab, msgUnread = 0 }: { tokens: TemplateTokens; primary: string; accent: string; tab: Tab; onTab: (t: Tab) => void; msgUnread?: number }) {
   const [vibesOpen, setVibesOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -757,6 +785,7 @@ function TopNavBar({ tokens, primary, accent, tab, onTab }: { tokens: TemplateTo
         <button key={it.leaf.key} onClick={() => onTab(it.leaf.key)} style={tabStyle(active, it.num)}>
           {variant === "editorial" && <span style={{ fontSize: 9.5, color: active ? primary : "#a8a29e" }}>{String(it.num + 1).padStart(2, "0")}</span>}
           {it.leaf.label}
+          {it.leaf.key === "Messages" && msgUnread > 0 && <span style={{ background: "var(--poppy,#FA523C)", color: "#fff", border: "1px solid #fff", borderRadius: 999, fontSize: 9.5, fontWeight: 700, padding: "0px 6px", lineHeight: 1.6, marginLeft: 4 }}>{msgUnread}</span>}
         </button>
       );
     }

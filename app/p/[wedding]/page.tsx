@@ -6,6 +6,7 @@ import { applyMarkup } from "@/lib/billing/compute";
 import { seasonForDate, resolveAreaPrice, type Season, type AreaPriceRow } from "@/lib/venue/seasons";
 import { getWeddingTotals } from "@/app/venue/weddings/actions";
 import { CouplePortal } from "@/components/CouplePortal";
+import type { MessageThread, ThreadMessage } from "@/components/CoupleMessages";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +103,55 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
     .eq("wedding_id", wId);
   const introducedVendorIds = (introRows ?? []).map((r) => String(r.vendor_id)).filter(Boolean);
 
+  // Mediated supplier-messaging threads for instant first paint of the Messages
+  // tab. COUPLE-EYES rules enforced here: never select raw_body (the unredacted
+  // original is venue-only), and supplier contact stays null until booked.
+  const { data: msgThreadRows } = await db
+    .from("message_threads")
+    .select("id, vendor_id, supplier_name, supplier_type, supplier_email, supplier_phone, status, couple_unread, last_message_at")
+    .eq("wedding_id", wId)
+    .order("last_message_at", { ascending: false });
+  const threadIds = (msgThreadRows ?? []).map((t) => String(t.id));
+  let msgRows: Array<Record<string, unknown>> = [];
+  if (threadIds.length) {
+    const { data } = await db
+      .from("thread_messages")
+      .select("id, thread_id, sender, body, flagged, flag_reason, created_at")
+      .in("thread_id", threadIds)
+      .order("created_at", { ascending: true });
+    msgRows = data ?? [];
+  }
+  const msgsByThread = new Map<string, ThreadMessage[]>();
+  for (const m of msgRows) {
+    const tid = String(m.thread_id);
+    const list = msgsByThread.get(tid) ?? [];
+    list.push({
+      id: String(m.id),
+      sender: (m.sender as ThreadMessage["sender"]) ?? "system",
+      body: String(m.body ?? ""),
+      flagged: !!m.flagged,
+      flagReason: m.flag_reason ? String(m.flag_reason) : null,
+      createdAt: String(m.created_at ?? ""),
+    });
+    msgsByThread.set(tid, list);
+  }
+  const messageThreads: MessageThread[] = (msgThreadRows ?? []).map((t) => {
+    const status = (["active", "booked", "closed"].includes(String(t.status)) ? String(t.status) : "active") as MessageThread["status"];
+    const booked = status === "booked";
+    return {
+      id: String(t.id),
+      vendorId: t.vendor_id ? String(t.vendor_id) : null,
+      supplierName: String(t.supplier_name ?? ""),
+      supplierType: t.supplier_type ? String(t.supplier_type) : null,
+      status,
+      lastMessageAt: t.last_message_at ? String(t.last_message_at) : null,
+      coupleUnread: Number(t.couple_unread ?? 0),
+      supplierEmail: booked && t.supplier_email ? String(t.supplier_email) : null,
+      supplierPhone: booked && t.supplier_phone ? String(t.supplier_phone) : null,
+      messages: msgsByThread.get(String(t.id)) ?? [],
+    };
+  });
+
   // Countdown computed server-side (keeps the client component render pure).
   let daysToGo: number | null = null;
   let dateLabel = "Date TBC";
@@ -137,6 +187,7 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
       rooms={rooms}
       vendors={vendors}
       introducedVendorIds={introducedVendorIds}
+      messageThreads={messageThreads}
       gallery={gallery}
       tables={(tableRes.data ?? []).map((t) => ({ id: t.id as string, label: t.label as string, shape: t.shape as string, seats: Number(t.seats), quantity: Number(t.quantity) }))}
       areas={areas}

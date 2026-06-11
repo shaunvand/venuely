@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 type IconName =
-  | "overview" | "venue" | "enquiries" | "weddings" | "calendar" | "import"
+  | "overview" | "venue" | "enquiries" | "messages" | "weddings" | "calendar" | "import"
   | "marketplace" | "vendors" | "money" | "setup"
   | "catalogue" | "box" | "bed" | "areas" | "seat"
   | "catering" | "planner" | "flowers" | "music" | "camera" | "decor" | "bar"
@@ -23,6 +23,7 @@ const TOP_LINKS: (Item & { icon: IconName })[] = [
   { href: "/venue/calendar", label: "Calendar", icon: "calendar" },
   { href: "/venue/suppliers", label: "Suppliers", icon: "vendors" },
   { href: "/venue/enquiries", label: "Enquiries", icon: "enquiries" },
+  { href: "/venue/messages", label: "Messages", icon: "messages" },
   { href: "/venue/uploads", label: "Smart Import", icon: "import" },
 ];
 
@@ -56,6 +57,7 @@ function Icon({ name, className = "w-5 h-5" }: { name: IconName; className?: str
     overview: <path d="M3 11l9-8 9 8M5 10v10h14V10" {...common} />,
     venue: <path d="M4 21V9l8-5 8 5v12M9 21v-6h6v6" {...common} />,
     enquiries: <><rect x="3" y="5" width="18" height="14" rx="2" {...common} /><path d="M3 7l9 6 9-6" {...common} /></>,
+    messages: <><path d="M21 11.5c0 4.1-4 7.5-9 7.5-1.2 0-2.3-.2-3.3-.5L3 20l1.4-3.4C3.5 15.4 3 13.5 3 11.5 3 7.4 7 4 12 4s9 3.4 9 7.5z" {...common} /><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01" {...common} /></>,
     weddings: <path d="M12 21s-7-4.5-9.5-9A5 5 0 0112 5a5 5 0 019.5 7C19 16.5 12 21 12 21z" {...common} />,
     calendar: <><rect x="3" y="4" width="18" height="17" rx="2" {...common} /><path d="M3 9h18M8 2v4M16 2v4" {...common} /></>,
     import: <><path d="M12 15V3M7 8l5-5 5 5" {...common} /><path d="M4 21h16" {...common} /></>,
