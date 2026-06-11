@@ -55,10 +55,12 @@ export async function POST(req: NextRequest) {
   if (!token) return NextResponse.json({ ok: true, skipped: "no thread token" });
 
   const db = admin();
+  // The address carries a 32-hex prefix of the full token (RFC local-part limit) —
+  // token is regex-validated hex, so the LIKE pattern is injection-safe.
   const { data: thread } = await db
     .from("message_threads")
     .select("id, venue_id, status, supplier_name, email_subject")
-    .eq("reply_token", token)
+    .like("reply_token", `${token}%`)
     .maybeSingle();
   if (!thread) return NextResponse.json({ ok: true, skipped: "unknown token" });
 

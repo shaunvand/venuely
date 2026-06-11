@@ -12,9 +12,14 @@ export function inboundReplyDomain(): string | null {
   return process.env.INBOUND_REPLY_DOMAIN?.trim() || null;
 }
 
+// Email local parts max out at 64 chars (RFC 5321) and reply_token is 64 hex,
+// so the address carries only the first 32 hex chars (128 bits — still
+// unguessable); inbound lookup prefix-matches reply_token on it.
+export const REPLY_TOKEN_ADDR_LEN = 32;
+
 export function replyAddressFor(replyToken: string): string | null {
   const domain = inboundReplyDomain();
-  return domain ? `reply+${replyToken}@${domain}` : null;
+  return domain ? `reply+${replyToken.slice(0, REPLY_TOKEN_ADDR_LEN)}@${domain}` : null;
 }
 
 // Pull the thread token out of an inbound recipient list.
