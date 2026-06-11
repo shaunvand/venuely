@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { whatsappUrl } from "@/lib/whatsapp";
 
 export type Supplier = {
   id: string; category: string; name: string; email?: string; phone?: string;
   price?: string; status?: string; dueDate?: string; description?: string; fromVendorId?: string; img?: string | null;
 };
-type VenuePartner = { id: string; type: string; name: string; description: string; price: number | null; email: string | null; phone: string | null; website?: string | null; img?: string | null };
+type VenuePartner = { id: string; type: string; name: string; description: string; price: number | null; email: string | null; phone: string | null; website?: string | null; img?: string | null; commissionValue?: number | null; commissionType?: string | null };
 
 const serif: React.CSSProperties = { fontFamily: "'Fraunces', Georgia, serif" };
 const CATEGORIES = ["Venue", "Catering", "Photography", "Flowers", "Music", "Hair & Makeup", "Cake", "Waiter/Bar Staff", "Beverages", "Other"];
@@ -21,13 +22,52 @@ const blank = (): Supplier => ({ id: "", category: "Photography", name: "", emai
 
 // Couple supplier hub: the venue's recommended partners (one-tap add) + the couple's
 // own Vendor Tracker. Persists into wedding_state.suppliers (feeds the venue + total).
-export function SuppliersManager({ venueName, vendors, suppliers, onChange, primary, accent, heading, cardRadius }: {
+export function SuppliersManager({ venueName, vendors, suppliers, onChange, primary, accent, heading, cardRadius, slug, venueEmail, introducedVendorIds = [] }: {
   venueName: string; vendors: VenuePartner[]; suppliers: Supplier[]; onChange: (next: Supplier[]) => void;
   primary: string; accent: string; heading: React.CSSProperties; cardRadius: string;
+  slug?: string; venueEmail?: string | null; introducedVendorIds?: string[];
 }) {
   const [list, setList] = useState<Supplier[]>(suppliers ?? []);
   const [filter, setFilter] = useState("All");
   const [editing, setEditing] = useState<Supplier | null>(null);
+  // Vendors whose contact details are revealed: those already intro'd server-side
+  // (persists across reloads) plus any requested in this session.
+  const [introduced, setIntroduced] = useState<Set<string>>(() => new Set(introducedVendorIds));
+  const [requesting, setRequesting] = useState<string | null>(null);
+
+  // "Request introduction": log the intro server-side (snapshots commission terms
+  // so the venue stays in the loop), reveal the contact, then open a pre-filled
+  // intro email that CC's the venue. Falls back to WhatsApp when no email exists.
+  async function requestIntro(v: VenuePartner) {
+    if (introduced.has(v.id)) return;
+    setRequesting(v.id);
+    try {
+      if (slug) {
+        await fetch(`/api/wedding/${slug}/supplier-intro`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            vendor_id: v.id, supplier_name: v.name, supplier_type: v.type,
+            supplier_email: v.email, supplier_phone: v.phone,
+            commission_type: v.commissionType === "fixed" ? "fixed" : "percent",
+            commission_value: v.commissionValue ?? 0,
+          }),
+        });
+      }
+      setIntroduced((prev) => new Set(prev).add(v.id));
+      const subject = `Wedding enquiry via ${venueName}`;
+      const body = `Hi ${v.name},\n\nWe're getting married and ${venueName} recommended you. We'd love to chat about your ${labelFor(v.type).toLowerCase()} for our wedding.\n\nThis introduction comes via ${venueName} — they've been CC'd so they're in the loop.\n\nLooking forward to hearing from you!`;
+      if (v.email) {
+        const cc = venueEmail ? `&cc=${encodeURIComponent(venueEmail)}` : "";
+        window.location.href = `mailto:${encodeURIComponent(v.email)}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
+      } else {
+        const wa = whatsappUrl(v.phone, `Hi ${v.name}, ${venueName} recommended you for our wedding — we'd love to chat!`);
+        if (wa) window.open(wa, "_blank", "noopener,noreferrer");
+      }
+    } finally {
+      setRequesting(null);
+    }
+  }
 
   function commit(next: Supplier[]) { setList(next); onChange(next); }
   function save(s: Supplier) {
@@ -103,6 +143,8 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(230px,1fr))", gap: 12 }}>
             {vendors.map((v) => {
               const added = list.some((x) => x.fromVendorId === v.id);
+              const revealed = introduced.has(v.id);
+              const hasContact = !!(v.phone || v.email || v.website);
               return (
                 <div key={v.id} className="hover-lift" style={cardChrome}>
                   {v.img && (
@@ -113,18 +155,35 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
                     <span style={chipStyle}>{labelFor(v.type)}</span>
                     <div style={{ ...serif, fontSize: 16, fontWeight: 700, marginTop: 6 }}>{v.name}</div>
                     {v.description && <div style={{ fontSize: 12.5, color: "#57534e", fontStyle: "italic", margin: "6px 0" }}>{v.description}</div>}
-                    {(v.phone || v.email) && (
-                      <div style={{ fontSize: 12, color: "#57534e", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {[v.phone, v.email].filter(Boolean).join(" · ")}
-                      </div>
-                    )}
-                    {v.website && (
-                      <a href={/^https?:\/\//i.test(v.website) ? v.website : `https://${v.website}`} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ display: "inline-block", fontSize: 12, color: primary, marginTop: 3 }}>
-                        Visit website ↗
-                      </a>
-                    )}
                     {v.price != null && <div style={{ color: primary, fontWeight: 700, fontSize: 13, marginTop: 4 }}>From {rZA(v.price)}</div>}
-                    <button onClick={() => addFromVenue(v)} disabled={added} style={{ marginTop: 10, width: "100%", border: `1px solid ${added ? "#1a7f4b" : primary}`, background: added ? "#1a7f4b" : "#fff", color: added ? "#fff" : primary, borderRadius: 999, padding: "7px", fontWeight: 600, fontSize: 12.5, cursor: added ? "default" : "pointer" }}>{added ? "✓ Added to my vendors" : "+ Add to my vendors"}</button>
+
+                    {/* Contact is GATED — revealed only after the couple requests an
+                        introduction, so the venue stays in the booking thread. */}
+                    {revealed ? (
+                      <div style={{ marginTop: 8 }}>
+                        {(v.phone || v.email) && (
+                          <div style={{ fontSize: 12, color: "#57534e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {[v.phone, v.email].filter(Boolean).join(" · ")}
+                          </div>
+                        )}
+                        {v.website && (
+                          <a href={/^https?:\/\//i.test(v.website) ? v.website : `https://${v.website}`} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ display: "inline-block", fontSize: 12, color: primary, marginTop: 3 }}>
+                            Visit website ↗
+                          </a>
+                        )}
+                        <div style={{ fontSize: 10.5, color: "#1a7f4b", fontWeight: 600, marginTop: 4 }}>✓ Introduction requested — {venueName} is in the loop</div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => requestIntro(v)}
+                        disabled={requesting === v.id || !hasContact}
+                        style={{ marginTop: 10, width: "100%", border: "none", background: primary, color: "#fff", borderRadius: 999, padding: "8px", fontWeight: 700, fontSize: 12.5, cursor: requesting === v.id || !hasContact ? "default" : "pointer", letterSpacing: 0.4, opacity: hasContact ? 1 : 0.5 }}
+                      >
+                        {requesting === v.id ? "Requesting…" : hasContact ? "Request introduction" : "No contact on file"}
+                      </button>
+                    )}
+
+                    <button onClick={() => addFromVenue(v)} disabled={added} style={{ marginTop: 8, width: "100%", border: `1px solid ${added ? "#1a7f4b" : primary}`, background: added ? "#1a7f4b" : "#fff", color: added ? "#fff" : primary, borderRadius: 999, padding: "7px", fontWeight: 600, fontSize: 12.5, cursor: added ? "default" : "pointer" }}>{added ? "✓ Added to my vendors" : "+ Add to my vendors"}</button>
                   </div>
                 </div>
               );

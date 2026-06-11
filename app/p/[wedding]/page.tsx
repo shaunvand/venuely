@@ -92,7 +92,15 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
   const catalogue = (catRes.data ?? []).map((c) => ({ id: c.id, category: c.category, name: c.name, description: c.description ?? "", img: (c.image_url as string) ?? null, price: applyMarkup(num(c.price), c.commission_value, c.commission_type), included: (c.cost_treatment as string) === "included", eventPart: (c.event_part as string) ?? null }));
   const rentals = (rentRes.data ?? []).map((r) => ({ id: r.id, category: r.category, name: r.name, description: r.description ?? "", img: (r.image_url as string) ?? null, price: applyMarkup(num(r.price), r.commission_value, r.commission_type), included: (r.cost_treatment as string) === "included" }));
   const rooms = (roomRes.data ?? []).map((r) => ({ id: r.id, name: r.name, type: (r.room_type as string) ?? "Room", sleeps: num(r.sleeps), description: r.description ?? "", img: (r.hero_image_url as string) || (r.image_url as string) || null, price: applyMarkup(num(r.price_per_night), r.commission_value, r.commission_type) }));
-  const vendors = (vendRes.data ?? []).map((v) => ({ id: v.id, type: (v.vendor_type as string) ?? "vendor", name: v.name, description: v.description ?? "", img: (v.image_url as string) ?? null, price: v.price_from == null ? null : applyMarkup(num(v.price_from), v.commission_value, v.commission_type), email: (v.contact_email as string) ?? null, phone: (v.contact_phone as string) ?? null, website: (v.website_url as string) ?? null }));
+  const vendors = (vendRes.data ?? []).map((v) => ({ id: v.id, type: (v.vendor_type as string) ?? "vendor", name: v.name, description: v.description ?? "", img: (v.image_url as string) ?? null, price: v.price_from == null ? null : applyMarkup(num(v.price_from), v.commission_value, v.commission_type), email: (v.contact_email as string) ?? null, phone: (v.contact_phone as string) ?? null, website: (v.website_url as string) ?? null, commissionValue: v.commission_value == null ? null : Number(v.commission_value), commissionType: (v.commission_type as string) ?? null }));
+
+  // Suppliers the couple has already requested an intro for — drives the gated
+  // contact reveal so it persists across reloads.
+  const { data: introRows } = await db
+    .from("supplier_intros")
+    .select("vendor_id")
+    .eq("wedding_id", wId);
+  const introducedVendorIds = (introRows ?? []).map((r) => String(r.vendor_id)).filter(Boolean);
 
   // Countdown computed server-side (keeps the client component render pure).
   let daysToGo: number | null = null;
@@ -128,6 +136,7 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
       rentals={rentals}
       rooms={rooms}
       vendors={vendors}
+      introducedVendorIds={introducedVendorIds}
       gallery={gallery}
       tables={(tableRes.data ?? []).map((t) => ({ id: t.id as string, label: t.label as string, shape: t.shape as string, seats: Number(t.seats), quantity: Number(t.quantity) }))}
       areas={areas}

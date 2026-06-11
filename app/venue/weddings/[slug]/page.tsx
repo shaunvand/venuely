@@ -21,6 +21,7 @@ import { loadRules, computeTotals, applyMarkup, platformFee, type Charge, type P
 import { nightsBetween, nightsLabel } from "@/lib/billing/charges";
 import { buildAreaPriceMap, type Season, type AreaPriceRow } from "@/lib/venue/seasons";
 import { whatsappUrl, bookingNotificationMessage } from "@/lib/whatsapp";
+import { SupplierIntrosPanel, type SupplierIntro } from "@/components/SupplierIntrosPanel";
 
 type WeddingState = {
   rentalSelections?: Record<string, { sel?: boolean; qty?: number; mg?: boolean; wed?: boolean; fb?: boolean }>;
@@ -108,10 +109,19 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     supabase.from("venue_seasons").select("id, name, start_month, start_day, end_month, end_day, sort_order").eq("venue_id", venue.id),
   ]);
   // Weekend view + planning progress data.
-  const [{ data: timelineRows }, progressMap] = await Promise.all([
+  const [{ data: timelineRows }, progressMap, { data: introRows }] = await Promise.all([
     supabase.from("wedding_timeline").select("id, title, start_time, location, event_date, sort_order").eq("wedding_id", wedding.id).order("sort_order"),
     computeWeddingsProgress(supabase, [{ id: wedding.id, area_selections: wedding.area_selections }]),
+    supabase.from("supplier_intros")
+      .select("id, supplier_name, supplier_type, supplier_email, supplier_phone, commission_type, commission_value, status, booking_value, commission_amount, intro_sent_at, booked_at")
+      .eq("wedding_id", wedding.id)
+      .eq("venue_id", venue.id)
+      .order("created_at", { ascending: false }),
   ]);
+  const supplierIntros = (introRows ?? []) as SupplierIntro[];
+  const introCommissionDue = supplierIntros
+    .filter((i) => i.status === "booked")
+    .reduce((s, i) => s + (Number(i.commission_amount) || 0), 0);
   const weddingProgress = progressMap.get(wedding.id) ?? null;
   const rentalMap = new Map((rentalsRes.data ?? []).map((r) => [r.id, r]));
   const cataMap = new Map((cataRes.data ?? []).map((c) => [c.id, c]));
@@ -666,6 +676,22 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
           <input name="amount" type="number" step="0.01" required placeholder="Amount" className="vy-input" />
           <button className="vy-btn vy-btn-primary">+ Add payment</button>
         </form>
+      </section>
+
+      {/* Supplier intros & commission ledger */}
+      <section className="vy-card space-y-3">
+        <div className="flex items-baseline justify-between flex-wrap gap-2">
+          <div>
+            <div className="vy-eyebrow">Supplier intros &amp; commission</div>
+            <h2 className="vy-h2 mt-1">{supplierIntros.length} introduction{supplierIntros.length === 1 ? "" : "s"}</h2>
+          </div>
+          {introCommissionDue > 0 && (
+            <div className="text-sm font-medium" style={{ color: "var(--poppy-deep)" }}>
+              R{Math.round(introCommissionDue).toLocaleString("en-ZA")} commission to invoice
+            </div>
+          )}
+        </div>
+        <SupplierIntrosPanel intros={supplierIntros} weddingId={wedding.id} slug={wedding.slug} />
       </section>
 
       {/* Notify suppliers via WhatsApp */}

@@ -84,7 +84,7 @@ const DAY_TYPES: { key: "mg" | "wed" | "fb"; label: string }[] = [
 type CatItem = { id: string; category: string; name: string; description: string; img: string | null; price?: number; included: boolean; eventPart?: string | null };
 type RentItem = CatItem & { price: number };
 type RoomItem = { id: string; name: string; type: string; sleeps: number; description: string; img: string | null; price: number };
-type VendorItem = { id: string; type: string; name: string; description: string; img: string | null; price: number | null; email: string | null; phone: string | null; website: string | null };
+type VendorItem = { id: string; type: string; name: string; description: string; img: string | null; price: number | null; email: string | null; phone: string | null; website: string | null; commissionValue?: number | null; commissionType?: string | null };
 type GalleryItem = { url: string; category: string; label: string };
 type TableItem = { id: string; label: string; shape: string; seats: number; quantity: number };
 type Venue = { name: string; region: string | null; address: string | null; description: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
@@ -160,7 +160,7 @@ function groupBy<T>(items: T[], key: (t: T) => string): [string, T[]][] {
 }
 
 export function CouplePortal({
-  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, weddingDate, weddingEndDate, totalDue, initialState, catalogue, rentals, rooms, vendors, gallery, tables, areas = [], initialAreaSelections = [],
+  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, weddingDate, weddingEndDate, totalDue, initialState, catalogue, rentals, rooms, vendors, introducedVendorIds = [], gallery, tables, areas = [], initialAreaSelections = [],
 }: {
   slug: string;
   tokens: TemplateTokens;
@@ -179,6 +179,7 @@ export function CouplePortal({
   rentals: RentItem[];
   rooms: RoomItem[];
   vendors: VendorItem[];
+  introducedVendorIds?: string[];
   gallery: GalleryItem[];
   tables: TableItem[];
   areas?: AreaItem[];
@@ -626,7 +627,10 @@ export function CouplePortal({
         {tab === "Suppliers" && (
           <SuppliersManager
             venueName={venue.name}
-            vendors={vendors.map((v) => ({ id: v.id, type: v.type, name: v.name, description: v.description, price: v.price, email: v.email, phone: v.phone, website: v.website, img: v.img }))}
+            slug={slug}
+            venueEmail={venue.email}
+            introducedVendorIds={introducedVendorIds}
+            vendors={vendors.map((v) => ({ id: v.id, type: v.type, name: v.name, description: v.description, price: v.price, email: v.email, phone: v.phone, website: v.website, img: v.img, commissionValue: v.commissionValue ?? null, commissionType: v.commissionType ?? null }))}
             suppliers={((state as Record<string, unknown>).suppliers as import("@/components/SuppliersManager").Supplier[]) ?? []}
             onChange={(next) => persist({ ...state, suppliers: next })}
             primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius}
