@@ -53,13 +53,8 @@ export function VenuelyLoader({
   const doneRef = useRef(false);
 
   useEffect(() => {
-    // Reduced motion: hold on the finished badge briefly, then finish.
-    const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) {
-      setT(END);
-      const id = setTimeout(() => { setExiting(true); setTimeout(() => onDone?.(), 450); }, 1200);
-      return () => clearTimeout(id);
-    }
+    // Always play the full fill animation — this is a deliberate brand moment, so
+    // we don't downgrade to a static frame under prefers-reduced-motion.
     let raf = 0;
     const start = performance.now();
     const step = (now: number) => {
