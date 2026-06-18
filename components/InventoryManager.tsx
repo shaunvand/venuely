@@ -457,11 +457,34 @@ export function InventoryManager({
                           {String(i.category)}
                         </span>
                       ) : null}
+                      {/* AI course grouping (catalogue) — shows the result of Auto-group by course. */}
+                      {type === "catalogue" && i.event_part ? (
+                        <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md" style={{ background: "#eef3ff", color: "#3a5bbf" }}>
+                          {String(i.event_part)}
+                        </span>
+                      ) : null}
                       {showExtraColumns && (stock > 0 ? (
                         <span className="text-[10px] font-medium" style={{ color: "#1f5d3e" }}>● {stock} available</span>
                       ) : (
                         <span className="text-[10px] font-medium" style={{ color: "var(--poppy-deep)" }}>○ on request</span>
                       ))}
+                      {/* Included in the venue price vs a paid extra — drives the dashboard
+                          split. Click to toggle per item. */}
+                      {(() => {
+                        const incl = String(i.cost_treatment) === "included";
+                        return (
+                          <button
+                            type="button"
+                            disabled={isPending}
+                            onClick={() => startTransition(async () => { await updateItem(type, i.id, { cost_treatment: incl ? "extra" : "included" }); })}
+                            title="Click to switch between Included and Extra"
+                            className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md transition hover:shadow-sm"
+                            style={incl ? { background: "#e7f4ec", color: "#1a7f4b" } : { background: "#fdf1dc", color: "#9a6a00" }}
+                          >
+                            {incl ? "Included" : "Extra"}
+                          </button>
+                        );
+                      })()}
                     </div>
                     <div className="font-serif text-base sm:text-lg leading-tight truncate" style={{ fontWeight: 700 }}>
                       {String(i.name ?? "")}

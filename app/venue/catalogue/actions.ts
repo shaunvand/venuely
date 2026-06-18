@@ -36,17 +36,17 @@ export async function deleteCatalogue(itemId: string) {
 // so the couple portal can group the menu by part of the day.
 const EVENT_PARTS = ["Breakfast", "Lunch", "Dinner", "Drinks & Bar", "Snacks & Canapés", "Other"];
 
-export async function autoCategoriseCatalogue(venueId: string): Promise<void> {
+export async function autoCategoriseCatalogue(venueId: string): Promise<{ ok: boolean; grouped: number; error?: string }> {
   const supabase = await createClient();
   const { data: items } = await supabase
     .from("catalogue_items")
     .select("id, name, description, category")
     .eq("venue_id", venueId);
   const list = (items ?? []) as Array<{ id: string; name: string; description: string | null; category: string | null }>;
-  if (!list.length) return;
+  if (!list.length) return { ok: true, grouped: 0 };
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("AI not configured (ANTHROPIC_API_KEY).");
+  if (!apiKey) return { ok: false, grouped: 0, error: "AI not configured (ANTHROPIC_API_KEY)." };
   const Anthropic = (await import("@anthropic-ai/sdk")).default;
   const anthropic = new Anthropic({ apiKey });
 
@@ -78,10 +78,13 @@ export async function autoCategoriseCatalogue(venueId: string): Promise<void> {
       }
     } catch { /* skip */ }
   }
+  let grouped = 0;
   for (let i = 0; i < list.length; i++) {
     const part = map[i] || "Other";
     const { error } = await supabase.from("catalogue_items").update({ event_part: part }).eq("id", list[i].id).eq("venue_id", venueId);
-    if (error) throw new Error(error.message);
+    if (error) return { ok: false, grouped, error: error.message };
+    grouped++;
   }
   revalidatePath("/venue/catalogue");
+  return { ok: true, grouped };
 }

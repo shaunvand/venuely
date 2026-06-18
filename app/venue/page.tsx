@@ -131,7 +131,7 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
     supabase.from("rental_items").select("price, commission_value, commission_type, active, stock_total").eq("venue_id", venue.id),
     supabase.from("accommodation_rooms").select("price_per_night, commission_value, commission_type, active").eq("venue_id", venue.id),
     supabase.from("vendor_partners").select("price_from, commission_value, commission_type, active").eq("venue_id", venue.id),
-    supabase.from("accommodation_rooms").select("id, name, sleeps, active, sort_order").eq("venue_id", venue.id).order("sort_order"),
+    supabase.from("accommodation_rooms").select("id, name, sleeps, cost_treatment, active, sort_order").eq("venue_id", venue.id).order("sort_order"),
     supabase.from("accommodation_bookings").select("room_id, check_in, check_out, wedding:weddings!inner(venue_id)").eq("wedding.venue_id", venue.id),
     supabase.from("catalogue_items").select("category").eq("venue_id", venue.id),
     supabase.from("rental_items").select("category").eq("venue_id", venue.id),
@@ -199,9 +199,19 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
 
   // Active accommodation rooms + the per-night occupancy map that powers the
   // calendar's live "Rooms available" panel.
-  const activeRooms = ((accomRoomRows ?? []) as Array<{ id: string; name: string; sleeps: number | null; active: boolean | null }>)
+  const accomRoomsTyped = (accomRoomRows ?? []) as Array<{ id: string; name: string; sleeps: number | null; cost_treatment: string | null; active: boolean | null }>;
+  const activeRooms = accomRoomsTyped
     .filter((r) => r.active !== false)
     .map((r) => ({ id: r.id, name: r.name, sleeps: Number(r.sleeps ?? 0) }));
+  // Split on-site sleeping capacity into Included (part of the venue price) vs
+  // Extra (paid add-on stays), so the dashboard shows how many guests sleep on
+  // site at no extra cost and how many more can be housed via paid bookings.
+  const includedSleeps = accomRoomsTyped
+    .filter((r) => r.active !== false && String(r.cost_treatment) === "included")
+    .reduce((n, r) => n + Number(r.sleeps ?? 0), 0);
+  const extraSleeps = accomRoomsTyped
+    .filter((r) => r.active !== false && String(r.cost_treatment) !== "included")
+    .reduce((n, r) => n + Number(r.sleeps ?? 0), 0);
   const roomOccupancy: Record<string, string[]> = {};
   ((accomBookingRows ?? []) as Array<{ room_id: string; check_in: string; check_out: string }>).forEach((b) => {
     if (!b.room_id) return;
@@ -384,7 +394,7 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
     { label: "Commission potential", value: fmtRand(commissionTotal), sub: "across active items", href: "/venue/rentals", accent: "var(--sage)" },
     { label: "Payments collected", value: fmtRand(collected), sub: `of ${fmtRand(invoiced)} invoiced`, href: "/venue/payments", accent: "var(--poppy)" },
     { label: "Outstanding", value: fmtRand(outstanding), sub: overdue.length ? `${overdue.length} overdue` : "All paid up", href: "/venue/payments", accent: overdue.length ? "var(--poppy)" : "var(--sage)" },
-    { label: "Accommodation rooms", value: counts.rooms.toString(), sub: counts.rooms ? "Active" : "Add your first", href: "/venue/accommodation", accent: "var(--sage)" },
+    { label: "Sleeps on-site", value: counts.rooms ? `${includedSleeps}` : "—", sub: counts.rooms ? `${includedSleeps} included · +${extraSleeps} extra · ${counts.rooms} room${counts.rooms === 1 ? "" : "s"}` : "Add your first", href: "/venue/accommodation", accent: "var(--sage)" },
     { label: "Catalogue + rentals", value: (counts.catalogue + counts.rentals).toString(), sub: `${counts.catalogue} included · ${counts.rentals} extras`, href: "/venue/catalogue", accent: "var(--sage)" },
     { label: "Enquiry conversion", value: conversionPct == null ? "—" : `${conversionPct}%`, sub: enquiriesTotal ? `${enquiriesConverted} of ${enquiriesTotal} enquiries booked` : "No enquiries yet", href: "/venue/enquiries", accent: "var(--poppy)" },
   ];
