@@ -54,6 +54,10 @@ export function DashboardWelcomeModal() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    // TESTING: open on every dashboard load so the lightbox is easy to preview.
+    // Revert to the gated version (sessionStorage "vy-welcome-steps") for launch.
+    const TESTING_ALWAYS_OPEN = true;
+    if (TESTING_ALWAYS_OPEN) { setOpen(true); return; }
     let show = false;
     try {
       show = sessionStorage.getItem("vy-welcome-steps") === "1";
