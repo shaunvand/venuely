@@ -547,6 +547,11 @@ function StepSpaces({
   // Venue's groups + seasons (loaded on mount so the wizard can capture them).
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
   const [seasons, setSeasons] = useState<{ id: string; name: string }[]>([]);
+  // AI suggestions pulled from the venue's website — editable, verify-before-save.
+  type Suggestion = { name: string; type: string; sub_category: string; wedding_price: number | null; note: string };
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestState, setSuggestState] = useState<"idle" | "loading" | "ready" | "empty">("idle");
+  const [addingAll, setAddingAll] = useState(false);
   const total = areasCount + added.length;
   const done = spacesDone || added.length > 0;
 
@@ -559,43 +564,79 @@ function StepSpaces({
     return () => { cancelled = true; };
   }, [venueId]);
 
+  // Pre-fill from the venue's website (once, only when starting empty) so the
+  // owner reviews-and-edits instead of typing every space from scratch.
+  useEffect(() => {
+    if (!venueId || areasCount > 0) return;
+    let cancelled = false;
+    setSuggestState("loading");
+    fetch("/api/venue/suggest-spaces", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ venue_id: venueId }),
+    })
+      .then((r) => r.json())
+      .then((j) => {
+        if (cancelled) return;
+        const list = Array.isArray(j?.spaces) ? (j.spaces as Suggestion[]) : [];
+        setSuggestions(list);
+        setSuggestState(list.length ? "ready" : "empty");
+      })
+      .catch(() => { if (!cancelled) setSuggestState("empty"); });
+    return () => { cancelled = true; };
+  }, [venueId, areasCount]);
+
+  // Resolve a sub-category NAME to a group id (creating it if needed), then save
+  // the space. Shared by the manual form and the suggestion list.
+  async function commitSpace(opts: { name: string; kind: string; groupName?: string; groupId?: string; price?: string | number | null }) {
+    if (!venueId) return;
+    let assignGroup = opts.groupId ?? "none";
+    const gName = (opts.groupName ?? "").trim();
+    if (assignGroup === "__new" || gName) {
+      const wanted = assignGroup === "__new" ? newGroup.trim() : gName;
+      if (wanted) {
+        const existing = groups.find((g) => g.name.toLowerCase() === wanted.toLowerCase());
+        if (existing) {
+          assignGroup = existing.id;
+        } else {
+          const gfd = new FormData();
+          gfd.set("name", wanted);
+          gfd.set("location", "venue");
+          gfd.set("included", "true");
+          await addAreaGroup(venueId, gfd);
+          const refreshed = await getVenueGroupsAndSeasons(venueId);
+          setGroups(refreshed.groups as { id: string; name: string }[]);
+          const match = (refreshed.groups as { id: string; name: string }[]).find((g) => g.name.toLowerCase() === wanted.toLowerCase());
+          assignGroup = match?.id ?? "none";
+        }
+      }
+    }
+    const fd = new FormData();
+    fd.set("name", opts.name.trim());
+    fd.set("area_kind", opts.kind);
+    if (assignGroup && assignGroup !== "none" && assignGroup !== "__new") fd.set("group_id", assignGroup);
+    const priceStr = opts.price == null ? "" : String(opts.price).replace(/[^\d.]/g, "");
+    if (seasons.length) {
+      for (const s of seasons) {
+        const v = (seasonPrices[s.id] ?? "").trim();
+        const num = (v || priceStr).replace(/[^\d.]/g, "");
+        if (num) fd.set(`price_wedding_season_${s.id}`, num);
+      }
+    } else if (priceStr) {
+      fd.set("price_wedding", priceStr);
+    }
+    await addArea(venueId, fd);
+    setAdded((a) => [...a, opts.name.trim()]);
+  }
+
   async function add(e: React.FormEvent) {
     e.preventDefault();
     if (!venueId || !name.trim() || busy) return;
     setBusy(true);
     setErr(null);
     try {
-      // Optionally create a new sub-category inline, then assign the space to it.
-      let assignGroup = groupId;
-      if (groupId === "__new" && newGroup.trim()) {
-        const gfd = new FormData();
-        gfd.set("name", newGroup.trim());
-        gfd.set("location", "venue");
-        gfd.set("included", "true");
-        await addAreaGroup(venueId, gfd);
-        const refreshed = await getVenueGroupsAndSeasons(venueId);
-        setGroups(refreshed.groups as { id: string; name: string }[]);
-        const match = (refreshed.groups as { id: string; name: string }[]).find((g) => g.name === newGroup.trim());
-        assignGroup = match?.id ?? "none";
-      }
-      const fd = new FormData();
-      fd.set("name", name.trim());
-      fd.set("area_kind", kind);
-      if (assignGroup && assignGroup !== "none" && assignGroup !== "__new") fd.set("group_id", assignGroup);
-      if (seasons.length) {
-        // Per-season wedding-day prices (fall back to the single price for blanks).
-        const fallback = price.trim() ? price.replace(/[^\d.]/g, "") : "";
-        for (const s of seasons) {
-          const v = (seasonPrices[s.id] ?? "").trim();
-          const num = (v || fallback).replace(/[^\d.]/g, "");
-          if (num) fd.set(`price_wedding_season_${s.id}`, num);
-        }
-      } else if (price.trim()) {
-        fd.set("price_wedding", price.replace(/[^\d.]/g, ""));
-      }
-      await addArea(venueId, fd);
       const isFirst = added.length === 0 && !spacesDone;
-      setAdded((a) => [...a, name.trim()]);
+      await commitSpace({ name, kind, groupId, price });
       setName("");
       setPrice("");
       setSeasonPrices({});
@@ -610,6 +651,38 @@ function StepSpaces({
     } finally {
       setBusy(false);
     }
+  }
+
+  function editSuggestion(i: number, patch: Partial<Suggestion>) {
+    setSuggestions((s) => s.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
+  }
+  function dismissSuggestion(i: number) {
+    setSuggestions((s) => s.filter((_, idx) => idx !== i));
+  }
+  async function addSuggestion(i: number) {
+    const s = suggestions[i];
+    if (!s || !s.name.trim() || busy) return;
+    setBusy(true); setErr(null);
+    try {
+      await commitSpace({ name: s.name, kind: s.type, groupName: s.sub_category, price: s.wedding_price });
+      dismissSuggestion(i);
+    } catch (ex) {
+      setErr(ex instanceof Error ? ex.message : "Couldn't add that space — try again.");
+    } finally { setBusy(false); }
+  }
+  async function addAllSuggestions() {
+    if (addingAll || !suggestions.length) return;
+    setAddingAll(true); setErr(null);
+    try {
+      // Sequential — group creation must settle before the next space reuses it.
+      for (const s of [...suggestions]) {
+        if (!s.name.trim()) continue;
+        await commitSpace({ name: s.name, kind: s.type, groupName: s.sub_category, price: s.wedding_price });
+      }
+      setSuggestions([]);
+    } catch (ex) {
+      setErr(ex instanceof Error ? ex.message : "Couldn't add every space — the rest are still listed.");
+    } finally { setAddingAll(false); }
   }
 
   return (
@@ -637,6 +710,68 @@ function StepSpaces({
           )}
         </div>
       </div>
+
+      {/* AI loading shimmer while we read the website */}
+      {suggestState === "loading" && (
+        <div className="rounded-xl p-4 mb-4 flex items-center gap-3 text-sm" style={{ border: "1px solid var(--line)", background: "var(--cream)" }}>
+          <span className="inline-block w-4 h-4 rounded-full border-2 border-[var(--poppy)] border-t-transparent animate-spin" />
+          <span style={{ color: "var(--ink-2)" }}>Reading your website to pre-fill your spaces…</span>
+        </div>
+      )}
+
+      {/* AI suggestions — editable, verify-before-save */}
+      {suggestState === "ready" && suggestions.length > 0 && (
+        <div className="rounded-xl mb-4 overflow-hidden" style={{ border: "1px solid var(--poppy)" }}>
+          <div className="px-4 py-3 flex items-start gap-2.5" style={{ background: "var(--peach)" }}>
+            <span aria-hidden className="text-base leading-none mt-0.5">⚠️</span>
+            <div className="flex-1 text-sm">
+              <div className="font-semibold" style={{ color: "var(--poppy-deep)" }}>Auto-filled from your website — please check before adding</div>
+              <div style={{ color: "var(--ink-2)" }}>
+                We estimated these spaces, their type, sub-category and price from {`${suggestions.length === 1 ? "your site" : "your site"}`}. Edit anything that&apos;s wrong, dismiss what doesn&apos;t belong, then add them.
+              </div>
+            </div>
+          </div>
+          <div className="p-3 space-y-2.5" style={{ background: "#fff" }}>
+            {suggestions.map((s, i) => (
+              <div key={i} className="rounded-lg p-3 grid gap-2.5 sm:grid-cols-[1fr_auto_auto_auto_auto] sm:items-end" style={{ border: "1px solid var(--line)", background: "var(--bone)" }}>
+                <div className="space-y-1 min-w-0">
+                  <label className="vy-label">Space name</label>
+                  <input value={s.name} onChange={(e) => editSuggestion(i, { name: e.target.value })} className="vy-input" />
+                </div>
+                <div className="space-y-1">
+                  <label className="vy-label">Type</label>
+                  <select value={s.type} onChange={(e) => editSuggestion(i, { type: e.target.value })} className="vy-select">
+                    <option value="main">Main (included)</option>
+                    <option value="extra">Extra (paid)</option>
+                    <option value="overflow">Overflow</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="vy-label">Sub-category</label>
+                  <input value={s.sub_category} onChange={(e) => editSuggestion(i, { sub_category: e.target.value })} placeholder="—" className="vy-input w-28" />
+                </div>
+                <div className="space-y-1">
+                  <label className="vy-label">Price (R)</label>
+                  <input
+                    value={s.wedding_price ?? ""}
+                    onChange={(e) => editSuggestion(i, { wedding_price: e.target.value.trim() === "" ? null : Number(e.target.value.replace(/[^\d.]/g, "")) })}
+                    inputMode="numeric" placeholder="0" className="vy-input w-24"
+                  />
+                </div>
+                <div className="flex gap-1.5 justify-end">
+                  <button type="button" onClick={() => addSuggestion(i)} disabled={busy || addingAll || !s.name.trim()} className="vy-btn vy-btn-primary whitespace-nowrap" style={{ padding: "8px 14px" }}>+ Add</button>
+                  <button type="button" onClick={() => dismissSuggestion(i)} disabled={addingAll} className="vy-btn vy-btn-ghost whitespace-nowrap" style={{ padding: "8px 12px" }}>Dismiss</button>
+                </div>
+              </div>
+            ))}
+            <div className="flex justify-end pt-1">
+              <button type="button" onClick={addAllSuggestions} disabled={addingAll || busy} className="vy-btn vy-btn-primary whitespace-nowrap">
+                {addingAll ? "Adding all…" : `Add all ${suggestions.length} space${suggestions.length === 1 ? "" : "s"} →`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Inline add form */}
       <form onSubmit={add} className="rounded-xl p-4 space-y-3" style={{ border: "1px solid var(--line)", background: "#fff" }}>
