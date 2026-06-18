@@ -120,6 +120,7 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
     { data: accomBookingRows },
     { data: cataCatRows },
     { data: rentalCatRows },
+    { data: chargeRaw },
   ] = await Promise.all([
     supabase.from("weddings").select("id, slug, couple_names, wedding_date").eq("venue_id", venue.id).order("created_at", { ascending: false }).limit(5),
     supabase.from("weddings").select("id, slug, couple_names, wedding_date, wedding_end_date, status, invoice_total, invoiced_at, deposit_due_at, balance_due_at").eq("venue_id", venue.id),
@@ -136,6 +137,9 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
     supabase.from("accommodation_bookings").select("room_id, check_in, check_out, wedding:weddings!inner(venue_id)").eq("wedding.venue_id", venue.id),
     supabase.from("catalogue_items").select("category").eq("venue_id", venue.id),
     supabase.from("rental_items").select("category").eq("venue_id", venue.id),
+    // Live proforma charges per wedding — the real "billed" amount even before a
+    // venue clicks Mark invoiced, so unpaid charges aren't mistaken for "paid up".
+    supabase.from("wedding_charges").select("wedding_id, amount, wedding:weddings!inner(venue_id)").eq("wedding.venue_id", venue.id),
   ]);
   const { data: enquiryRows } = await supabase.from("enquiries").select("id, status, wedding_id").eq("venue_id", venue.id);
 
@@ -269,17 +273,32 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
     paidByWedding.set(w.id, (paidByWedding.get(w.id) ?? 0) + signedAmount(r));
   });
 
+  // Live proforma total per wedding (sum of wedding_charges) — what the couple is
+  // actually being billed even before "Mark invoiced" snapshots invoice_total.
+  const chargesByWedding = new Map<string, number>();
+  ((chargeRaw ?? []) as Array<{ wedding_id: string; amount: number | string }>).forEach((c) => {
+    if (!c.wedding_id) return;
+    chargesByWedding.set(c.wedding_id, (chargesByWedding.get(c.wedding_id) ?? 0) + Number(c.amount || 0));
+  });
+  // A wedding's BILLED amount = the invoiced snapshot once invoiced, else its live
+  // proforma charges. This is the figure a couple owes against.
+  const billedOf = (w: WeddingRow) =>
+    (w.invoiced_at && Number(w.invoice_total ?? 0) > 0) ? Number(w.invoice_total ?? 0) : (chargesByWedding.get(w.id) ?? 0);
+
   const invoicedWeddings = activeWeddings.filter((w) => w.invoiced_at && Number(w.invoice_total ?? 0) > 0);
   const invoiced = invoicedWeddings.reduce((s, w) => s + Number(w.invoice_total ?? 0), 0);
-  // Per-wedding balance still owed. Which deadline applies: the deposit deadline
-  // until anything has been paid, then the balance deadline.
-  const balances = invoicedWeddings
+  // Per-wedding balance still owed = billed (invoice or live charges) − paid. Counts
+  // any active wedding that has been billed something, so an unpaid sent invoice is
+  // outstanding (not silently "paid up"). Which deadline applies: deposit until
+  // anything's paid, then balance.
+  const balances = activeWeddings
     .map((w) => {
+      const billed = billedOf(w);
       const paid = paidByWedding.get(w.id) ?? 0;
       const due = (paid <= 0 ? w.deposit_due_at ?? w.balance_due_at : w.balance_due_at ?? w.deposit_due_at) ?? null;
-      return { wedding: w, due: due ? String(due).slice(0, 10) : null, outstanding: Math.max(0, Number(w.invoice_total ?? 0) - paid) };
+      return { wedding: w, billed, due: due ? String(due).slice(0, 10) : null, outstanding: Math.max(0, billed - paid) };
     })
-    .filter((b) => b.outstanding > 0);
+    .filter((b) => b.billed > 0 && b.outstanding > 0);
   const outstanding = balances.reduce((s, b) => s + b.outstanding, 0);
   const overdue = balances.filter((b) => b.due && b.due < todayIso);
   const overdueTotal = overdue.reduce((s, b) => s + b.outstanding, 0);
@@ -450,13 +469,20 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
         const end = String(spotlight.wedding_end_date ?? spotlight.wedding_date).slice(0, 10);
         const running = start <= todayIso;
         const imminent = start <= in7;
-        const owed = balances.find((b) => b.wedding.id === spotlight.id)?.outstanding ?? 0;
+        // Billed vs paid for THIS wedding — so we can tell "nothing invoiced yet"
+        // apart from "fully paid" (both have zero owed, but mean opposite things).
+        const spotlightBilled = billedOf(spotlight);
+        const spotlightPaid = paidByWedding.get(spotlight.id) ?? 0;
+        const owed = Math.max(0, spotlightBilled - spotlightPaid);
+        const outstandingValue = owed > 0
+          ? `R${Math.round(owed).toLocaleString("en-ZA")} due`
+          : spotlightBilled > 0 ? "Paid up ✓" : "Not invoiced yet";
         const fmtDay = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
         const facts = [
           { label: "Dates", value: end !== start ? `${fmtDay(start)} – ${fmtDay(end)}` : fmtDay(start) },
           { label: "Guests", value: spotlightGuests ? String(spotlightGuests) : "—" },
           { label: "Rooms booked", value: spotlightRooms ? String(spotlightRooms) : "—" },
-          { label: "Outstanding", value: owed > 0 ? `R${Math.round(owed).toLocaleString("en-ZA")}` : "Paid up ✓" },
+          { label: "Outstanding", value: outstandingValue },
         ];
         return (
           <section className="vy-card" style={{ background: "linear-gradient(120deg, var(--cream), #fff)", border: "2px solid var(--peach)" }}>
