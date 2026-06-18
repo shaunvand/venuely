@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SetupVenueForm } from "@/components/SetupVenueForm";
 import type { SetupVenueState } from "@/app/onboarding/setup-venue/actions";
-import { addArea, getVenueGroupsAndSeasons, addAreaGroup } from "@/app/venue/areas/actions";
 import { BulkUploader, type BulkUploaderHandle } from "@/components/BulkUploader";
 import { LogoMark } from "@/components/Logo";
 import { VenuelyLoader } from "@/components/VenuelyLoader";
@@ -189,6 +188,20 @@ export function WizardClient({
 }) {
   const router = useRouter();
   const [step, setStep] = useState<number>(initialStep);
+
+  // Keep ?step= in sync with the current step (without navigating), so if anything
+  // ever route-refreshes the wizard, the server re-reads the SAME step instead of
+  // snapping back to its default (Import). Belt-and-braces alongside fetch-based
+  // mutations that already avoid refreshes.
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("step") !== String(step)) {
+        url.searchParams.set("step", String(step));
+        window.history.replaceState(window.history.state, "", url.toString());
+      }
+    } catch { /* SSR / no-window — ignore */ }
+  }, [step]);
 
   // Auto pre-import the venue's own Google photos into "Your Venue" the first
   // time the wizard loads with a created venue. This reuses the proven
@@ -544,9 +557,6 @@ function StepSpaces({
   const [subAreas, setSubAreas] = useState<SubArea[]>([blankSub()]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  // Venue's groups + seasons (loaded on mount so the wizard can reuse them).
-  const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
-  const [, setSeasons] = useState<{ id: string; name: string }[]>([]);
   // AI suggestions pulled from the website — nested categories, verify-before-save.
   type SugArea = { name: string; pricing: "included" | "separate"; price: number | null };
   type SugCategory = { category: string; location: "venue" | "offsite"; areas: SugArea[] };
@@ -555,15 +565,6 @@ function StepSpaces({
   const [addingAll, setAddingAll] = useState(false);
   const total = areasCount + added.length;
   const done = spacesDone || added.length > 0;
-
-  useEffect(() => {
-    if (!venueId) return;
-    let cancelled = false;
-    getVenueGroupsAndSeasons(venueId)
-      .then((r) => { if (!cancelled) { setGroups(r.groups as { id: string; name: string }[]); setSeasons(r.seasons as { id: string; name: string }[]); } })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [venueId]);
 
   // Pre-fill from the venue's website (once, only when starting empty) so the
   // owner reviews-and-edits instead of typing every space from scratch.
@@ -587,44 +588,26 @@ function StepSpaces({
     return () => { cancelled = true; };
   }, [venueId, areasCount]);
 
-  // Resolve/create the category group, then save each named sub-area under it.
+  // Save a category + its sub-areas via the API route (NOT a server action), so
+  // the wizard never route-refreshes mid-add and the step/progress is preserved.
   async function commitCategory(catName: string, loc: "venue" | "offsite", subs: SubArea[]) {
     if (!venueId) return;
     const named = subs.filter((s) => s.name.trim());
     if (!named.length) return;
-    const wanted = catName.trim();
-
-    // Find or create the category group (case-insensitive).
-    let groupId: string | null = null;
-    if (wanted) {
-      const existing = groups.find((g) => g.name.toLowerCase() === wanted.toLowerCase());
-      if (existing) {
-        groupId = existing.id;
-      } else {
-        const gfd = new FormData();
-        gfd.set("name", wanted);
-        gfd.set("location", loc);
-        // Group-level flag: included only when every sub-area is included.
-        gfd.set("included", named.every((s) => s.pricing === "included") ? "true" : "false");
-        await addAreaGroup(venueId, gfd);
-        const refreshed = await getVenueGroupsAndSeasons(venueId);
-        setGroups(refreshed.groups as { id: string; name: string }[]);
-        groupId = (refreshed.groups as { id: string; name: string }[]).find((g) => g.name.toLowerCase() === wanted.toLowerCase())?.id ?? null;
-      }
-    }
-
-    for (const s of named) {
-      const fd = new FormData();
-      fd.set("name", s.name.trim());
-      fd.set("area_kind", s.pricing === "included" ? "main" : "extra");
-      if (groupId) fd.set("group_id", groupId);
-      if (s.pricing === "separate") {
-        const p = s.price.replace(/[^\d.]/g, "");
-        if (p) fd.set("price_wedding", p);
-      }
-      await addArea(venueId, fd);
-      setAdded((a) => [...a, s.name.trim()]);
-    }
+    const res = await fetch("/api/venue/areas/create", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        venue_id: venueId,
+        category: catName.trim(),
+        location: loc,
+        areas: named.map((s) => ({ name: s.name.trim(), pricing: s.pricing, price: s.pricing === "separate" ? s.price.replace(/[^\d.]/g, "") : null })),
+      }),
+    });
+    const j = await res.json().catch(() => null);
+    if (!res.ok || !j?.ok) throw new Error(j?.error || "Couldn't save that space.");
+    const names: string[] = Array.isArray(j.added) ? j.added : named.map((s) => s.name.trim());
+    setAdded((a) => [...a, ...names]);
   }
 
   function editSub(i: number, patch: Partial<SubArea>) {
