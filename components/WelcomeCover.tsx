@@ -24,6 +24,9 @@ export function WelcomeCover() {
     try { welcome = new URLSearchParams(window.location.search).get("welcome") === "1"; } catch {}
     if (!welcome) return;
     setActive(true);
+    // Hand off to the dashboard welcome lightbox (it reads + clears this once the
+    // cover fades), so the first-run steps appear right after the animation.
+    try { sessionStorage.setItem("vy-welcome-steps", "1"); } catch {}
     // Strip ?welcome=1 immediately so a refresh / back never replays the cover.
     try {
       const url = new URL(window.location.href);

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { computeSetupSteps } from "@/lib/venue/setup";
 import { applyMarkup } from "@/lib/billing/compute";
 import { WelcomeImportModal } from "@/components/WelcomeImportModal";
+import { DashboardWelcomeModal } from "@/components/DashboardWelcomeModal";
 import { VenuelyOpener } from "@/components/VenuelyOpener";
 import { OverviewCalendar } from "@/components/OverviewCalendar";
 
@@ -410,6 +411,8 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
           ?welcome=force replays it for previewing). */}
       {(welcome === "1" || welcome === "force") && <VenuelyOpener trigger="welcome" />}
       {showWelcome && <WelcomeImportModal venueId={venue.id} venueName={venue.name} />}
+      {/* First-run "recommended steps" lightbox after the post-onboarding loader. */}
+      <DashboardWelcomeModal />
 
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
