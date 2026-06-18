@@ -49,7 +49,9 @@ export function DashboardWelcomeModal() {
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "relative",
-          width: "min(840px, 94vw)",
+          // Fit the whole 16:9 animation inside the viewport — bounded by width AND
+          // height so it never crops or overflows.
+          width: "min(94vw, calc(90vh * 16 / 9))",
           aspectRatio: "1920 / 1080",
           borderRadius: 18,
           overflow: "hidden",
