@@ -9,7 +9,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { WelcomeExplainer } from "@/components/WelcomeExplainer";
 
 const SERIF = "'Fraunces', Georgia, serif";
 
@@ -54,16 +53,16 @@ export function DashboardWelcomeModal() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    // TESTING: open on every dashboard load so the lightbox is easy to preview.
-    // Revert to the gated version (sessionStorage "vy-welcome-steps") for launch.
-    const TESTING_ALWAYS_OPEN = true;
-    if (TESTING_ALWAYS_OPEN) { setOpen(true); return; }
+    // Show once, only after the wizard hand-off (WelcomeCover sets the flag on the
+    // ?welcome=1 arrival). Pops ~2s after the dashboard settles, then never again.
     let show = false;
     try {
       show = sessionStorage.getItem("vy-welcome-steps") === "1";
       if (show) sessionStorage.removeItem("vy-welcome-steps");
     } catch {}
-    if (show) setOpen(true);
+    if (!show) return;
+    const id = setTimeout(() => setOpen(true), 2000);
+    return () => clearTimeout(id);
   }, []);
 
   if (!open) return null;
@@ -155,22 +154,27 @@ export function DashboardWelcomeModal() {
 // allow autoplay. Falls back to the looping illustration if the video is missing or
 // can't play. Set NEXT_PUBLIC_WELCOME_VIDEO_URL (or drop welcome-explainer.mp4 in
 // /public) to switch it on — no code change needed.
-// Only attempt a video when a URL is explicitly configured — otherwise the coded
-// motion-graphics explainer is the (crisp, no-network) default.
-const EXPLAINER_SRC = process.env.NEXT_PUBLIC_WELCOME_VIDEO_URL || "";
+// The polished welcome explainer (Claude Design) lives as a self-contained page in
+// /public. We embed it 16:9 so it plays exactly as designed; it runs once and holds
+// its final frame (loop removed in welcome-scenes.js). Optional NEXT_PUBLIC_WELCOME_
+// VIDEO_URL can still override with a video instead.
+const EXPLAINER_VIDEO = process.env.NEXT_PUBLIC_WELCOME_VIDEO_URL || "";
 
 function ExplainerMedia() {
-  const [failed, setFailed] = useState(false);
-  if (!EXPLAINER_SRC || failed) return <WelcomeExplainer />;
+  if (EXPLAINER_VIDEO) {
+    return (
+      <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", background: "#211d1a" }}>
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+        <video src={EXPLAINER_VIDEO} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+      </div>
+    );
+  }
   return (
-    <div style={{ position: "relative", height: 196 }}>
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      <video
-        src={EXPLAINER_SRC}
-        autoPlay muted playsInline loop
-        onError={() => setFailed(true)}
-        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-      />
-    </div>
+    <iframe
+      src="/welcome-video.html"
+      title="How Venuely works"
+      loading="eager"
+      style={{ display: "block", width: "100%", aspectRatio: "16 / 9", border: "none", background: "#211d1a" }}
+    />
   );
 }
