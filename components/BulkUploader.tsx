@@ -109,6 +109,8 @@ const READING_MESSAGES = [
 
 const BUBBLE = "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition";
 const BUBBLE_PRIMARY = `${BUBBLE} bg-[var(--poppy)] text-white hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed`;
+// Larger, unmissable variant for the final "Approve" step — the key next action.
+const BUBBLE_PRIMARY_LG = "inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-base font-bold transition bg-[var(--poppy)] text-white shadow-lg hover:brightness-105 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed";
 const BUBBLE_SECONDARY = `${BUBBLE} bg-white border border-stone-300 text-stone-800 hover:bg-stone-100`;
 const BUBBLE_GHOST = `${BUBBLE} text-stone-700 hover:bg-stone-100`;
 
@@ -124,6 +126,11 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
 ) {
   const fileRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
+  // Anchors for auto-scroll: down to the populated review once parsing lands, and
+  // down to the per-category results once the import is approved — so the user
+  // always sees what happened and what to do next instead of a still screen.
+  const reviewRef = useRef<HTMLDivElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -171,6 +178,27 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
     }
   }
   useEffect(() => () => stopTimers(), []);
+
+  // After the loading overlay finishes (parse done + items populated), glide down
+  // to the review grid so the freshly-sorted categories are in view — not left
+  // off-screen below a screen that looks unchanged.
+  useEffect(() => {
+    if (phase !== "done" || items.length === 0) return;
+    const id = setTimeout(() => {
+      reviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 600); // let the overlay begin its fade first
+    return () => clearTimeout(id);
+  }, [phase, items.length]);
+
+  // After a successful import, scroll to the per-category results + next steps so
+  // the user sees what landed instead of staring at the same review screen.
+  useEffect(() => {
+    if (!imported) return;
+    const id = setTimeout(() => {
+      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+    return () => clearTimeout(id);
+  }, [imported]);
 
   // Slow, size-scaled climb toward a ceiling (never reaches 100 until done). Bigger
   // uploads ease more slowly; a small floor keeps the bar always inching forward so
@@ -303,7 +331,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
       setFileReports(j.files ?? []);
       setExtractedImages(j.images ?? []);
       setProgress(100); setPhase("done");
-      setStatus({ tone: "success", text: `Found: ${counts}. Review below and click "Import" to save into your dashboard.` });
+      setStatus({ tone: "success", text: `Found: ${counts}. Review the sorted categories below and click "Approve" to save them into your dashboard.` });
     } catch (e) {
       stopTimers(); setPhase("idle"); setProgress(0);
       if (cancelledRef.current) {
@@ -527,7 +555,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
 
       {/* Per-destination commit breakdown + undo window (shown ~10 min after a commit) */}
       {(commitResults || undo) && (
-        <div className="rounded-xl px-4 py-3 text-sm space-y-2" style={{ background: "var(--bone)", border: "1px solid var(--line)" }}>
+        <div ref={resultsRef} className="rounded-xl px-4 py-3 text-sm space-y-2 scroll-mt-4" style={{ background: "var(--bone)", border: "1px solid var(--line)" }}>
           {commitResults && (
             <ul className="space-y-1">
               {Object.entries(commitResults).map(([table, r]) => (
@@ -687,6 +715,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
 
       {items.length > 0 && (
         <>
+          <div ref={reviewRef} className="scroll-mt-4" aria-hidden />
           {/* Category filter pills — matches Vendor Tracker styling */}
           <div className="flex gap-2 flex-wrap items-center border-t pt-4" style={{ borderColor: "var(--line)" }}>
             <button
@@ -916,14 +945,14 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                     You can edit these later <span aria-hidden>→</span>
                   </span>
                 )}
-                <button disabled={isPending || !includedCount} onClick={commit} className={BUBBLE_PRIMARY}>
+                <button disabled={isPending || !includedCount} onClick={commit} className={BUBBLE_PRIMARY_LG}>
                   {isPending ? (
                     <>
-                      <span className="inline-block w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
                       Importing — don&apos;t close this tab…
                     </>
                   ) : (
-                    `Import ${includedCount} item${includedCount === 1 ? "" : "s"} →`
+                    `Approve ${includedCount} item${includedCount === 1 ? "" : "s"} →`
                   )}
                 </button>
               </div>
