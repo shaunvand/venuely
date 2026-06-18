@@ -28,10 +28,10 @@
     position:relative; width:1920px; height:1080px;
     background:
       radial-gradient(1200px 700px at 50% -8%, var(--paper-hi) 0%, var(--paper) 58%);
-    border-radius:34px;
+    /* No inner frame — the popup itself is the frame. */
+    border-radius:0;
     overflow:hidden;
     transform-origin:center center;
-    box-shadow:0 40px 120px rgba(0,0,0,.45);
   }
   /* faint decorative arc */
   #stage::after{
@@ -190,8 +190,10 @@
   });
 
   // ---- scaling ----
+  // Scale to the WIDTH so all four steps are always fully in frame; the popup is
+  // sized 16:9 so this fills exactly with no crop.
   function fit(){
-    const s = Math.min(window.innerWidth/1920, window.innerHeight/1080)*0.96;
+    const s = window.innerWidth/1920;
     stage.style.transform = 'scale('+s+')';
   }
   window.addEventListener('resize', fit); fit();

@@ -49,14 +49,14 @@ export function DashboardWelcomeModal() {
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "relative",
-          // Fit the whole 16:9 animation inside the viewport — bounded by width AND
-          // height so it never crops or overflows.
-          width: "min(94vw, calc(90vh * 16 / 9))",
+          // Wide 16:9 frame, bounded by width AND height so the full animation
+          // (all four steps) fits the screen without cropping.
+          width: "min(97vw, calc(94vh * 16 / 9))",
           aspectRatio: "1920 / 1080",
-          borderRadius: 18,
+          borderRadius: 20,
           overflow: "hidden",
           background: "#FFF6F0",
-          boxShadow: "0 24px 60px rgba(28,25,23,0.4)",
+          boxShadow: "0 24px 70px rgba(28,25,23,0.42)",
           animation: "vyPopIn 0.45s ease both",
         }}
       >
