@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Venuely — Get Started</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@500;600;700&family=Mulish:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --coral:#FA523C; --coral-deep:#E5412B; --coral-soft:#FF7E5F;
+    --ink:#2A2622; --paper:#FFF6F0; --paper-hi:#FFFBF7; --card:#FFFFFF;
+    --muted:rgba(42,38,34,.60); --line:rgba(250,82,60,.16);
+    --font-head:'Playfair Display',serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; }
+  body {
+    background:#FFF6F0;
+    font-family:'Mulish',sans-serif;
+    overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+    min-height:100vh;
+  }
+  #viewport { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
+  #stage {
+    position:relative; width:1920px; height:1080px;
+    background:
+      radial-gradient(1200px 700px at 50% -8%, var(--paper-hi) 0%, var(--paper) 58%);
+    border-radius:34px;
+    overflow:hidden;
+    transform-origin:center center;
+    box-shadow:0 40px 120px rgba(0,0,0,.45);
+  }
+  /* faint decorative arc */
+  #stage::after{
+    content:""; position:absolute; right:-220px; top:-220px;
+    width:640px; height:640px; border-radius:50%;
+    background:radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--coral) 12%, transparent), transparent 62%);
+    pointer-events:none;
+  }
+
+  /* ---------- header ---------- */
+  .eyebrow{
+    font-weight:700; font-size:22px; letter-spacing:.34em;
+    color:var(--coral); text-transform:uppercase;
+  }
+  #header{ position:absolute; top:118px; left:0; right:0; text-align:center; }
+  #headline{
+    font-family:var(--font-head); font-weight:800;
+    font-size:96px; line-height:1.0; color:var(--ink);
+    margin:22px 0 0;
+  }
+  #sub{
+    font-size:30px; color:var(--muted); margin-top:20px; font-weight:500;
+  }
+  #sub b{ color:var(--coral-deep); font-weight:700; }
+
+  /* ---------- stepper ---------- */
+  #track, #fill{
+    position:absolute; top:566px; left:420px; height:6px; border-radius:6px;
+  }
+  #track{ width:1080px; background:var(--line); }
+  #fill{ width:0; background:linear-gradient(90deg,var(--coral-soft),var(--coral)); }
+
+  .col{
+    position:absolute; top:476px; width:320px; text-align:center;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  .disc{
+    position:relative; width:180px; height:180px; border-radius:50%;
+    background:var(--card); border:6px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 18px 40px rgba(229,65,43,.16);
+    opacity:0;
+  }
+  .disc .ringfill{
+    position:absolute; inset:-6px; border-radius:50%;
+    background:linear-gradient(160deg,var(--coral-soft),var(--coral) 60%,var(--coral-deep));
+    opacity:0; transform:scale(.6);
+  }
+  .disc svg{ position:relative; width:84px; height:84px; }
+  .ink{ fill:none; stroke:#fff; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round;
+        stroke-dasharray:1; stroke-dashoffset:1; }
+  .num{
+    position:absolute; top:-6px; right:-6px;
+    width:54px; height:54px; border-radius:50%;
+    background:var(--ink); color:var(--paper);
+    font-family:var(--font-head); font-weight:700; font-size:26px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 16px rgba(0,0,0,.22); opacity:0; transform:scale(.5);
+  }
+  .step-label{ margin-top:30px; }
+  .step-eyebrow{ font-weight:700; font-size:18px; letter-spacing:.22em; color:var(--coral); text-transform:uppercase; }
+  .step-title{
+    font-family:var(--font-head); font-weight:700; font-size:38px;
+    color:var(--ink); margin:8px 0 0; line-height:1.06;
+    min-height:84px; display:flex; align-items:flex-start; justify-content:center;
+  }
+  .step-desc{ font-size:22px; line-height:1.42; color:var(--muted); margin:10px 4px 0; font-weight:500; }
+
+  /* ---------- footer ---------- */
+  #footer{
+    position:absolute; left:0; right:0; bottom:78px;
+    display:flex; align-items:center; justify-content:center; gap:20px;
+    opacity:0;
+  }
+  #footer .vmark{ width:64px; height:64px; }
+  #footer .ftext{ font-family:var(--font-head); font-style:italic; font-weight:600;
+    font-size:34px; color:var(--ink); }
+  #footer .ftext span{ color:var(--coral-deep); font-style:normal; font-weight:700; }
+</style>
+</head>
+<body>
+<div id="viewport">
+  <div id="stage">
+    <div id="header">
+      <div class="eyebrow" id="eb">Welcome to Venuely</div>
+      <h1 id="headline">You're all set up</h1>
+      <div id="sub">Four quick steps to your first <b>wedding portal</b>.</div>
+    </div>
+
+    <div id="track"></div>
+    <div id="fill"></div>
+
+    <!-- columns injected by JS -->
+
+    <div id="footer">
+      <svg class="vmark" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="240" height="240" rx="56" fill="#FA523C"></rect>
+        <text x="124" y="168" text-anchor="middle" font-family="'Playfair Display',serif" font-weight="700" font-size="120" fill="#FFFDFB">V</text>
+        <circle cx="160" cy="159" r="10" fill="#FFFDFB"></circle>
+      </svg>
+      <div class="ftext">Knock these out and you're <span>ready to host.</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const STEPS = [
+    { n:'01', eyebrow:'Couple Experience', title:'Build their page',
+      desc:'Set up the page couples actually see — your spaces, photos and venue story.',
+      icon:'<path class="ink" pathLength="1" d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v11A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"/><circle class="ink" pathLength="1" cx="9" cy="10" r="1.6"/><path class="ink" pathLength="1" d="M20 15.5l-4.5-4L7 19"/>' },
+    { n:'02', eyebrow:'Invoicing & Banking', title:'Get paid right',
+      desc:'Pick your invoice style and add bank details so couples can pay you.',
+      icon:'<path class="ink" pathLength="1" d="M7 3.5h7l4 4v13H7z"/><path class="ink" pathLength="1" d="M14 3.5v4h4"/><path class="ink" pathLength="1" d="M9.5 13h5"/><path class="ink" pathLength="1" d="M9.5 16.5h3"/><path class="ink" pathLength="1" d="M11.8 9.4c0 .9 2.4.6 2.4 1.9 0 .6-.6 1-1.2 1s-1.2-.3-1.2-1M13 8.5v.7M13 12.1v.7"/>' },
+    { n:'03', eyebrow:'Your Marketplace', title:'Check your catalogue',
+      desc:'Review your rentals and suppliers so everything reads correctly.',
+      icon:'<path class="ink" pathLength="1" d="M5 9.5l1-4.5h12l1 4.5"/><path class="ink" pathLength="1" d="M5 9.5h14V20H5z"/><path class="ink" pathLength="1" d="M5 9.5a2 2 0 0 0 3.5 0 2 2 0 0 0 3.5 0 2 2 0 0 0 3.5 0 2 2 0 0 0 3.5 0"/><path class="ink" pathLength="1" d="M10 20v-4.5h4V20"/>' },
+    { n:'04', eyebrow:'First Wedding', title:'Create the portal',
+      desc:'Add the couple and date — Venuely builds their private portal instantly.',
+      icon:'<path class="ink" pathLength="1" d="M12 3l1.8 1.8L12 6.6 10.2 4.8z"/><circle class="ink" pathLength="1" cx="9.2" cy="14.5" r="4.6"/><circle class="ink" pathLength="1" cx="14.8" cy="14.5" r="4.6"/>' },
+  ];
+
+  const centers = [420, 780, 1140, 1500];   // px within 1920 stage
+  const TRACK_X = 420, TRACK_W = 1080;
+  const stage = document.getElementById('stage');
+  const fill = document.getElementById('fill');
+  const header = document.getElementById('header');
+  const eb = document.getElementById('eb');
+  const headline = document.getElementById('headline');
+  const sub = document.getElementById('sub');
+  const footer = document.getElementById('footer');
+
+  // build columns
+  const cols = STEPS.map((s,i)=>{
+    const col = document.createElement('div');
+    col.className='col';
+    col.style.left = (centers[i]-160)+'px';
+    col.innerHTML =
+      '<div class="disc"><div class="ringfill"></div>'+
+        '<div class="num">'+s.n+'</div>'+
+        '<svg viewBox="0 0 24 24">'+s.icon+'</svg>'+
+      '</div>'+
+      '<div class="step-label">'+
+        '<div class="step-eyebrow">'+s.eyebrow+'</div>'+
+        '<div class="step-title">'+s.title+'</div>'+
+        '<div class="step-desc">'+s.desc+'</div>'+
+      '</div>';
+    stage.appendChild(col);
+    return {
+      col,
+      ring: col.querySelector('.ringfill'),
+      num: col.querySelector('.num'),
+      inks: col.querySelectorAll('.ink'),
+      label: col.querySelector('.step-label'),
+    };
+  });
+
+  // ---- scaling ----
+  function fit(){
+    const s = Math.min(window.innerWidth/1920, window.innerHeight/1080)*0.96;
+    stage.style.transform = 'scale('+s+')';
+  }
+  window.addEventListener('resize', fit); fit();
+
+  // ---- easings ----
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  const eio=t=>(t<0.5?4*t*t*t:(t-1)*(2*t-2)*(2*t-2)+1);
+  const eout=t=>1-Math.pow(1-t,3);
+  const backK=(t,k)=>{const c1=k,c3=c1+1;return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2);};
+  const back=t=>backK(t,1.70158);
+
+  // ---- motion config ----
+  const CFG={ t0:1.7, gap:1.7, pop:0.9, txt:0.85, travel:18, ring:'back', headDur:0.95 };
+  const nodeT=i=>CFG.t0+i*CFG.gap;
+  const footT=()=>nodeT(3)+0.65;
+  const endT=()=>footT()+0.8+1.4;
+  function ringScale(ap){
+    if(CFG.ring==='soft') return 0.8+0.2*eout(ap);
+    if(CFG.ring==='strong') return 0.52+0.48*backK(ap,2.6);
+    return 0.6+0.4*back(ap);
+  }
+
+  function nodeX(t){
+    if(t<=nodeT(0)) return centers[0];
+    for(let i=0;i<3;i++){
+      const a=nodeT(i), b=nodeT(i+1);
+      if(t>=b) continue;
+      if(t>a) return lerp(centers[i],centers[i+1], eio((t-a)/(b-a)));
+    }
+    return centers[3];
+  }
+
+  function render(t){
+    // header
+    const hp=eout(clamp((t-0.25)/CFG.headDur,0,1));
+    eb.style.opacity=hp; eb.style.transform='translateY('+(CFG.travel*0.8*(1-hp))+'px)';
+    headline.style.opacity=hp; headline.style.transform='translateY('+(CFG.travel*1.25*(1-hp))+'px)';
+    const sp=eout(clamp((t-0.85)/CFG.headDur,0,1));
+    sub.style.opacity=sp; sub.style.transform='translateY('+(CFG.travel*0.8*(1-sp))+'px)';
+
+    // connecting fill
+    const fx = t<nodeT(0) ? centers[0] : nodeX(t);
+    const w = clamp(fx-TRACK_X,0,TRACK_W);
+    fill.style.width = (t<nodeT(0)?0:w)+'px';
+
+    // steps
+    cols.forEach((c,i)=>{
+      const ap=clamp((t-nodeT(i))/CFG.pop,0,1);
+      const disc=c.col.querySelector('.disc');
+      // the shell only appears AS it fills — fade + pop together
+      disc.style.opacity=eout(clamp(ap*1.5,0,1));
+      disc.style.transform='scale('+ringScale(ap)+')';
+      c.ring.style.opacity=ap;                    // coral wash floods the shell
+      c.ring.style.transform='scale(1)';
+      const np=clamp((t-nodeT(i)-0.18)/0.5,0,1);
+      c.num.style.opacity=np; c.num.style.transform='scale('+(0.5+0.5*back(np))+')';
+      const dp=clamp(ap*1.2,0,1);
+      c.inks.forEach(el=>el.style.strokeDashoffset=(1-eout(dp)));
+      const tp=eout(clamp((t-nodeT(i)-0.15)/CFG.txt,0,1));
+      c.label.style.opacity=tp; c.label.style.transform='translateY('+(CFG.travel*(1-tp))+'px)';
+      disc.style.borderColor = ap>0.5 ? 'rgba(250,82,60,0)' : 'var(--line)';
+    });
+
+    // footer
+    const fp=eout(clamp((t-footT())/0.7,0,1));
+    footer.style.opacity=fp; footer.style.transform='translateY('+(CFG.travel*0.9*(1-fp))+'px)';
+  }
+
+  // ---- run (play ONCE, then hold the fully-built final frame) ----
+  let startT=null, raf=null, END=endT();
+  function tick(now){
+    if(startT===null) startT=now;
+    let t=(now-startT)/1000;
+    render(Math.min(t,END));
+    if(t>=END) return;                 // played through once — rest on the finished state
+    raf=requestAnimationFrame(tick);
+  }
+  function play(){
+    cancelAnimationFrame(raf); startT=null; END=endT();
+    render(0);
+    raf=requestAnimationFrame(tick);
+  }
+  play();
+  window.__render=t=>{cancelAnimationFrame(raf);render(t);};
+  window.__play=play;
+})();
+</script>
+</body>
+</html>
