@@ -26,6 +26,16 @@ export function DashboardWelcomeModal() {
   }, []);
 
   function close() {
+    // Light up the sidebar step hints (1–4) so the venue is nudged through the
+    // sequence. Each clears when its tab is visited; they never re-arm once done.
+    try {
+      const raw = localStorage.getItem("vy-step-hints");
+      const done = raw ? (JSON.parse(raw).done ?? []) : [];
+      if (!Array.isArray(done) || done.length < 4) {
+        localStorage.setItem("vy-step-hints", JSON.stringify({ active: true, done: Array.isArray(done) ? done : [] }));
+        window.dispatchEvent(new Event("venuely:step-hints"));
+      }
+    } catch {}
     setFading(true);
     setTimeout(() => setOpen(false), 350);
   }

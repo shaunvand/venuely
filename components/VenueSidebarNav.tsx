@@ -2,7 +2,58 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+// Onboarding step → the page that "completes" it. After the welcome popup closes
+// (DashboardWelcomeModal), a breathing numbered badge appears on each step's nav
+// entry; visiting that page clears its badge for good (persisted in localStorage).
+const STEP_MATCH: { n: number; path: string }[] = [
+  { n: 1, path: "/venue/your-venue" },  // Couple Experience (top link)
+  { n: 2, path: "/venue/billing" },     // Invoicing & Banking (Money group)
+  { n: 3, path: "/venue/catalogue" },   // Marketplace (Marketplace group)
+  { n: 4, path: "/venue/weddings" },    // First Wedding (top link)
+];
+const STEP_FOR_TOP: Record<string, number> = { "/venue/your-venue": 1, "/venue/weddings": 4 };
+const STEP_FOR_GROUP: Record<string, number> = { Money: 2, Marketplace: 3 };
+
+type Hints = { active: boolean; done: number[] };
+
+function StepPulse({ n }: { n: number }) {
+  return (
+    <span className="vy-steppulse" aria-label={`Step ${n} — start here`} title={`Step ${n}`}>{n}</span>
+  );
+}
+
+// Shared hint state + auto-clear on navigation. Returns a predicate for "show n".
+function useStepHints(pathname: string) {
+  const [hints, setHints] = useState<Hints>({ active: false, done: [] });
+
+  useEffect(() => {
+    const load = () => {
+      try {
+        const raw = localStorage.getItem("vy-step-hints");
+        setHints(raw ? JSON.parse(raw) : { active: false, done: [] });
+      } catch { setHints({ active: false, done: [] }); }
+    };
+    load();
+    window.addEventListener("venuely:step-hints", load);
+    window.addEventListener("storage", load);
+    return () => { window.removeEventListener("venuely:step-hints", load); window.removeEventListener("storage", load); };
+  }, []);
+
+  // Visiting a step's page clears it permanently.
+  useEffect(() => {
+    if (!hints.active) return;
+    const hit = STEP_MATCH.find((s) => pathname.startsWith(s.path) && !hints.done.includes(s.n));
+    if (!hit) return;
+    const done = [...hints.done, hit.n];
+    const next: Hints = { active: done.length < 4, done };
+    try { localStorage.setItem("vy-step-hints", JSON.stringify(next)); } catch {}
+    setHints(next);
+  }, [pathname, hints]);
+
+  return (n: number) => hints.active && !hints.done.includes(n);
+}
 
 type IconName =
   | "overview" | "venue" | "enquiries" | "messages" | "weddings" | "calendar" | "import"
@@ -86,19 +137,40 @@ function Icon({ name, className = "w-5 h-5" }: { name: IconName; className?: str
   return <svg viewBox="0 0 24 24" className={className} aria-hidden>{paths[name]}</svg>;
 }
 
+const STEP_PULSE_CSS = `
+@keyframes vyStepPulse {
+  0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(250,82,60,0.45); }
+  50%     { transform: scale(1.14); box-shadow: 0 0 0 5px rgba(250,82,60,0); }
+}
+.vy-steppulse {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:18px; height:18px; margin-left:auto; flex-shrink:0;
+  border-radius:999px; background:var(--poppy,#FA523C); color:#fff;
+  font-size:11px; font-weight:800; line-height:1;
+  animation: vyStepPulse 1.5s ease-in-out infinite;
+}
+.vy-steppulse-dot {
+  position:absolute; top:5px; right:5px; width:9px; height:9px; border-radius:999px;
+  background:var(--poppy,#FA523C); animation: vyStepPulse 1.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce){ .vy-steppulse,.vy-steppulse-dot{ animation:none; } }
+`;
+
 export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) {
   const pathname = usePathname();
   const search = useSearchParams();
   const view = search.get("view");
+  const showStep = useStepHints(pathname);
 
   // Collapsed: a flat icon rail (top links + one icon per group → its first item).
   if (collapsed) {
-    const rail: { href: string; label: string; icon: IconName }[] = [
-      ...TOP_LINKS,
-      ...GROUPS.map((g) => ({ href: g.items[0].href, label: g.label, icon: g.icon })),
+    const rail: { href: string; label: string; icon: IconName; step?: number }[] = [
+      ...TOP_LINKS.map((l) => ({ ...l, step: STEP_FOR_TOP[l.href] })),
+      ...GROUPS.map((g) => ({ href: g.items[0].href, label: g.label, icon: g.icon, step: STEP_FOR_GROUP[g.label] })),
     ];
     return (
       <nav className="flex flex-col items-center gap-1 flex-1">
+        <style>{STEP_PULSE_CSS}</style>
         {rail.map((it) => {
           const base = it.href.split("?")[0];
           const active = base === "/venue" ? pathname === "/venue" : pathname.startsWith(base);
@@ -108,10 +180,11 @@ export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) 
               href={it.href}
               title={it.label}
               aria-label={it.label}
-              className="w-11 h-11 flex items-center justify-center rounded-xl transition-colors hover:bg-[color:var(--bone)]"
+              className="relative w-11 h-11 flex items-center justify-center rounded-xl transition-colors hover:bg-[color:var(--bone)]"
               style={active ? { background: "var(--cream)", color: "var(--forest)" } : { color: "var(--ink-2)" }}
             >
               <Icon name={it.icon} />
+              {it.step && showStep(it.step) && <span className="vy-steppulse-dot" />}
             </Link>
           );
         })}
@@ -121,8 +194,10 @@ export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) 
 
   return (
     <nav className="flex flex-col flex-1">
+      <style>{STEP_PULSE_CSS}</style>
       {TOP_LINKS.map((l) => {
         const active = l.href === "/venue" ? pathname === "/venue" : pathname.startsWith(l.href);
+        const step = STEP_FOR_TOP[l.href];
         return (
           <Link
             key={l.href}
@@ -131,6 +206,7 @@ export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) 
           >
             <Icon name={l.icon} className="w-[18px] h-[18px] flex-shrink-0" />
             {l.label}
+            {step && showStep(step) && <StepPulse n={step} />}
           </Link>
         );
       })}
@@ -139,15 +215,16 @@ export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) 
         const groupActive = g.items.some(
           (i) => pathname === i.href.split("?")[0] || pathname.startsWith(i.href.split("?")[0] + "/")
         );
-        return <NavGroup key={g.label} group={g} defaultOpen={groupActive} pathname={pathname} view={view} />;
+        const step = STEP_FOR_GROUP[g.label];
+        return <NavGroup key={g.label} group={g} defaultOpen={groupActive} pathname={pathname} view={view} badge={step && showStep(step) ? step : null} />;
       })}
     </nav>
   );
 }
 
 function NavGroup({
-  group, defaultOpen, pathname, view,
-}: { group: Group; defaultOpen: boolean; pathname: string; view: string | null }) {
+  group, defaultOpen, pathname, view, badge = null,
+}: { group: Group; defaultOpen: boolean; pathname: string; view: string | null; badge?: number | null }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="mt-3">
@@ -157,7 +234,7 @@ function NavGroup({
         className="w-full flex items-center justify-between px-1 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500 hover:text-stone-900 transition-colors"
       >
         <span className="flex items-center gap-2.5"><Icon name={group.icon} className="w-[18px] h-[18px]" />{group.label}</span>
-        <span className={`text-[10px] transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
+        {badge ? <StepPulse n={badge} /> : <span className={`text-[10px] transition-transform ${open ? "rotate-90" : ""}`}>▶</span>}
       </button>
       {open && (
         <div className="flex flex-col">
