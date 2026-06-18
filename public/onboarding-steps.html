@@ -190,13 +190,19 @@
   });
 
   // ---- scaling ----
-  // Scale to the WIDTH so all four steps are always fully in frame; the popup is
-  // sized 16:9 so this fills exactly with no crop.
+  // CONTAIN: scale to whichever of width/height is the tighter fit, so the whole
+  // 1920×1080 stage is always fully visible — never cropped — at any container
+  // size, zoom level, or on mobile. A ResizeObserver re-fits on every change
+  // (browser zoom doesn't always fire window 'resize' inside an iframe).
   function fit(){
-    const s = window.innerWidth/1920;
+    const w = document.documentElement.clientWidth || window.innerWidth;
+    const h = document.documentElement.clientHeight || window.innerHeight;
+    const s = Math.min(w/1920, h/1080);
     stage.style.transform = 'scale('+s+')';
   }
-  window.addEventListener('resize', fit); fit();
+  window.addEventListener('resize', fit);
+  if (window.ResizeObserver){ new ResizeObserver(fit).observe(document.documentElement); }
+  fit();
 
   // ---- easings ----
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));

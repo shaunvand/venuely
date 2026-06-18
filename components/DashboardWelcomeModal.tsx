@@ -49,11 +49,11 @@ export function DashboardWelcomeModal() {
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "relative",
-          // Wide 16:9 frame, bounded by width AND height so the full animation
-          // (all four steps) fits the screen without cropping.
-          width: "min(97vw, calc(94vh * 16 / 9))",
-          aspectRatio: "1920 / 1080",
-          borderRadius: 20,
+          // Compact 16:9 frame (~quarter the old full-screen size). The animation
+          // contain-scales inside, so it always fits whole — never cropped.
+          width: "min(560px, 92vw, calc(82vh * 16 / 9))",
+          aspectRatio: "16 / 9",
+          borderRadius: 18,
           overflow: "hidden",
           background: "#FFF6F0",
           boxShadow: "0 24px 70px rgba(28,25,23,0.42)",
@@ -67,7 +67,7 @@ export function DashboardWelcomeModal() {
           <video src={EXPLAINER_VIDEO} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         ) : (
           <iframe
-            src="/onboarding-steps.html?v=3"
+            src="/onboarding-steps.html?v=4"
             title="Welcome to Venuely — your first steps"
             loading="eager"
             style={{ width: "100%", height: "100%", border: "none", display: "block" }}
