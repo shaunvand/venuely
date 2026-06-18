@@ -67,7 +67,7 @@ export function DashboardWelcomeModal() {
           <video src={EXPLAINER_VIDEO} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         ) : (
           <iframe
-            src="/onboarding-steps.html?v=4"
+            src="/onboarding-steps.html?v=5"
             title="Welcome to Venuely — your first steps"
             loading="eager"
             style={{ width: "100%", height: "100%", border: "none", display: "block" }}

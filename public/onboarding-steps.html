@@ -23,15 +23,18 @@
     display:flex; align-items:center; justify-content:center;
     min-height:100vh;
   }
-  #viewport { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
+  #viewport { position:fixed; inset:0; overflow:hidden; background:var(--paper); }
   #stage {
-    position:relative; width:1920px; height:1080px;
+    /* Absolute-centred + transform-scaled so it ALWAYS sits centred and fully
+       contained, regardless of overflow, zoom, or container ratio. */
+    position:absolute; left:50%; top:50%;
+    width:1920px; height:1080px;
     background:
       radial-gradient(1200px 700px at 50% -8%, var(--paper-hi) 0%, var(--paper) 58%);
-    /* No inner frame — the popup itself is the frame. */
-    border-radius:0;
+    border-radius:0;            /* the popup itself is the frame */
     overflow:hidden;
     transform-origin:center center;
+    transform:translate(-50%,-50%) scale(1);
   }
   /* faint decorative arc */
   #stage::after{
@@ -195,13 +198,12 @@
   // size, zoom level, or on mobile. A ResizeObserver re-fits on every change
   // (browser zoom doesn't always fire window 'resize' inside an iframe).
   function fit(){
-    const w = document.documentElement.clientWidth || window.innerWidth;
-    const h = document.documentElement.clientHeight || window.innerHeight;
+    const w = window.innerWidth, h = window.innerHeight;
     const s = Math.min(w/1920, h/1080);
-    stage.style.transform = 'scale('+s+')';
+    stage.style.transform = 'translate(-50%,-50%) scale('+s+')';
   }
   window.addEventListener('resize', fit);
-  if (window.ResizeObserver){ new ResizeObserver(fit).observe(document.documentElement); }
+  if (window.ResizeObserver){ new ResizeObserver(fit).observe(document.body); }
   fit();
 
   // ---- easings ----
