@@ -17,20 +17,19 @@
   * { box-sizing: border-box; }
   html, body { margin:0; height:100%; }
   body {
-    background:#FFF6F0;
+    background:transparent;     /* the frosted popup behind shows through */
     font-family:'Mulish',sans-serif;
     overflow:hidden;
     display:flex; align-items:center; justify-content:center;
     min-height:100vh;
   }
-  #viewport { position:fixed; inset:0; overflow:hidden; background:var(--paper); }
+  #viewport { position:fixed; inset:0; overflow:hidden; background:transparent; }
   #stage {
     /* Absolute-centred + transform-scaled so it ALWAYS sits centred and fully
        contained, regardless of overflow, zoom, or container ratio. */
     position:absolute; left:50%; top:50%;
     width:1920px; height:1080px;
-    background:
-      radial-gradient(1200px 700px at 50% -8%, var(--paper-hi) 0%, var(--paper) 58%);
+    background:transparent;     /* translucent: the popup is the surface */
     border-radius:0;            /* the popup itself is the frame */
     overflow:hidden;
     transform-origin:center center;

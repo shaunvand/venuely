@@ -40,7 +40,7 @@ export function DashboardWelcomeModal() {
       onClick={close}
       style={{
         position: "fixed", inset: 0, zIndex: 150,
-        background: "rgba(28,25,23,0.55)", backdropFilter: "blur(3px)",
+        background: "rgba(28,25,23,0.28)", backdropFilter: "blur(2px)",
         display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
         opacity: fading ? 0 : 1, transition: "opacity 0.35s ease",
       }}
@@ -49,13 +49,17 @@ export function DashboardWelcomeModal() {
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "relative",
-          // Compact 16:9 frame (~quarter the old full-screen size). The animation
-          // contain-scales inside, so it always fits whole — never cropped.
-          width: "min(560px, 92vw, calc(82vh * 16 / 9))",
+          // 16:9 frame, ~2× the compact size. The animation contain-scales inside
+          // so it always fits whole — never cropped.
+          width: "min(1120px, 94vw, calc(88vh * 16 / 9))",
           aspectRatio: "16 / 9",
-          borderRadius: 18,
+          borderRadius: 20,
           overflow: "hidden",
-          background: "#FFF6F0",
+          // Frosted translucency to match the loading overlay.
+          background: "rgba(255, 250, 246, 0.78)",
+          backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
+          border: "1px solid rgba(250,82,60,0.18)",
           boxShadow: "0 24px 70px rgba(28,25,23,0.42)",
           animation: "vyPopIn 0.45s ease both",
         }}
@@ -67,7 +71,7 @@ export function DashboardWelcomeModal() {
           <video src={EXPLAINER_VIDEO} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         ) : (
           <iframe
-            src="/onboarding-steps.html?v=5"
+            src="/onboarding-steps.html?v=6"
             title="Welcome to Venuely — your first steps"
             loading="eager"
             style={{ width: "100%", height: "100%", border: "none", display: "block" }}
