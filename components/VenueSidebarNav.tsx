@@ -153,7 +153,6 @@ const STEP_PULSE_CSS = `
   position:absolute; top:5px; right:5px; width:9px; height:9px; border-radius:999px;
   background:var(--poppy,#FA523C); animation: vyStepPulse 1.5s ease-in-out infinite;
 }
-@media (prefers-reduced-motion: reduce){ .vy-steppulse,.vy-steppulse-dot{ animation:none; } }
 `;
 
 export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) {
