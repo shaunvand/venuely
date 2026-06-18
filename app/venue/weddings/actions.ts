@@ -66,11 +66,13 @@ function pascalSlug(couples: string): string {
 }
 
 async function uniqueSlug(supabase: Awaited<ReturnType<typeof createClient>>, base: string): Promise<string> {
-  let candidate = base;
+  let candidate = base || "Wedding";
   let n = 2;
   while (true) {
-    const { data } = await supabase.from("weddings").select("id").eq("slug", candidate).maybeSingle();
-    if (!data) return candidate;
+    // limit(1) (not maybeSingle) so a pre-existing slug COLLISION doesn't error
+    // and wrongly report the slug as free — that's how dupes crept in.
+    const { data } = await supabase.from("weddings").select("id").eq("slug", candidate).limit(1);
+    if (!data || data.length === 0) return candidate;
     candidate = `${base}${n++}`;
   }
 }

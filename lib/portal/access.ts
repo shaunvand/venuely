@@ -25,11 +25,16 @@ export async function portalAccess(slug: string, req?: NextRequest): Promise<Acc
   // rows. The password/membership gate below is what actually authorises access.
   const db = createAdminClient() ?? (await createClient());
 
-  const { data: wedding } = await db
+  // Resolve by slug. Slugs are meant to be unique, but legacy/seed data can carry
+  // a collision — `.maybeSingle()` ERRORS on >1 row and would 404 a real portal.
+  // Take the newest match deterministically so the portal always loads.
+  const { data: matches } = await db
     .from("weddings")
     .select("id, slug, venue_id, portal_password_hash")
     .eq("slug", slug)
-    .maybeSingle();
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const wedding = matches?.[0];
   if (!wedding) return { ok: false, status: 404, reason: "Wedding not found" };
 
   // Try password cookie first (cheapest check).
