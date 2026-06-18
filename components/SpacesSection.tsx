@@ -34,9 +34,10 @@ export function SpacesSection({ slug, areas, initialSelections, primary, accent,
   const [busy, setBusy] = useState(false);
   if (areas.length === 0) return null;
 
-  // Group areas by their venue-named sub-category. Areas with no group land in a
-  // default group whose Included/Extra split mirrors the legacy area_kind.
-  type RenderGroup = { key: string; name: string; included: boolean; offsite: boolean; areas: AreaItem[]; sort: number };
+  // Group areas by their venue-named sub-category (the "space"). Within a space,
+  // each AREA decides included-vs-paid on its own kind, so a single space can mix
+  // included areas and separate-cost extras.
+  type RenderGroup = { key: string; name: string; offsite: boolean; areas: AreaItem[]; sort: number };
   const groupMap = new Map<string, RenderGroup>();
   areas.forEach((a, i) => {
     const g = a.group ?? null;
@@ -45,8 +46,6 @@ export function SpacesSection({ slug, areas, initialSelections, primary, accent,
       groupMap.set(key, {
         key,
         name: g?.name ?? "Spaces",
-        // Ungrouped areas keep the legacy rule: area_kind "main" = included.
-        included: g ? g.included : a.kind === "main",
         offsite: g?.location === "offsite",
         areas: [],
         sort: g ? i : Number.MAX_SAFE_INTEGER, // default group renders last
@@ -55,6 +54,8 @@ export function SpacesSection({ slug, areas, initialSelections, primary, accent,
     groupMap.get(key)!.areas.push(a);
   });
   const groups = Array.from(groupMap.values()).sort((x, y) => x.sort - y.sort);
+  // An area is "included" when its own kind is main (offsite areas are always paid).
+  const isIncluded = (a: AreaItem, offsite: boolean) => !offsite && a.kind === "main";
 
   function persist(next: Set<string>) {
     setSel(next);
@@ -118,16 +119,22 @@ export function SpacesSection({ slug, areas, initialSelections, primary, accent,
     <div style={{ marginTop: 26 }}>
       <h2 style={{ ...heading, fontSize: 22, marginBottom: 4 }}>Spaces</h2>
       <p style={{ color: "#57534e", fontSize: 13, marginBottom: 14 }}>The areas you can use across your day — included spaces and optional paid extras.</p>
-      {groups.map((g, gi) => (
-        <div key={g.key} style={{ marginBottom: gi < groups.length - 1 ? 22 : 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#a8a29e", fontWeight: 700 }}>{g.name}</span>
-            <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: g.included ? "#1a7f4b" : "#9a6a00", background: g.included ? "#e7f4ec" : "#fdf1dc", borderRadius: 999, padding: "2px 8px" }}>{g.included ? "Included" : "Extra"}</span>
-            {g.offsite && <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#57534e", background: "#efeae4", borderRadius: 999, padding: "2px 8px" }}>Outside the venue</span>}
+      {groups.map((g, gi) => {
+        const allIncl = g.areas.every((a) => isIncluded(a, g.offsite));
+        const allPaid = g.areas.every((a) => !isIncluded(a, g.offsite));
+        // Group pill: Included / Extra when uniform, else "Some paid extras".
+        const pill = allIncl ? { t: "Included", c: "#1a7f4b", b: "#e7f4ec" } : allPaid ? { t: "Extra", c: "#9a6a00", b: "#fdf1dc" } : { t: "Some paid extras", c: "#9a6a00", b: "#fdf1dc" };
+        return (
+          <div key={g.key} style={{ marginBottom: gi < groups.length - 1 ? 22 : 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#a8a29e", fontWeight: 700 }}>{g.name}</span>
+              <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: pill.c, background: pill.b, borderRadius: 999, padding: "2px 8px" }}>{pill.t}</span>
+              {g.offsite && <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#57534e", background: "#efeae4", borderRadius: 999, padding: "2px 8px" }}>Outside the venue</span>}
+            </div>
+            <div style={grid}>{g.areas.map((a) => areaCard(a, isIncluded(a, g.offsite)))}</div>
           </div>
-          <div style={grid}>{g.areas.map((a) => areaCard(a, g.included))}</div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
