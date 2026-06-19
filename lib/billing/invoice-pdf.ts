@@ -43,6 +43,26 @@ function hexToRgb(hex: string): RGB {
   const n = parseInt(m[1], 16);
   return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
 }
+// Lighten an accent toward white for subtle fills (≈10% accent).
+function tintAccent(c: RGB): RGB {
+  const mix = (v: number) => 1 - (1 - v) * 0.12;
+  return rgb(mix(c.red), mix(c.green), mix(c.blue));
+}
+// Word-wrap to a max width, returning up to `maxLines` lines.
+function wrapText(s: string, font: PDFFont, size: number, maxW: number, maxLines: number): string[] {
+  const words = String(s ?? "").split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    const next = cur ? `${cur} ${w}` : w;
+    if (font.widthOfTextAtSize(next, size) > maxW && cur) {
+      lines.push(cur); cur = w;
+      if (lines.length === maxLines - 1) break;
+    } else cur = next;
+  }
+  if (cur && lines.length < maxLines) lines.push(cur);
+  return lines;
+}
 const rand = (n: number) => `R ${Math.round(Number(n) || 0).toLocaleString("en-ZA")}`;
 function fmtDate(s?: string | null): string {
   if (!s) return "";
@@ -131,18 +151,20 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<{ base64:
     y -= 26;
   }
 
-  // ---------- Venue contact + bill-to ----------
-  const venueLines = [input.venueAddress, input.venueEmail, input.venuePhone].map((s) => String(s ?? "").trim()).filter(Boolean);
+  // ---------- Venue contact (FROM) + bill-to ----------
+  const fromColW = 250; // keep FROM clear of the right-hand BILLED TO column
   text("FROM", M, y, 8, sansB, MUTED);
   let fy = y - 14;
   text(input.venueName, M, fy, 11, sansB, INK); fy -= 14;
-  for (const l of venueLines.slice(0, 3)) { text(l.slice(0, 60), M, fy, 9.5, reg, MUTED); fy -= 13; }
+  for (const al of wrapText(String(input.venueAddress ?? "").trim(), reg, 9.5, fromColW, 2)) { text(al, M, fy, 9.5, reg, MUTED); fy -= 12; }
+  if (input.venueEmail) { text(String(input.venueEmail).trim(), M, fy, 9.5, reg, MUTED); fy -= 12; }
+  if (input.venuePhone) { text(String(input.venuePhone).trim(), M, fy, 9.5, reg, MUTED); fy -= 12; }
 
   right("BILLED TO", width - M, y, 8, sansB, MUTED);
   right(input.coupleNames, width - M, y - 14, 11, sansB, INK);
   if (input.weddingDate) right(`Wedding: ${fmtDate(input.weddingDate)}`, width - M, y - 28, 9.5, reg, MUTED);
   if (input.reference) right(`Ref: ${input.reference}`, width - M, y - 42, 9.5, reg, MUTED);
-  y = Math.min(fy, y - 56) - 14;
+  y = Math.min(fy, y - 56) - 16;
 
   // ---------- Line items ----------
   const accentTable = tpl.accentOn === "all" || tpl.accentOn === "header";
@@ -171,40 +193,47 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<{ base64:
     y -= 22;
   });
 
-  // ---------- Totals (accent on total when template says so) ----------
-  y -= 6;
-  page.drawLine({ start: { x: width / 2, y }, end: { x: width - M, y }, thickness: 1, color: LINE });
-  y -= 20;
+  // ---------- Totals — compact, right-aligned block ----------
+  y -= 12;
+  const tLeft = width - M - 220;        // totals block ~220pt wide, pinned right
   const totalAccent = tpl.accentOn === "total" || tpl.accentOn === "all" ? accent : INK;
-  const row = (label: string, val: number, strong = false, col: RGB = MUTED) => {
-    text(label, width / 2, y, strong ? 12 : 10, strong ? sansB : reg, strong ? INK : MUTED);
-    right(rand(val), width - M, y, strong ? 12 : 10, strong ? sansB : reg, strong ? col : MUTED);
-    y -= strong ? 22 : 18;
+  page.drawLine({ start: { x: tLeft, y }, end: { x: width - M, y }, thickness: 1, color: LINE });
+  y -= 20;
+  const row = (label: string, val: number, strong = false, col: RGB = INK, valCol: RGB = MUTED) => {
+    text(label, tLeft, y, strong ? 11.5 : 10, strong ? sansB : reg, strong ? col : MUTED);
+    right(rand(val), width - M, y, strong ? 12 : 10, strong ? sansB : reg, strong ? valCol : MUTED);
+    y -= strong ? 21 : 17;
   };
-  row("Total", input.total, true, INK);
+  row("Total", input.total, true, INK, INK);
   if (input.paid > 0) row("Paid", input.paid);
-  row("Balance outstanding", input.balance, true, totalAccent);
+  row("Balance outstanding", input.balance, true, INK, totalAccent);
   if (typeof input.amountDueNow === "number" && input.amountDueNow > 0 && input.amountDueLabel) {
-    y -= 2; row(input.amountDueLabel + (input.dueDate ? ` (by ${fmtDate(input.dueDate)})` : ""), input.amountDueNow, true, accent);
+    // Amount-due row gets an accent bar to stand out.
+    y -= 2;
+    page.drawRectangle({ x: tLeft - 8, y: y - 5, width: width - M - tLeft + 8, height: 24, color: tintAccent(accent) });
+    const label = input.amountDueLabel + (input.dueDate ? ` (by ${fmtDate(input.dueDate)})` : "");
+    text(label, tLeft, y, 11.5, sansB, INK);
+    right(rand(input.amountDueNow), width - M, y, 12.5, sansB, accent);
+    y -= 26;
   }
 
-  // ---------- Banking ----------
+  // ---------- Banking (left-aligned, directly under, consistent gap) ----------
   const b = input.banking;
   if (b && (b.account_number || b.bank_name)) {
-    y -= 16;
-    const boxH = 96;
-    page.drawRectangle({ x: M, y: y - boxH, width: width - 2 * M, height: boxH, borderColor: LINE, borderWidth: 1, color: rgb(0.99, 0.976, 0.96) });
-    page.drawRectangle({ x: M, y: y - boxH, width: 3, height: boxH, color: accent });
-    text("BANKING DETAILS (EFT)", M + 16, y - 18, 8, sansB, accent);
     const lines: Array<[string, string | null | undefined]> = [
       ["Account name", b.account_name], ["Bank", b.bank_name], ["Account number", b.account_number],
       ["Branch code", b.branch_code], ["SWIFT", b.swift], ["IBAN", b.iban],
-    ];
+    ].filter(([, v]) => v) as Array<[string, string]>;
+    const boxH = 30 + lines.length * 15;
+    y -= 22;
+    page.drawRectangle({ x: M, y: y - boxH, width: width - 2 * M, height: boxH, borderColor: LINE, borderWidth: 1, color: rgb(0.99, 0.976, 0.96) });
+    page.drawRectangle({ x: M, y: y - boxH, width: 3, height: boxH, color: accent });
+    text("BANKING DETAILS (EFT)", M + 18, y - 18, 8, sansB, accent);
     let by = y - 36;
-    for (const [k, v] of lines) { if (!v) continue; text(k, M + 16, by, 9, reg, MUTED); text(String(v), M + 140, by, 10, sansB, INK); by -= 15; }
+    for (const [k, v] of lines) { text(k, M + 18, by, 9, reg, MUTED); text(String(v), M + 150, by, 10, sansB, INK); by -= 15; }
   }
 
-  text(`Please use the reference "${input.reference ?? input.coupleNames}" when paying. Thank you.`, M, 44, 9, reg, MUTED);
+  text(`Please use the reference "${input.reference ?? input.coupleNames}" when paying. Thank you.`, M, 40, 9, reg, MUTED);
 
   const bytes = await pdf.save();
   const base64 = Buffer.from(bytes).toString("base64");

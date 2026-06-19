@@ -190,7 +190,13 @@ async function loadWeddingTotals(
     templateId: (vmeta?.invoice_template as string | null) ?? null,
     theme: vmeta?.invoice_theme ?? null,
     logoUrl: (vmeta?.branding_logo_url as string | null) ?? null,
-    address: [vmeta?.address, vmeta?.region].map((s) => String(s ?? "").trim()).filter(Boolean).join(", ") || null,
+    address: (() => {
+      const addr = String(vmeta?.address ?? "").trim();
+      const region = String(vmeta?.region ?? "").trim();
+      // Avoid duplicating province/country that the address already contains.
+      if (region && addr && !addr.toLowerCase().includes(region.toLowerCase().split(",")[0])) return `${addr}, ${region}`;
+      return addr || region || null;
+    })(),
     email: (vmeta?.contact_email as string | null) ?? null,
     phone: (vmeta?.contact_phone as string | null) ?? null,
   };
