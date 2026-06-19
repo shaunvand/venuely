@@ -49,7 +49,7 @@ type LoadedWedding = {
 // so deposit_amount / balance_due are authoritative.
 async function loadWeddingTotals(
   weddingId: string,
-): Promise<{ wedding: LoadedWedding; totals: Computed; charges: Charge[]; banking: BankInfo } | null> {
+): Promise<{ wedding: LoadedWedding; totals: Computed; charges: Charge[]; banking: BankInfo; venueMeta: VenueMeta } | null> {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
 
@@ -171,19 +171,28 @@ async function loadWeddingTotals(
 
   const totals = computeTotals(rules, charges, payments);
 
-  // Venue banking — printed on the invoice so the couple can pay by EFT.
-  const { data: bank } = await supabase
+  // Venue banking + invoice template/branding — so the PDF matches the venue's
+  // SAVED invoice template and carries its own details.
+  const { data: vmeta } = await supabase
     .from("venues")
-    .select("bank_name, bank_account_name, bank_account_number, bank_branch_code, bank_swift, bank_iban")
+    .select("bank_name, bank_account_name, bank_account_number, bank_branch_code, bank_swift, bank_iban, invoice_template, invoice_theme, branding_logo_url, address, region, contact_email, contact_phone")
     .eq("id", venue.id)
     .maybeSingle();
   const banking: BankInfo = {
-    bank_name: bank?.bank_name ?? null,
-    account_name: bank?.bank_account_name ?? null,
-    account_number: bank?.bank_account_number ?? null,
-    branch_code: bank?.bank_branch_code ?? null,
-    swift: bank?.bank_swift ?? null,
-    iban: bank?.bank_iban ?? null,
+    bank_name: vmeta?.bank_name ?? null,
+    account_name: vmeta?.bank_account_name ?? null,
+    account_number: vmeta?.bank_account_number ?? null,
+    branch_code: vmeta?.bank_branch_code ?? null,
+    swift: vmeta?.bank_swift ?? null,
+    iban: vmeta?.bank_iban ?? null,
+  };
+  const venueMeta = {
+    templateId: (vmeta?.invoice_template as string | null) ?? null,
+    theme: vmeta?.invoice_theme ?? null,
+    logoUrl: (vmeta?.branding_logo_url as string | null) ?? null,
+    address: [vmeta?.address, vmeta?.region].map((s) => String(s ?? "").trim()).filter(Boolean).join(", ") || null,
+    email: (vmeta?.contact_email as string | null) ?? null,
+    phone: (vmeta?.contact_phone as string | null) ?? null,
   };
 
   return {
@@ -200,8 +209,11 @@ async function loadWeddingTotals(
     totals,
     charges,
     banking,
+    venueMeta,
   };
 }
+
+type VenueMeta = { templateId: string | null; theme: unknown; logoUrl: string | null; address: string | null; email: string | null; phone: string | null };
 
 export type ReminderResult = {
   ok: boolean;
@@ -232,7 +244,7 @@ export async function sendDepositReminder(weddingId: string, slug: string): Prom
   const loaded = await loadWeddingTotals(weddingId);
   if (!loaded) return { ok: false, sent: false, amount: 0, reason: "not_found" };
 
-  const { wedding, totals, charges, banking } = loaded;
+  const { wedding, totals, charges, banking, venueMeta } = loaded;
   const amount = totals.deposit_amount;
   if (amount <= 0) return { ok: true, sent: false, amount, reason: "nothing_due" };
   // The invoice must carry banking details — block the send if they're missing.
@@ -251,7 +263,9 @@ export async function sendDepositReminder(weddingId: string, slug: string): Prom
   if (!wedding.couple_email) return { ok: true, sent: false, amount, reason: "no_email" };
 
   const pdf = await buildInvoicePdf({
-    venueName: wedding.venueName, coupleNames: wedding.couple_names, weddingDate: wedding.wedding_date,
+    venueName: wedding.venueName, venueAddress: venueMeta.address, venueEmail: venueMeta.email, venuePhone: venueMeta.phone,
+    templateId: venueMeta.templateId, theme: venueMeta.theme, logoFallbackUrl: venueMeta.logoUrl,
+    coupleNames: wedding.couple_names, weddingDate: wedding.wedding_date,
     reference: wedding.couple_names, lineItems: invoice.lineItems ?? [],
     total: invoice.total ?? 0, paid: invoice.paid ?? 0, balance: invoice.balance ?? 0,
     amountDueNow: amount, amountDueLabel: "Deposit due", dueDate: wedding.deposit_due_at, banking,
@@ -267,7 +281,7 @@ export async function sendBalanceReminder(weddingId: string, slug: string): Prom
   const loaded = await loadWeddingTotals(weddingId);
   if (!loaded) return { ok: false, sent: false, amount: 0, reason: "not_found" };
 
-  const { wedding, totals, charges, banking } = loaded;
+  const { wedding, totals, charges, banking, venueMeta } = loaded;
   const amount = totals.balance_due;
   if (amount <= 0) return { ok: true, sent: false, amount, reason: "nothing_due" };
   if (!hasBankDetails(banking)) return { ok: false, sent: false, amount, reason: "no_bank_details" };
@@ -284,7 +298,9 @@ export async function sendBalanceReminder(weddingId: string, slug: string): Prom
   if (!wedding.couple_email) return { ok: true, sent: false, amount, reason: "no_email" };
 
   const pdf = await buildInvoicePdf({
-    venueName: wedding.venueName, coupleNames: wedding.couple_names, weddingDate: wedding.wedding_date,
+    venueName: wedding.venueName, venueAddress: venueMeta.address, venueEmail: venueMeta.email, venuePhone: venueMeta.phone,
+    templateId: venueMeta.templateId, theme: venueMeta.theme, logoFallbackUrl: venueMeta.logoUrl,
+    coupleNames: wedding.couple_names, weddingDate: wedding.wedding_date,
     reference: wedding.couple_names, lineItems: invoice.lineItems ?? [],
     total: invoice.total ?? 0, paid: invoice.paid ?? 0, balance: invoice.balance ?? 0,
     amountDueNow: amount, amountDueLabel: "Balance due", dueDate: wedding.balance_due_at, banking,
