@@ -91,6 +91,58 @@ function venueNameOf(wedding: WeddingLike): string {
   return (wedding.venue?.name ?? wedding.venueName ?? "your venue") || "your venue";
 }
 
+export type BankInfo = {
+  bank_name?: string | null; account_name?: string | null; account_number?: string | null;
+  branch_code?: string | null; swift?: string | null; iban?: string | null;
+};
+// The proforma invoice + banking details that ride along with a reminder, so the
+// couple sees exactly what they owe and how to pay.
+export type InvoiceExtra = {
+  lineItems?: Array<{ label: string; amount: number }>;
+  total?: number; paid?: number; balance?: number;
+  banking?: BankInfo | null; reference?: string | null;
+};
+
+// Renders the proforma table + banking block appended to a reminder email.
+function invoiceBlock(extra?: InvoiceExtra): string {
+  if (!extra) return "";
+  const rows = (extra.lineItems ?? []).filter((l) => l && l.label);
+  const tableRows = rows.map((l) =>
+    `<tr><td style="padding:7px 0;color:#44403c;border-bottom:1px solid #FFE7DC">${esc(l.label)}</td>
+         <td style="padding:7px 0;color:#44403c;text-align:right;border-bottom:1px solid #FFE7DC;white-space:nowrap">${rands(l.amount)}</td></tr>`).join("");
+  const sumRow = (label: string, val: number, strong = false) =>
+    `<tr><td style="padding:5px 0;color:${strong ? "#1c1917" : "#57534e"};${strong ? "font-weight:700" : ""}">${esc(label)}</td>
+         <td style="padding:5px 0;text-align:right;color:${strong ? "#FA523C" : "#57534e"};${strong ? "font-weight:700" : ""};white-space:nowrap">${rands(val)}</td></tr>`;
+  const b = extra.banking;
+  const bankRow = (label: string, val?: string | null) => val ? `<tr><td style="padding:3px 0;color:#8a857f;width:130px">${esc(label)}</td><td style="padding:3px 0;color:#1c1917;font-weight:600">${esc(val)}</td></tr>` : "";
+  const bankingHtml = b && (b.account_number || b.bank_name) ? `
+    <div style="background:#fff;border:1px solid #FFE7DC;border-radius:12px;padding:16px 18px;margin:16px 0 0">
+      <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#FA523C;font-weight:700;margin-bottom:8px">Banking details (EFT)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        ${bankRow("Account name", b.account_name)}
+        ${bankRow("Bank", b.bank_name)}
+        ${bankRow("Account number", b.account_number)}
+        ${bankRow("Branch code", b.branch_code)}
+        ${bankRow("SWIFT", b.swift)}
+        ${bankRow("IBAN", b.iban)}
+        ${extra.reference ? bankRow("Reference", extra.reference) : ""}
+      </table>
+    </div>` : "";
+
+  return `
+    <div style="background:#fff;border:1px solid #FFE7DC;border-radius:12px;padding:16px 18px;margin:8px 0 0">
+      <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#FA523C;font-weight:700;margin-bottom:8px">Your invoice</div>
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        ${tableRows}
+        <tr><td colspan="2" style="padding:4px 0"></td></tr>
+        ${typeof extra.total === "number" ? sumRow("Total", extra.total, true) : ""}
+        ${typeof extra.paid === "number" && extra.paid > 0 ? sumRow("Paid", extra.paid) : ""}
+        ${typeof extra.balance === "number" ? sumRow("Balance outstanding", extra.balance, true) : ""}
+      </table>
+    </div>
+    ${bankingHtml}`;
+}
+
 // Brand-matched email shell (Poppy #FA523C / Peach / Cream) reused by reminders.
 function shell(opts: { eyebrow: string; heading: string; bodyHtml: string }): string {
   return `
@@ -108,9 +160,13 @@ export function depositReminder(
   wedding: WeddingLike,
   amount: number,
   dueDate?: string | null,
+  invoice?: InvoiceExtra,
 ): CoupleMessage {
   const venueName = venueNameOf(wedding);
-  const subject = `Deposit reminder — your wedding at ${venueName}`;
+  const subject = `Deposit reminder & invoice — your wedding at ${venueName}`;
+  const payLine = invoice?.banking
+    ? `<p style="color:#57534e;margin:0">Your invoice and EFT banking details are below.</p>`
+    : `<p style="color:#57534e;margin:0">Pay by EFT or card — reply here for banking details or a payment link.</p>`;
   const html = shell({
     eyebrow: "Venuely",
     heading: "A friendly deposit reminder",
@@ -118,8 +174,9 @@ export function depositReminder(
       <p style="color:#57534e;margin:0 0 16px">Hi ${esc(wedding.couple_names)}, to secure your date with ${esc(venueName)} your deposit is due.</p>
       <p style="margin:0 0 4px;color:#57534e">Deposit due:</p>
       <p style="font-size:24px;font-weight:600;margin:0 0 4px;color:#FA523C">${rands(amount)}</p>
-      <p style="margin:0 0 20px;color:#57534e">Due ${dueDate ? `by <b>${esc(dueLabel(dueDate))}</b>` : "soon"}.</p>
-      <p style="color:#57534e;margin:0">Pay by EFT or card — reply here for banking details or a payment link.</p>`,
+      <p style="margin:0 0 16px;color:#57534e">Due ${dueDate ? `by <b>${esc(dueLabel(dueDate))}</b>` : "soon"}.</p>
+      ${payLine}
+      ${invoiceBlock(invoice)}`,
   });
   const whatsappText = depositReminderMessage({ venueName, coupleNames: wedding.couple_names, amount, dueDate });
   return { subject, html, whatsappText };
@@ -129,9 +186,13 @@ export function balanceReminder(
   wedding: WeddingLike,
   amount: number,
   dueDate?: string | null,
+  invoice?: InvoiceExtra,
 ): CoupleMessage {
   const venueName = venueNameOf(wedding);
-  const subject = `Balance reminder — your wedding at ${venueName}`;
+  const subject = `Balance reminder & invoice — your wedding at ${venueName}`;
+  const payLine = invoice?.banking
+    ? `<p style="color:#57534e;margin:0">Your invoice and EFT banking details are below.</p>`
+    : `<p style="color:#57534e;margin:0">Reply here for banking details, a payment link, or to arrange anything else.</p>`;
   const html = shell({
     eyebrow: "Venuely",
     heading: "Your balance is coming due",
@@ -139,8 +200,9 @@ export function balanceReminder(
       <p style="color:#57534e;margin:0 0 16px">Hi ${esc(wedding.couple_names)}, the remaining balance on your wedding with ${esc(venueName)} is due.</p>
       <p style="margin:0 0 4px;color:#57534e">Balance due:</p>
       <p style="font-size:24px;font-weight:600;margin:0 0 4px;color:#FA523C">${rands(amount)}</p>
-      <p style="margin:0 0 20px;color:#57534e">Due ${dueDate ? `by <b>${esc(dueLabel(dueDate))}</b>` : "soon"}.</p>
-      <p style="color:#57534e;margin:0">Reply here for banking details, a payment link, or to arrange anything else.</p>`,
+      <p style="margin:0 0 16px;color:#57534e">Due ${dueDate ? `by <b>${esc(dueLabel(dueDate))}</b>` : "soon"}.</p>
+      ${payLine}
+      ${invoiceBlock(invoice)}`,
   });
   const whatsappText = balanceReminderMessage({ venueName, coupleNames: wedding.couple_names, amount, dueDate });
   return { subject, html, whatsappText };

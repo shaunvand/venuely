@@ -14,7 +14,7 @@ import {
   loadRules, computeTotals, applyMarkup,
   type Charge, type Payment, type Computed,
 } from "@/lib/billing/compute";
-import { sendEmail, depositReminder, balanceReminder } from "@/lib/notifications";
+import { sendEmail, depositReminder, balanceReminder, type BankInfo, type InvoiceExtra } from "@/lib/notifications";
 import { nightsBetween, nightsLabel } from "@/lib/billing/charges";
 import { buildAreaPriceMap, type Season, type AreaPriceRow } from "@/lib/venue/seasons";
 
@@ -48,7 +48,7 @@ type LoadedWedding = {
 // so deposit_amount / balance_due are authoritative.
 async function loadWeddingTotals(
   weddingId: string,
-): Promise<{ wedding: LoadedWedding; totals: Computed } | null> {
+): Promise<{ wedding: LoadedWedding; totals: Computed; charges: Charge[]; banking: BankInfo } | null> {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
 
@@ -170,6 +170,21 @@ async function loadWeddingTotals(
 
   const totals = computeTotals(rules, charges, payments);
 
+  // Venue banking — printed on the invoice so the couple can pay by EFT.
+  const { data: bank } = await supabase
+    .from("venues")
+    .select("bank_name, bank_account_name, bank_account_number, bank_branch_code, bank_swift, bank_iban")
+    .eq("id", venue.id)
+    .maybeSingle();
+  const banking: BankInfo = {
+    bank_name: bank?.bank_name ?? null,
+    account_name: bank?.bank_account_name ?? null,
+    account_number: bank?.bank_account_number ?? null,
+    branch_code: bank?.bank_branch_code ?? null,
+    swift: bank?.bank_swift ?? null,
+    iban: bank?.bank_iban ?? null,
+  };
+
   return {
     wedding: {
       id: wedding.id,
@@ -182,6 +197,8 @@ async function loadWeddingTotals(
       venueName: venue.name,
     },
     totals,
+    charges,
+    banking,
   };
 }
 
@@ -189,21 +206,43 @@ export type ReminderResult = {
   ok: boolean;
   sent: boolean;
   amount: number;
-  reason?: "not_found" | "nothing_due" | "no_email" | "email_not_configured" | "send_failed";
+  reason?: "not_found" | "nothing_due" | "no_email" | "email_not_configured" | "send_failed" | "no_bank_details";
 };
+
+// Bank details are "set up" once there's an account number + bank name.
+function hasBankDetails(b: BankInfo): boolean {
+  return !!(String(b.account_number ?? "").trim() && String(b.bank_name ?? "").trim());
+}
+
+// Build the proforma invoice payload that rides along with a reminder.
+function buildInvoice(charges: Charge[], totals: Computed, banking: BankInfo, reference: string): InvoiceExtra {
+  const paid = totals.payments_in - totals.payments_out;
+  return {
+    lineItems: charges.filter((c) => Number(c.amount) > 0).map((c) => ({ label: c.label, amount: Number(c.amount) })),
+    total: totals.grand_total,
+    paid: paid > 0 ? paid : 0,
+    balance: totals.balance_due,
+    banking,
+    reference,
+  };
+}
 
 export async function sendDepositReminder(weddingId: string, slug: string): Promise<ReminderResult> {
   const loaded = await loadWeddingTotals(weddingId);
   if (!loaded) return { ok: false, sent: false, amount: 0, reason: "not_found" };
 
-  const { wedding, totals } = loaded;
+  const { wedding, totals, charges, banking } = loaded;
   const amount = totals.deposit_amount;
   if (amount <= 0) return { ok: true, sent: false, amount, reason: "nothing_due" };
+  // The invoice must carry banking details — block the send if they're missing.
+  if (!hasBankDetails(banking)) return { ok: false, sent: false, amount, reason: "no_bank_details" };
 
+  const invoice = buildInvoice(charges, totals, banking, wedding.couple_names);
   const msg = depositReminder(
     { couple_names: wedding.couple_names, wedding_date: wedding.wedding_date, venueName: wedding.venueName },
     amount,
     wedding.deposit_due_at,
+    invoice,
   );
 
   // Env-gated email. No key / no couple_email → clean no-op with a reason.
@@ -219,14 +258,17 @@ export async function sendBalanceReminder(weddingId: string, slug: string): Prom
   const loaded = await loadWeddingTotals(weddingId);
   if (!loaded) return { ok: false, sent: false, amount: 0, reason: "not_found" };
 
-  const { wedding, totals } = loaded;
+  const { wedding, totals, charges, banking } = loaded;
   const amount = totals.balance_due;
   if (amount <= 0) return { ok: true, sent: false, amount, reason: "nothing_due" };
+  if (!hasBankDetails(banking)) return { ok: false, sent: false, amount, reason: "no_bank_details" };
 
+  const invoice = buildInvoice(charges, totals, banking, wedding.couple_names);
   const msg = balanceReminder(
     { couple_names: wedding.couple_names, wedding_date: wedding.wedding_date, venueName: wedding.venueName },
     amount,
     wedding.balance_due_at,
+    invoice,
   );
 
   if (!process.env.RESEND_API_KEY) return { ok: true, sent: false, amount, reason: "email_not_configured" };
