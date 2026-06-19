@@ -28,7 +28,7 @@ export async function sendEmail(
   to: string | null | undefined,
   subject: string,
   html: string,
-  opts?: { replyTo?: string | null; headers?: Record<string, string> },
+  opts?: { replyTo?: string | null; headers?: Record<string, string>; attachments?: Array<{ filename: string; content: string }> },
 ): Promise<SendEmailResult> {
   if (!process.env.RESEND_API_KEY) return { sent: false, reason: "no_api_key" };
   const recipient = (to ?? "").trim();
@@ -46,6 +46,7 @@ export async function sendEmail(
         to: recipient,
         ...(opts?.replyTo ? { reply_to: opts.replyTo } : {}),
         ...(opts?.headers && Object.keys(opts.headers).length ? { headers: opts.headers } : {}),
+        ...(opts?.attachments && opts.attachments.length ? { attachments: opts.attachments } : {}),
         subject,
         html,
       }),
@@ -103,45 +104,6 @@ export type InvoiceExtra = {
   banking?: BankInfo | null; reference?: string | null;
 };
 
-// Renders the proforma table + banking block appended to a reminder email.
-function invoiceBlock(extra?: InvoiceExtra): string {
-  if (!extra) return "";
-  const rows = (extra.lineItems ?? []).filter((l) => l && l.label);
-  const tableRows = rows.map((l) =>
-    `<tr><td style="padding:7px 0;color:#44403c;border-bottom:1px solid #FFE7DC">${esc(l.label)}</td>
-         <td style="padding:7px 0;color:#44403c;text-align:right;border-bottom:1px solid #FFE7DC;white-space:nowrap">${rands(l.amount)}</td></tr>`).join("");
-  const sumRow = (label: string, val: number, strong = false) =>
-    `<tr><td style="padding:5px 0;color:${strong ? "#1c1917" : "#57534e"};${strong ? "font-weight:700" : ""}">${esc(label)}</td>
-         <td style="padding:5px 0;text-align:right;color:${strong ? "#FA523C" : "#57534e"};${strong ? "font-weight:700" : ""};white-space:nowrap">${rands(val)}</td></tr>`;
-  const b = extra.banking;
-  const bankRow = (label: string, val?: string | null) => val ? `<tr><td style="padding:3px 0;color:#8a857f;width:130px">${esc(label)}</td><td style="padding:3px 0;color:#1c1917;font-weight:600">${esc(val)}</td></tr>` : "";
-  const bankingHtml = b && (b.account_number || b.bank_name) ? `
-    <div style="background:#fff;border:1px solid #FFE7DC;border-radius:12px;padding:16px 18px;margin:16px 0 0">
-      <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#FA523C;font-weight:700;margin-bottom:8px">Banking details (EFT)</div>
-      <table style="width:100%;border-collapse:collapse;font-size:14px">
-        ${bankRow("Account name", b.account_name)}
-        ${bankRow("Bank", b.bank_name)}
-        ${bankRow("Account number", b.account_number)}
-        ${bankRow("Branch code", b.branch_code)}
-        ${bankRow("SWIFT", b.swift)}
-        ${bankRow("IBAN", b.iban)}
-        ${extra.reference ? bankRow("Reference", extra.reference) : ""}
-      </table>
-    </div>` : "";
-
-  return `
-    <div style="background:#fff;border:1px solid #FFE7DC;border-radius:12px;padding:16px 18px;margin:8px 0 0">
-      <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#FA523C;font-weight:700;margin-bottom:8px">Your invoice</div>
-      <table style="width:100%;border-collapse:collapse;font-size:14px">
-        ${tableRows}
-        <tr><td colspan="2" style="padding:4px 0"></td></tr>
-        ${typeof extra.total === "number" ? sumRow("Total", extra.total, true) : ""}
-        ${typeof extra.paid === "number" && extra.paid > 0 ? sumRow("Paid", extra.paid) : ""}
-        ${typeof extra.balance === "number" ? sumRow("Balance outstanding", extra.balance, true) : ""}
-      </table>
-    </div>
-    ${bankingHtml}`;
-}
 
 // Brand-matched email shell (Poppy #FA523C / Peach / Cream) reused by reminders.
 function shell(opts: { eyebrow: string; heading: string; bodyHtml: string }): string {
@@ -165,7 +127,7 @@ export function depositReminder(
   const venueName = venueNameOf(wedding);
   const subject = `Deposit reminder & invoice — your wedding at ${venueName}`;
   const payLine = invoice?.banking
-    ? `<p style="color:#57534e;margin:0">Your invoice and EFT banking details are below.</p>`
+    ? `<p style="color:#57534e;margin:0">Your full invoice — with our EFT banking details for payment — is <b>attached as a PDF</b>.</p>`
     : `<p style="color:#57534e;margin:0">Pay by EFT or card — reply here for banking details or a payment link.</p>`;
   const html = shell({
     eyebrow: "Venuely",
@@ -175,8 +137,7 @@ export function depositReminder(
       <p style="margin:0 0 4px;color:#57534e">Deposit due:</p>
       <p style="font-size:24px;font-weight:600;margin:0 0 4px;color:#FA523C">${rands(amount)}</p>
       <p style="margin:0 0 16px;color:#57534e">Due ${dueDate ? `by <b>${esc(dueLabel(dueDate))}</b>` : "soon"}.</p>
-      ${payLine}
-      ${invoiceBlock(invoice)}`,
+      ${payLine}`,
   });
   const whatsappText = depositReminderMessage({ venueName, coupleNames: wedding.couple_names, amount, dueDate });
   return { subject, html, whatsappText };
@@ -191,7 +152,7 @@ export function balanceReminder(
   const venueName = venueNameOf(wedding);
   const subject = `Balance reminder & invoice — your wedding at ${venueName}`;
   const payLine = invoice?.banking
-    ? `<p style="color:#57534e;margin:0">Your invoice and EFT banking details are below.</p>`
+    ? `<p style="color:#57534e;margin:0">Your full invoice — with our EFT banking details for payment — is <b>attached as a PDF</b>.</p>`
     : `<p style="color:#57534e;margin:0">Reply here for banking details, a payment link, or to arrange anything else.</p>`;
   const html = shell({
     eyebrow: "Venuely",
@@ -201,8 +162,7 @@ export function balanceReminder(
       <p style="margin:0 0 4px;color:#57534e">Balance due:</p>
       <p style="font-size:24px;font-weight:600;margin:0 0 4px;color:#FA523C">${rands(amount)}</p>
       <p style="margin:0 0 16px;color:#57534e">Due ${dueDate ? `by <b>${esc(dueLabel(dueDate))}</b>` : "soon"}.</p>
-      ${payLine}
-      ${invoiceBlock(invoice)}`,
+      ${payLine}`,
   });
   const whatsappText = balanceReminderMessage({ venueName, coupleNames: wedding.couple_names, amount, dueDate });
   return { subject, html, whatsappText };

@@ -47,7 +47,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
   // dyno host (localhost:10000).
   const host = h.get("x-forwarded-host") || h.get("host") || "venuely.co.za";
   const proto = h.get("x-forwarded-proto") || "https";
-  const portalUrl = `${proto}://${host}/${slug}`;
+  const portalUrl = `${proto}://${host}/p/${slug}`;
 
   const { data: wedding } = await supabase
     .from("weddings")
@@ -288,8 +288,10 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
             </p>
           )}
         </div>
-        <Link href={`/${wedding.slug}`} target="_blank" className="vy-btn vy-btn-secondary">Open couple portal →</Link>
-        <Link href={`/p/${wedding.slug}`} target="_blank" className="vy-btn vy-btn-secondary">View new design (beta) →</Link>
+        <Link href={`/p/${wedding.slug}`} target="_blank" className="vy-btn vy-btn-secondary inline-flex items-center gap-1.5">
+          Open Couples Portal →
+          <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: "var(--peach)", color: "var(--poppy-deep)" }}>Beta</span>
+        </Link>
       </div>
 
       <PortalLinkCard

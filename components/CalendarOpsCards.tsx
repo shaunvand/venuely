@@ -107,7 +107,7 @@ export function WeddingOverviewCards({ cards }: { cards: OpsCard[] }) {
   if (!cards.length) return null;
 
   function copyPortal(slug: string, id: string) {
-    const url = `${typeof window !== "undefined" ? window.location.origin : "https://venuely.co.za"}/${slug}`;
+    const url = `${typeof window !== "undefined" ? window.location.origin : "https://venuely.co.za"}/p/${slug}`;
     navigator.clipboard?.writeText(url).then(() => { setCopiedId(id); setTimeout(() => setCopiedId(null), 1500); }).catch(() => {});
   }
 
@@ -155,7 +155,7 @@ export function WeddingOverviewCards({ cards }: { cards: OpsCard[] }) {
                 <details className="relative shrink-0">
                   <summary className="list-none cursor-pointer w-9 h-9 rounded-lg flex items-center justify-center font-semibold tracking-widest transition hover:bg-[color:var(--cream)]" style={{ border: "1px solid var(--line)", color: "var(--ink-2)" }}>…</summary>
                   <div className="absolute right-0 bottom-11 z-10 rounded-xl bg-white shadow-lg py-1 text-sm" style={{ border: "1px solid var(--line)", minWidth: 180 }}>
-                    <Link href={`/${c.slug}`} target="_blank" className="block px-3 py-2 hover:bg-[color:var(--cream)]">Open couple portal ↗</Link>
+                    <Link href={`/p/${c.slug}`} target="_blank" className="block px-3 py-2 hover:bg-[color:var(--cream)]">Open Couples Portal ↗</Link>
                     <button type="button" onClick={() => copyPortal(c.slug, c.id)} className="block w-full text-left px-3 py-2 hover:bg-[color:var(--cream)]">{copiedId === c.id ? "✓ Copied" : "Copy portal URL"}</button>
                   </div>
                 </details>

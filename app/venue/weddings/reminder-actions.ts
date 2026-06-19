@@ -15,6 +15,7 @@ import {
   type Charge, type Payment, type Computed,
 } from "@/lib/billing/compute";
 import { sendEmail, depositReminder, balanceReminder, type BankInfo, type InvoiceExtra } from "@/lib/notifications";
+import { buildInvoicePdf } from "@/lib/billing/invoice-pdf";
 import { nightsBetween, nightsLabel } from "@/lib/billing/charges";
 import { buildAreaPriceMap, type Season, type AreaPriceRow } from "@/lib/venue/seasons";
 
@@ -249,7 +250,15 @@ export async function sendDepositReminder(weddingId: string, slug: string): Prom
   if (!process.env.RESEND_API_KEY) return { ok: true, sent: false, amount, reason: "email_not_configured" };
   if (!wedding.couple_email) return { ok: true, sent: false, amount, reason: "no_email" };
 
-  const res = await sendEmail(wedding.couple_email, msg.subject, msg.html);
+  const pdf = await buildInvoicePdf({
+    venueName: wedding.venueName, coupleNames: wedding.couple_names, weddingDate: wedding.wedding_date,
+    reference: wedding.couple_names, lineItems: invoice.lineItems ?? [],
+    total: invoice.total ?? 0, paid: invoice.paid ?? 0, balance: invoice.balance ?? 0,
+    amountDueNow: amount, amountDueLabel: "Deposit due", dueDate: wedding.deposit_due_at, banking,
+  });
+  const res = await sendEmail(wedding.couple_email, msg.subject, msg.html, {
+    attachments: [{ filename: pdf.filename, content: pdf.base64 }],
+  });
   revalidatePath(`/venue/weddings/${slug}`);
   return { ok: true, sent: res.sent, amount, reason: res.sent ? undefined : "send_failed" };
 }
@@ -274,7 +283,15 @@ export async function sendBalanceReminder(weddingId: string, slug: string): Prom
   if (!process.env.RESEND_API_KEY) return { ok: true, sent: false, amount, reason: "email_not_configured" };
   if (!wedding.couple_email) return { ok: true, sent: false, amount, reason: "no_email" };
 
-  const res = await sendEmail(wedding.couple_email, msg.subject, msg.html);
+  const pdf = await buildInvoicePdf({
+    venueName: wedding.venueName, coupleNames: wedding.couple_names, weddingDate: wedding.wedding_date,
+    reference: wedding.couple_names, lineItems: invoice.lineItems ?? [],
+    total: invoice.total ?? 0, paid: invoice.paid ?? 0, balance: invoice.balance ?? 0,
+    amountDueNow: amount, amountDueLabel: "Balance due", dueDate: wedding.balance_due_at, banking,
+  });
+  const res = await sendEmail(wedding.couple_email, msg.subject, msg.html, {
+    attachments: [{ filename: pdf.filename, content: pdf.base64 }],
+  });
   revalidatePath(`/venue/weddings/${slug}`);
   return { ok: true, sent: res.sent, amount, reason: res.sent ? undefined : "send_failed" };
 }
