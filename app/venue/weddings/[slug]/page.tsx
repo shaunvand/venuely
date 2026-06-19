@@ -288,10 +288,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
             </p>
           )}
         </div>
-        <Link href={`/p/${wedding.slug}`} target="_blank" className="vy-btn vy-btn-secondary inline-flex items-center gap-1.5">
-          Open Couples Portal →
-          <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: "var(--peach)", color: "var(--poppy-deep)" }}>Beta</span>
-        </Link>
+        <Link href={`/p/${wedding.slug}`} target="_blank" className="vy-btn vy-btn-secondary">Open Couples Portal →</Link>
       </div>
 
       <PortalLinkCard
