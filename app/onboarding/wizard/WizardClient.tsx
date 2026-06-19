@@ -566,11 +566,11 @@ function StepSpaces({
   const total = areasCount + added.length;
   const done = spacesDone || added.length > 0;
 
-  // Pre-fill from the venue's website (once, only when starting empty) so the
-  // owner reviews-and-edits instead of typing every space from scratch.
-  useEffect(() => {
-    if (!venueId || areasCount > 0) return;
-    let cancelled = false;
+  // Pre-fill from the venue's website. The API dedupes against spaces the venue
+  // already has, so this is safe to run even when some exist (it only surfaces
+  // NEW discoverable spaces). Runs once on mount and on demand via the button.
+  function loadSuggestions() {
+    if (!venueId) return;
     setSuggestState("loading");
     fetch("/api/venue/suggest-spaces", {
       method: "POST",
@@ -579,14 +579,13 @@ function StepSpaces({
     })
       .then((r) => r.json())
       .then((j) => {
-        if (cancelled) return;
         const list = Array.isArray(j?.categories) ? (j.categories as SugCategory[]) : [];
         setSuggestions(list);
         setSuggestState(list.length ? "ready" : "empty");
       })
-      .catch(() => { if (!cancelled) setSuggestState("empty"); });
-    return () => { cancelled = true; };
-  }, [venueId, areasCount]);
+      .catch(() => setSuggestState("empty"));
+  }
+  useEffect(() => { if (venueId) loadSuggestions(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [venueId]);
 
   // Save a category + its sub-areas via the API route (NOT a server action), so
   // the wizard never route-refreshes mid-add and the step/progress is preserved.
@@ -704,7 +703,17 @@ function StepSpaces({
       {suggestState === "loading" && (
         <div className="rounded-xl p-4 mb-4 flex items-center gap-3 text-sm" style={{ border: "1px solid var(--line)", background: "var(--cream)" }}>
           <span className="inline-block w-4 h-4 rounded-full border-2 border-[var(--poppy)] border-t-transparent animate-spin" />
-          <span style={{ color: "var(--ink-2)" }}>Reading your website to pre-fill your spaces…</span>
+          <span style={{ color: "var(--ink-2)" }}>Reading your website for spaces — this can take a few seconds…</span>
+        </div>
+      )}
+
+      {/* No suggestions found / not run yet → offer a manual AI trigger. */}
+      {(suggestState === "empty" || suggestState === "idle") && (
+        <div className="rounded-xl p-4 mb-4 flex items-center justify-between gap-3 flex-wrap text-sm" style={{ border: "1px solid var(--line)", background: "var(--cream)" }}>
+          <span style={{ color: "var(--ink-2)" }}>
+            {suggestState === "empty" ? "No new spaces found on your website automatically." : "Pull your spaces in from your website with AI."}
+          </span>
+          <button type="button" onClick={loadSuggestions} className="vy-btn vy-btn-secondary whitespace-nowrap">✨ Find spaces from my website</button>
         </div>
       )}
 

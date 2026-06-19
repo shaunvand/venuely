@@ -81,7 +81,7 @@ function parseCategories(text: string) {
 }
 
 // Strip markup to readable text for the model (cheap + avoids huge token bills).
-function htmlToText(html: string): string {
+function htmlToText(html: string, cap = 24_000): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
@@ -90,7 +90,40 @@ function htmlToText(html: string): string {
     .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 24_000);
+    .slice(0, cap);
+}
+
+// Discover internal links worth crawling for SPACE info (weddings/functions/venue/
+// ceremony/reception/accommodation pages), where venues actually list their areas.
+const SPACE_HINT = /(wedding|function|venue|ceremony|reception|space|hall|chapel|garden|lawn|marquee|accommodat|cottage|glamping|event|celebrat)/i;
+function discoverLinks(html: string, base: URL, max = 4): URL[] {
+  const out: URL[] = [];
+  const seen = new Set<string>([base.pathname.replace(/\/+$/, "")]);
+  for (const m of html.matchAll(/<a[^>]+href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    if (out.length >= max) break;
+    const href = m[1], anchor = m[2].replace(/<[^>]+>/g, " ");
+    if (!SPACE_HINT.test(href) && !SPACE_HINT.test(anchor)) continue;
+    let u: URL;
+    try { u = new URL(href, base); } catch { continue; }
+    if (u.hostname !== base.hostname) continue;             // same site only
+    const key = u.pathname.replace(/\/+$/, "");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    try { assertSafeUrl(u); } catch { continue; }
+    out.push(u);
+  }
+  return out;
+}
+
+async function fetchText(u: URL, cap: number): Promise<string> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 9000);
+  try {
+    const res = await safeFetch(u, { signal: ctrl.signal, headers: { "User-Agent": "VenuelySpacesBot/1.0 (+https://venuely.co.za)" } });
+    if (!res.ok) return "";
+    return (await res.text()).slice(0, 600_000);
+  } catch { return ""; }
+  finally { clearTimeout(timer); }
 }
 
 export async function POST(req: NextRequest) {
@@ -109,23 +142,14 @@ export async function POST(req: NextRequest) {
     try { parsed = new URL(target); assertSafeUrl(parsed); }
     catch { return NextResponse.json({ ok: true, categories: [], reason: "bad_url" }); }
 
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 12000);
-    let html = "";
-    try {
-      const res = await safeFetch(parsed, {
-        signal: ctrl.signal,
-        headers: { "User-Agent": "VenuelySpacesBot/1.0 (+https://venuely.co.za)" },
-      });
-      if (!res.ok) return NextResponse.json({ ok: true, categories: [], reason: "fetch_failed" });
-      html = await res.text();
-    } catch {
-      return NextResponse.json({ ok: true, categories: [], reason: "unreachable" });
-    } finally {
-      clearTimeout(timer);
-    }
+    const homeHtml = await fetchText(parsed, 600_000);
+    if (!homeHtml) return NextResponse.json({ ok: true, categories: [], reason: "unreachable" });
 
-    const text = htmlToText(html);
+    // Homepage text + a few relevant sub-pages (weddings/functions/venue/accommodation),
+    // where the actual ceremony/reception/space listings usually live.
+    const subPages = discoverLinks(homeHtml, parsed, 4);
+    const subTexts = await Promise.all(subPages.map((u) => fetchText(u, 200_000).then((h) => h ? htmlToText(h, 12_000) : "")));
+    const text = [htmlToText(homeHtml, 16_000), ...subTexts.filter(Boolean)].join("\n\n---\n\n").slice(0, 40_000);
     if (text.length < 80) return NextResponse.json({ ok: true, categories: [], reason: "empty_site" });
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -134,12 +158,21 @@ export async function POST(req: NextRequest) {
 
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1500,
+      max_tokens: 2000,
       messages: [{ role: "user", content: `${INSTRUCTION}\n\nWEBSITE (${parsed.hostname}):\n${text}` }],
     });
     const out = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-    const categories = parseCategories(out);
-    if (!categories) return NextResponse.json({ ok: true, categories: [], reason: "parse_failed" });
+    const parsed2 = parseCategories(out);
+    if (!parsed2) return NextResponse.json({ ok: true, categories: [], reason: "parse_failed" });
+
+    // Drop areas the venue already has (so this is safe to run even when some
+    // spaces exist) — match on a normalised name.
+    const { data: existing } = await a.auth.from("venue_areas").select("name").eq("venue_id", venue_id);
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const have = new Set((existing ?? []).map((r) => norm(String(r.name))));
+    const categories = (parsed2.filter(Boolean) as Array<{ category: string; location: string; areas: Array<{ name: string; pricing: string; price: number | null }> }>)
+      .map((c) => ({ ...c, areas: c.areas.filter((ar) => !have.has(norm(ar.name))) }))
+      .filter((c) => c.areas.length > 0);
 
     return NextResponse.json({ ok: true, categories, site: parsed.hostname });
   } catch (e) {
