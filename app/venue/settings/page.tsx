@@ -4,6 +4,7 @@ import { VenueAddressPicker } from "@/components/VenueAddressPicker";
 import { LogoUploadField } from "@/components/SetupVenueForm";
 import { updateVenue } from "./actions";
 import { SaveButton } from "@/components/SaveButton";
+import { BrandColourField } from "@/components/BrandColourField";
 
 export default async function VenueSettings({
   searchParams,
@@ -136,17 +137,9 @@ export default async function VenueSettings({
           />
         </section>
 
-        <section className="space-y-1">
+        <section className="space-y-2">
           <label className="text-sm font-medium">Brand colour</label>
-          <div className="flex items-center gap-3">
-            <input
-              name="branding_primary"
-              type="color"
-              defaultValue={venue.branding_primary ?? "#0a4a3a"}
-              className="h-10 w-20 border rounded cursor-pointer"
-            />
-            <span className="text-xs text-stone-500">Used on couple portal headers + buttons. Default is deep green.</span>
-          </div>
+          <BrandColourField name="branding_primary" defaultValue={venue.branding_primary ?? "#0a4a3a"} />
         </section>
 
         <section>
