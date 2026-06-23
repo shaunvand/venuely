@@ -12,6 +12,7 @@ import {
   type Charge, type Payment, type Computed,
 } from "@/lib/billing/compute";
 import { buildAreaPriceMap, type Season, type AreaPriceRow } from "@/lib/venue/seasons";
+import { catalogueQuantity } from "@/lib/billing/catalogue-qty";
 
 type WeddingState = {
   rentalSelections?: Record<string, { sel?: boolean; qty?: number; mg?: boolean; wed?: boolean; fb?: boolean }>;
@@ -78,7 +79,7 @@ export async function buildWeddingCharges(
 
   const [rentalsRes, cataRes, accomRes, vendorsRes, areasRes, areaPricingRes, seasonsRes, paymentsRes, chargesRes] = await Promise.all([
     supabase.from("rental_items").select("id, name, price, commission_value, commission_type, item_code, cost_treatment").eq("venue_id", venueId),
-    supabase.from("catalogue_items").select("id, name, price, commission_value, commission_type, cost_treatment").eq("venue_id", venueId),
+    supabase.from("catalogue_items").select("id, name, price, price_unit, commission_value, commission_type, cost_treatment").eq("venue_id", venueId),
     supabase.from("accommodation_rooms").select("id, name, price_per_night, commission_value, commission_type, cost_treatment").eq("venue_id", venueId),
     supabase.from("vendor_partners").select("id, name, vendor_type, price_from, commission_value, commission_type, cost_treatment").eq("venue_id", venueId),
     supabase.from("venue_areas").select("id, name, slug, area_kind").eq("venue_id", venueId).eq("active", true),
@@ -117,8 +118,16 @@ export async function buildWeddingCharges(
     charges.push({ kind: "rental", label: item.name, qty: units, unit_price: unit, amount: included ? 0 : unit * units, base_amount: included ? 0 : baseUnit * units, is_refundable: false });
   }
 
-  // Catalogue (per-head)
-  const guestCount = wedding.guest_count ?? 0;
+  // Catalogue — quantity depends on price_unit + thresholds in the item name
+  // (flat venue extras are NOT × guests; per-head items scale by the confirmed
+  // guest count; "...over N"/">N pax" fees only apply past the threshold).
+  // Confirmed guests: actual RSVP "attending" headcount when any have responded,
+  // else the couple's guest_count estimate.
+  const { data: guestRows } = await supabase
+    .from("guests").select("rsvp_status, party_size").eq("wedding_id", weddingId);
+  const attending = (guestRows ?? []).filter((g) => /attend|yes|going|accept|confirm/i.test(String(g.rsvp_status ?? "")));
+  const confirmedHeads = attending.reduce((s, g) => s + Math.max(1, Number(g.party_size) || 1), 0);
+  const guestCount = confirmedHeads > 0 ? confirmedHeads : (wedding.guest_count ?? 0);
   for (const [code, v] of Object.entries(state.catalogueSelections ?? {})) {
     if (!v.sel && !v.mg && !v.wed && !v.fb) continue;
     const item = cataMap.get(code); if (!item) continue;
@@ -126,7 +135,8 @@ export async function buildWeddingCharges(
     const baseUnit = Number(item.price);
     const unit = applyMarkup(baseUnit, item.commission_value, item.commission_type);
     const included = (item as { cost_treatment?: string }).cost_treatment === "included";
-    const units = dayCount * guestCount;
+    const q = catalogueQuantity({ name: item.name, priceUnit: (item as { price_unit?: string }).price_unit, guests: guestCount, days: dayCount });
+    const units = q.units;
     charges.push({ kind: "catalogue", label: item.name, qty: units, unit_price: unit, amount: included ? 0 : unit * units, base_amount: included ? 0 : baseUnit * units, is_refundable: false });
   }
 

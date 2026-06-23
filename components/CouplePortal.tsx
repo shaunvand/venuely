@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { catalogueQuantity } from "@/lib/billing/catalogue-qty";
 import { useRouter } from "next/navigation";
 import type { TemplateTokens, PortalTheme } from "@/lib/portal/templates";
 import { GuestManager } from "@/components/GuestManager";
@@ -83,7 +84,7 @@ const DAY_TYPES: { key: "mg" | "wed" | "fb"; label: string }[] = [
   { key: "mg", label: "M&G" }, { key: "wed", label: "Wedding" }, { key: "fb", label: "Farewell" },
 ];
 
-type CatItem = { id: string; category: string; name: string; description: string; img: string | null; price?: number; included: boolean; eventPart?: string | null };
+type CatItem = { id: string; category: string; name: string; description: string; img: string | null; price?: number; priceUnit?: string | null; included: boolean; eventPart?: string | null };
 type RentItem = CatItem & { price: number };
 type RoomItem = { id: string; name: string; type: string; sleeps: number; description: string; img: string | null; price: number };
 type VendorItem = { id: string; type: string; name: string; description: string; img: string | null; price: number | null; email: string | null; phone: string | null; website: string | null; commissionValue?: number | null; commissionType?: string | null };
@@ -164,7 +165,7 @@ function groupBy<T>(items: T[], key: (t: T) => string): [string, T[]][] {
 }
 
 export function CouplePortal({
-  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, weddingDate, weddingEndDate, totalDue, initialState, catalogue, rentals, rooms, vendors, introducedVendorIds = [], gallery, tables, areas = [], initialAreaSelections = [], messageThreads = [],
+  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, weddingDate, weddingEndDate, totalDue, guestCount = 0, initialState, catalogue, rentals, rooms, vendors, introducedVendorIds = [], gallery, tables, areas = [], initialAreaSelections = [], messageThreads = [],
 }: {
   slug: string;
   tokens: TemplateTokens;
@@ -178,6 +179,7 @@ export function CouplePortal({
   weddingDate: string | null;
   weddingEndDate: string | null;
   totalDue: number;
+  guestCount?: number;
   initialState: WState;
   catalogue: CatItem[];
   rentals: RentItem[];
@@ -773,14 +775,26 @@ export function CouplePortal({
               {!anyLines && <p style={{ color: "#57534e", fontSize: 14, marginTop: 18 }}>Nothing selected yet — add catering, rentals or accommodation from their tabs and they&apos;ll appear here.</p>}
 
               {catLines.length > 0 && <>
-                <div style={secHead}>Catering &amp; menu <span style={{ color: "#c9c4be" }}>· per guest</span></div>
-                {catLines.map((it) => (
-                  <div key={it.id} style={rowWrap}>
-                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: "#1c1917" }}>{it.name}</div><div style={{ fontSize: 12, color: "#8a8a8a" }}>{dayCount(catSel[it.id])} day{dayCount(catSel[it.id]) === 1 ? "" : "s"}{it.included ? " · Included" : ""}</div></div>
-                    <div style={{ color: primary, fontWeight: 700, whiteSpace: "nowrap" }}>{it.price ? `${rZA(it.price)}/guest` : "—"}</div>
-                    {!it.included && <button title="Remove" style={delBtn} onClick={() => toggleCat(it)}>✕</button>}
-                  </div>
-                ))}
+                <div style={secHead}>Catering &amp; venue extras</div>
+                {catLines.map((it) => {
+                  const days = dayCount(catSel[it.id]);
+                  const q = catalogueQuantity({ name: it.name, priceUnit: it.priceUnit, guests: guestCount, days });
+                  const rate = it.price ?? 0;
+                  const amount = rate * q.units;
+                  // Sub-line: how it's charged (flat / per guest × N / per day / threshold).
+                  const sub = it.included ? `${days} day${days === 1 ? "" : "s"} · Included`
+                    : q.basis === "per_person" ? `${rZA(rate)} × ${guestCount || "—"} guest${guestCount === 1 ? "" : "s"}${days > 1 ? ` × ${days} days` : ""}`
+                    : q.basis === "tier_overage" ? `${rZA(rate)} × ${q.applies ? q.units : 0} (${q.perUnitNote})`
+                    : q.basis === "conditional" ? (q.applies ? `${rZA(rate)}${days > 1 ? ` × ${days} days` : ""} · ${q.perUnitNote}` : q.perUnitNote)
+                    : q.basis === "per_day" ? `${rZA(rate)} × ${days} day${days === 1 ? "" : "s"}` : "Flat fee";
+                  return (
+                    <div key={it.id} style={{ ...rowWrap, opacity: !it.included && !q.applies ? 0.55 : 1 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: "#1c1917" }}>{it.name}</div><div style={{ fontSize: 12, color: "#8a8a8a" }}>{sub}</div></div>
+                      <div style={{ color: primary, fontWeight: 700, whiteSpace: "nowrap", minWidth: 70, textAlign: "right" }}>{it.included ? "Included" : q.applies ? rZA(amount) : "—"}</div>
+                      {!it.included && <button title="Remove" style={delBtn} onClick={() => toggleCat(it)}>✕</button>}
+                    </div>
+                  );
+                })}
               </>}
 
               {rentLines.length > 0 && <>

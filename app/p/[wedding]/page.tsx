@@ -29,9 +29,9 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
   const vId = access.wedding.venue_id;
 
   const [wedRes, venRes, catRes, rentRes, roomRes, vendRes, galRes, tableRes, areaRes, areaPriceRes, areaImgRes, areaGroupRes, seasonRes] = await Promise.all([
-    db.from("weddings").select("id, slug, couple_names, wedding_date, wedding_end_date, wedding_state, area_selections").eq("id", wId).single(),
+    db.from("weddings").select("id, slug, couple_names, wedding_date, wedding_end_date, wedding_state, area_selections, guest_count").eq("id", wId).single(),
     db.from("venues").select("name, region, address, portal_template, portal_theme, branding_logo_url, contact_email, contact_phone, google_maps_url, description").eq("id", vId).single(),
-    db.from("catalogue_items").select("id, category, name, description, price, image_url, cost_treatment, commission_value, commission_type, event_part, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
+    db.from("catalogue_items").select("id, category, name, description, price, price_unit, image_url, cost_treatment, commission_value, commission_type, event_part, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
     db.from("rental_items").select("id, category, name, description, price, image_url, cost_treatment, commission_value, commission_type, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
     db.from("accommodation_rooms").select("id, name, room_type, sleeps, description, price_per_night, hero_image_url, image_url, commission_value, commission_type, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
     db.from("vendor_partners").select("id, vendor_type, name, description, price_from, image_url, contact_email, contact_phone, website_url, commission_value, commission_type, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
@@ -90,7 +90,7 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
   const initialAreaSelections = (wedding.area_selections ?? []) as Array<{ area_id: string; day_type: string }>;
 
   const num = (n: unknown) => Number(n ?? 0);
-  const catalogue = (catRes.data ?? []).map((c) => ({ id: c.id, category: c.category, name: c.name, description: c.description ?? "", img: (c.image_url as string) ?? null, price: applyMarkup(num(c.price), c.commission_value, c.commission_type), included: (c.cost_treatment as string) === "included", eventPart: (c.event_part as string) ?? null }));
+  const catalogue = (catRes.data ?? []).map((c) => ({ id: c.id, category: c.category, name: c.name, description: c.description ?? "", img: (c.image_url as string) ?? null, price: applyMarkup(num(c.price), c.commission_value, c.commission_type), priceUnit: (c.price_unit as string) ?? null, included: (c.cost_treatment as string) === "included", eventPart: (c.event_part as string) ?? null }));
   const rentals = (rentRes.data ?? []).map((r) => ({ id: r.id, category: r.category, name: r.name, description: r.description ?? "", img: (r.image_url as string) ?? null, price: applyMarkup(num(r.price), r.commission_value, r.commission_type), included: (r.cost_treatment as string) === "included" }));
   const rooms = (roomRes.data ?? []).map((r) => ({ id: r.id, name: r.name, type: (r.room_type as string) ?? "Room", sleeps: num(r.sleeps), description: r.description ?? "", img: (r.hero_image_url as string) || (r.image_url as string) || null, price: applyMarkup(num(r.price_per_night), r.commission_value, r.commission_type) }));
   const vendors = (vendRes.data ?? []).map((v) => ({ id: v.id, type: (v.vendor_type as string) ?? "vendor", name: v.name, description: v.description ?? "", img: (v.image_url as string) ?? null, price: v.price_from == null ? null : applyMarkup(num(v.price_from), v.commission_value, v.commission_type), email: (v.contact_email as string) ?? null, phone: (v.contact_phone as string) ?? null, website: (v.website_url as string) ?? null, commissionValue: v.commission_value == null ? null : Number(v.commission_value), commissionType: (v.commission_type as string) ?? null }));
@@ -181,6 +181,7 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
       weddingDate={wedding.wedding_date ? String(wedding.wedding_date).slice(0, 10) : null}
       weddingEndDate={wedding.wedding_end_date ? String(wedding.wedding_end_date).slice(0, 10) : null}
       totalDue={totals?.grandTotal ?? 0}
+      guestCount={Number((wedding as { guest_count?: number }).guest_count ?? 0)}
       initialState={state}
       catalogue={catalogue}
       rentals={rentals}
