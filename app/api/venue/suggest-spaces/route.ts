@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { createClient as createAdmin } from "@supabase/supabase-js";
 import { assertSafeUrl, safeFetch } from "@/lib/security/guards";
 import Anthropic from "@anthropic-ai/sdk";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+// Service-role client for reads AFTER membership is verified — avoids any RLS /
+// session-cookie subtlety reading the venue's own website + existing areas.
+function admin() {
+  return createAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
 
 // Suggest a venue's bookable spaces from its website, so the onboarding "Your
 // spaces" step starts pre-filled instead of blank. We fetch the homepage (best
@@ -139,7 +148,8 @@ export async function POST(req: NextRequest) {
     const a = await authVenue(String(venue_id));
     if (!a.ok) return NextResponse.json({ error: a.error }, { status: a.status });
 
-    const { data: venue } = await a.auth.from("venues").select("website").eq("id", venue_id).maybeSingle();
+    const db = admin();
+    const { data: venue } = await db.from("venues").select("website").eq("id", venue_id).maybeSingle();
     let target = String(venue?.website ?? "").trim();
     if (!target) return NextResponse.json({ ok: true, categories: [], reason: "no_website" });
     if (!/^https?:\/\//i.test(target)) target = `https://${target}`;
@@ -175,7 +185,7 @@ export async function POST(req: NextRequest) {
 
     // Drop areas the venue already has (so this is safe to run even when some
     // spaces exist) — match on a normalised name.
-    const { data: existing } = await a.auth.from("venue_areas").select("name").eq("venue_id", venue_id);
+    const { data: existing } = await db.from("venue_areas").select("name").eq("venue_id", venue_id);
     const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     const have = new Set((existing ?? []).map((r) => norm(String(r.name))));
     const categories = (parsed2.filter(Boolean) as Array<{ category: string; location: string; areas: Array<{ name: string; pricing: string; price: number | null }> }>)
