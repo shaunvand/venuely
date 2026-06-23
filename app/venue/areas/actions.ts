@@ -143,6 +143,27 @@ export async function updateAreaPrice(areaId: string, dayType: string, seasonId:
   revalidatePath("/venue/areas");
 }
 
+// Bulk version of updateAreaPrice — commits every price field on the Areas page
+// at once (the sticky "Save changes" bar). Each item is a delete-then-insert of
+// the matching (area_id, day_type, season_id) row, same as the single-field save.
+export async function saveAllAreaPrices(
+  items: { areaId: string; dayType: string; seasonId: string | null; price: number }[],
+) {
+  const supabase = await createClient();
+  for (const it of items) {
+    if (!it.areaId || !it.dayType) continue;
+    const sid = it.dayType === "wedding" ? (it.seasonId && it.seasonId !== "none" ? it.seasonId : null) : null;
+    const price = Number.isFinite(it.price) ? it.price : 0;
+    let del = supabase.from("area_pricing").delete().eq("area_id", it.areaId).eq("day_type", it.dayType);
+    del = sid === null ? del.is("season_id", null) : del.eq("season_id", sid);
+    const { error: delError } = await del;
+    if (delError) throw new Error(delError.message);
+    const { error } = await supabase.from("area_pricing").insert({ area_id: it.areaId, day_type: it.dayType, price, season_id: sid });
+    if (error) throw new Error(error.message);
+  }
+  revalidatePath("/venue/areas");
+}
+
 export async function assignAreaGroup(areaId: string, groupId: string | null) {
   const supabase = await createClient();
   const group_id = groupId && groupId !== "none" ? groupId : null;

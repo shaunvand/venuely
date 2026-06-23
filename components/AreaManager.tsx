@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   updateArea, updateAreaPrice, toggleAreaActive, deleteArea,
-  addAreaImages, deleteAreaImage, assignAreaGroup,
+  addAreaImages, deleteAreaImage, assignAreaGroup, saveAllAreaPrices,
 } from "@/app/venue/areas/actions";
 import { type SeasonRow, type GroupRow, seasonRangeLabel, GroupBadges } from "@/components/SeasonsManager";
 
@@ -76,6 +76,63 @@ export function AreaManager({
           ))}
         </section>
       ))}
+    </div>
+  );
+}
+
+// Sticky bottom bar that commits every price field on the page in one click,
+// so the venue doesn't have to press each per-field "Save", then lets them move
+// on to the next setup step.
+export function AreaSaveBar({ nextHref = "/venue/seating", nextLabel = "Seating & tables" }: { nextHref?: string; nextLabel?: string }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  function saveAll() {
+    setErr(null);
+    setSaved(false);
+    const inputs = Array.from(document.querySelectorAll<HTMLInputElement>("input[data-area-price]"));
+    const items = inputs.map((el) => ({
+      areaId: el.dataset.areaId || "",
+      dayType: el.dataset.dayType || "",
+      seasonId: el.dataset.seasonId ? el.dataset.seasonId : null,
+      price: Number(el.value || 0),
+    })).filter((i) => i.areaId && i.dayType);
+    startTransition(async () => {
+      try {
+        await saveAllAreaPrices(items);
+        setSaved(true);
+        router.refresh();
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : "Save failed");
+      }
+    });
+  }
+
+  return (
+    <div
+      className="sticky bottom-0 z-30 -mx-4 sm:-mx-6 mt-4 px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap"
+      style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(6px)", borderTop: "1px solid var(--line)" }}
+    >
+      <div className="text-xs" style={{ color: "var(--ink-2)" }}>
+        {err ? <span style={{ color: "#b42318" }}>{err}</span>
+          : saved ? <span style={{ color: "#15803d" }}>✓ All area prices saved</span>
+          : "Saves every area price on this page at once."}
+      </div>
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={saveAll} disabled={isPending} className="vy-btn vy-btn-primary disabled:opacity-60">
+          {isPending ? "Saving…" : "Save changes"}
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push(nextHref)}
+          className="vy-btn vy-btn-secondary whitespace-nowrap"
+          title={`Continue to ${nextLabel}`}
+        >
+          {nextLabel} →
+        </button>
+      </div>
     </div>
   );
 }
@@ -274,7 +331,7 @@ function AreaCard({
           <form action={updateAreaPrice.bind(null, area.id, "wedding", null)} className="space-y-1 max-w-xs">
             <label className="vy-label">Wedding (R)</label>
             <div className="flex gap-2">
-              <input name="price" type="number" step="0.01" min="0" defaultValue={priceFor(area.priceRows, "wedding", null)} className="vy-input" />
+              <input name="price" type="number" step="0.01" min="0" defaultValue={priceFor(area.priceRows, "wedding", null)} className="vy-input" data-area-price data-area-id={area.id} data-day-type="wedding" data-season-id="" />
               <button className="vy-btn vy-btn-secondary text-xs whitespace-nowrap">Save</button>
             </div>
           </form>
@@ -284,7 +341,7 @@ function AreaCard({
               <form key={s.id} action={updateAreaPrice.bind(null, area.id, "wedding", s.id)} className="space-y-1">
                 <label className="vy-label">{s.name} <span style={{ color: "var(--ink-2)", fontWeight: 400 }}>· {seasonRangeLabel(s)}</span></label>
                 <div className="flex gap-2">
-                  <input name="price" type="number" step="0.01" min="0" defaultValue={priceFor(area.priceRows, "wedding", s.id)} className="vy-input" />
+                  <input name="price" type="number" step="0.01" min="0" defaultValue={priceFor(area.priceRows, "wedding", s.id)} className="vy-input" data-area-price data-area-id={area.id} data-day-type="wedding" data-season-id={s.id} />
                   <button className="vy-btn vy-btn-secondary text-xs whitespace-nowrap">Save</button>
                 </div>
               </form>
@@ -299,7 +356,7 @@ function AreaCard({
             <form key={dt.key} action={updateAreaPrice.bind(null, area.id, dt.key, null)} className="space-y-1">
               <label className="vy-label">{dt.label} (R)</label>
               <div className="flex gap-2">
-                <input name="price" type="number" step="0.01" min="0" defaultValue={priceFor(area.priceRows, dt.key, null)} className="vy-input" />
+                <input name="price" type="number" step="0.01" min="0" defaultValue={priceFor(area.priceRows, dt.key, null)} className="vy-input" data-area-price data-area-id={area.id} data-day-type={dt.key} data-season-id="" />
                 <button className="vy-btn vy-btn-secondary text-xs whitespace-nowrap">Save</button>
               </div>
             </form>

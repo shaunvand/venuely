@@ -1,7 +1,7 @@
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
 import { addArea } from "./actions";
-import { AreaManager, type AreaRow } from "@/components/AreaManager";
+import { AreaManager, AreaSaveBar, type AreaRow } from "@/components/AreaManager";
 import { SeasonsManager, type SeasonRow, type GroupRow } from "@/components/SeasonsManager";
 
 export default async function VenueAreas() {
@@ -109,6 +109,8 @@ export default async function VenueAreas() {
       </form>
 
       <AreaManager venueId={venue.id} areas={areaRows} gallery={galleryImgs} seasons={seasonRows} groups={groupRows} />
+
+      {areaRows.length > 0 && <AreaSaveBar />}
     </div>
   );
 }
