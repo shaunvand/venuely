@@ -322,6 +322,15 @@ export function PortalDesigner({
           </div>
 
           {msg && <p className="text-xs" style={{ color: msg.includes("✓") ? "#1f5d3e" : "var(--poppy)" }}>{msg}</p>}
+
+          {/* Second save action at the bottom — so you don't have to scroll back
+              up to the header button after editing colours/logo/cover. */}
+          <div className="flex items-center justify-end gap-3 pt-2 border-t" style={{ borderColor: "var(--line)" }}>
+            {saved && <span className="text-xs" style={{ color: "#1f5d3e" }}>Saved ✓</span>}
+            <button onClick={save} disabled={isPending} className="vy-btn vy-btn-primary">
+              {isPending ? "Saving…" : "Save design"}
+            </button>
+          </div>
       </div>
     </section>
   );
