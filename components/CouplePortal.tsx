@@ -200,25 +200,24 @@ export function CouplePortal({
     check(); window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
-  // Persist the active tab in the URL hash so a refresh restores the same tab
-  // (e.g. Accommodation) instead of dropping back to Overview. Hydration-safe:
-  // the server + first client render are always "Overview"; this syncs on mount,
-  // and also honours back/forward navigation between tabs.
+  // Remember the active tab across page refreshes AND soft router.refresh()
+  // re-renders (selecting a rental/catalogue item calls router.refresh to
+  // recompute the total) so the couple stays on the tab they're working in
+  // instead of being dropped back to Overview. We use sessionStorage rather than
+  // history.replaceState — manual replaceState interferes with the Next App
+  // Router and was itself bouncing the page to Overview on refresh.
+  // Hydration-safe: server + first client render are always "Overview", restored
+  // on mount.
   useEffect(() => {
-    const fromHash = () => {
-      const raw = decodeURIComponent(window.location.hash.replace(/^#/, ""));
-      if (raw && (TABS as readonly string[]).includes(raw)) setTab(raw as Tab);
-    };
-    fromHash();
-    window.addEventListener("hashchange", fromHash);
-    return () => window.removeEventListener("hashchange", fromHash);
-  }, []);
+    try {
+      const saved = sessionStorage.getItem(`vy-tab-${slug}`);
+      if (saved && (TABS as readonly string[]).includes(saved)) setTab(saved as Tab);
+    } catch { /* sessionStorage unavailable — keep default */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug]);
   useEffect(() => {
-    const target = `#${encodeURIComponent(tab)}`;
-    if (typeof window !== "undefined" && window.location.hash !== target) {
-      window.history.replaceState(null, "", target);
-    }
-  }, [tab]);
+    try { sessionStorage.setItem(`vy-tab-${slug}`, tab); } catch { /* ignore */ }
+  }, [tab, slug]);
   const [rentFilter, setRentFilter] = useState("All");
   const [rentFolder, setRentFolder] = useState<"all" | "included" | "extra">("all");
   const [vibesOpen, setVibesOpen] = useState(false); // "For the Vibes" sidebar group
