@@ -32,7 +32,7 @@ export function DashboardWelcomeModal() {
     try {
       const raw = localStorage.getItem("vy-step-hints");
       const done = raw ? (JSON.parse(raw).done ?? []) : [];
-      if (!Array.isArray(done) || done.length < 4) {
+      if (!Array.isArray(done) || done.length < 5) {
         localStorage.setItem("vy-step-hints", JSON.stringify({ active: true, done: Array.isArray(done) ? done : [] }));
         window.dispatchEvent(new Event("venuely:step-hints"));
       }

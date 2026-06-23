@@ -7,14 +7,19 @@ import { useEffect, useState } from "react";
 // Onboarding step → the page that "completes" it. After the welcome popup closes
 // (DashboardWelcomeModal), a breathing numbered badge appears on each step's nav
 // entry; visiting that page clears its badge for good (persisted in localStorage).
+const TOTAL_STEPS = 5;
 const STEP_MATCH: { n: number; path: string }[] = [
   { n: 1, path: "/venue/your-venue" },  // Couple Experience (top link)
-  { n: 2, path: "/venue/billing" },     // Invoicing & Banking (Money group)
-  { n: 3, path: "/venue/catalogue" },   // Marketplace (Marketplace group)
-  { n: 4, path: "/venue/weddings" },    // First Wedding (top link)
+  { n: 2, path: "/venue/billing" },     // Payment setup (Money group → Payouts & fees)
+  { n: 3, path: "/venue/seating" },     // Seating & tables (Marketplace group)
+  { n: 4, path: "/venue/catalogue" },   // Marketplace (Marketplace group)
+  { n: 5, path: "/venue/weddings" },    // First Wedding (top link)
 ];
-const STEP_FOR_TOP: Record<string, number> = { "/venue/your-venue": 1, "/venue/weddings": 4 };
-const STEP_FOR_GROUP: Record<string, number> = { Money: 2, Marketplace: 3 };
+const STEP_FOR_TOP: Record<string, number> = { "/venue/your-venue": 1, "/venue/weddings": 5 };
+// Steps that live INSIDE a group → badged on the group's matching child item when
+// expanded, and the group header carries the lowest-unfinished of them when collapsed.
+const STEP_FOR_ITEM: Record<string, number> = { "/venue/billing": 2, "/venue/seating": 3, "/venue/catalogue": 4 };
+const STEPS_IN_GROUP: Record<string, number[]> = { Money: [2], Marketplace: [3, 4] };
 
 type Hints = { active: boolean; done: number[] };
 
@@ -47,7 +52,7 @@ function useStepHints(pathname: string) {
     const hit = STEP_MATCH.find((s) => pathname.startsWith(s.path) && !hints.done.includes(s.n));
     if (!hit) return;
     const done = [...hints.done, hit.n];
-    const next: Hints = { active: done.length < 4, done };
+    const next: Hints = { active: done.length < TOTAL_STEPS, done };
     try { localStorage.setItem("vy-step-hints", JSON.stringify(next)); } catch {}
     setHints(next);
   }, [pathname, hints]);
@@ -160,12 +165,15 @@ export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) 
   const search = useSearchParams();
   const view = search.get("view");
   const showStep = useStepHints(pathname);
+  // A group's header badge = the lowest still-unfinished step that lives in it.
+  const groupStep = (label: string): number | undefined =>
+    (STEPS_IN_GROUP[label] ?? []).filter((n) => showStep(n)).sort((a, b) => a - b)[0];
 
   // Collapsed: a flat icon rail (top links + one icon per group → its first item).
   if (collapsed) {
     const rail: { href: string; label: string; icon: IconName; step?: number }[] = [
       ...TOP_LINKS.map((l) => ({ ...l, step: STEP_FOR_TOP[l.href] })),
-      ...GROUPS.map((g) => ({ href: g.items[0].href, label: g.label, icon: g.icon, step: STEP_FOR_GROUP[g.label] })),
+      ...GROUPS.map((g) => ({ href: g.items[0].href, label: g.label, icon: g.icon, step: groupStep(g.label) })),
     ];
     return (
       <nav className="flex flex-col items-center gap-1 flex-1">
@@ -214,16 +222,15 @@ export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) 
         const groupActive = g.items.some(
           (i) => pathname === i.href.split("?")[0] || pathname.startsWith(i.href.split("?")[0] + "/")
         );
-        const step = STEP_FOR_GROUP[g.label];
-        return <NavGroup key={g.label} group={g} defaultOpen={groupActive} pathname={pathname} view={view} badge={step && showStep(step) ? step : null} />;
+        return <NavGroup key={g.label} group={g} defaultOpen={groupActive} pathname={pathname} view={view} badge={groupStep(g.label) ?? null} showStep={showStep} />;
       })}
     </nav>
   );
 }
 
 function NavGroup({
-  group, defaultOpen, pathname, view, badge = null,
-}: { group: Group; defaultOpen: boolean; pathname: string; view: string | null; badge?: number | null }) {
+  group, defaultOpen, pathname, view, badge = null, showStep,
+}: { group: Group; defaultOpen: boolean; pathname: string; view: string | null; badge?: number | null; showStep: (n: number) => boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="mt-3">
@@ -233,13 +240,16 @@ function NavGroup({
         className="w-full flex items-center justify-between px-1 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500 hover:text-stone-900 transition-colors"
       >
         <span className="flex items-center gap-2.5"><Icon name={group.icon} className="w-[18px] h-[18px]" />{group.label}</span>
-        {badge ? <StepPulse n={badge} /> : <span className={`text-[10px] transition-transform ${open ? "rotate-90" : ""}`}>▶</span>}
+        {/* Header badge only when collapsed — once open, it moves to the matching
+            child item (e.g. clicking Money highlights Payouts & fees / payment setup). */}
+        {badge && !open ? <StepPulse n={badge} /> : <span className={`text-[10px] transition-transform ${open ? "rotate-90" : ""}`}>▶</span>}
       </button>
       {open && (
         <div className="flex flex-col">
           {group.items.map((i) => {
             const base = i.href.split("?")[0];
             const active = pathname === base || pathname.startsWith(base + "/");
+            const itemStep = STEP_FOR_ITEM[base];
             return (
               <div key={i.href}>
                 <Link
@@ -250,6 +260,7 @@ function NavGroup({
                 >
                   {i.icon && <Icon name={i.icon} className="w-[18px] h-[18px] flex-shrink-0" />}
                   {i.label}
+                  {itemStep && showStep(itemStep) && <StepPulse n={itemStep} />}
                 </Link>
                 {i.children && active && (
                   <div className="flex flex-col ml-3 border-l border-[color:var(--line)] pl-2">
