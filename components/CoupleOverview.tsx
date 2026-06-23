@@ -156,6 +156,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
   if (timeline.length === 0) tasks.push({ icon: "calendar", title: "Build your wedding timeline", detail: "Plan your day hour by hour", tab: "Timeline" });
   if (openChecklist.length > 0) tasks.push({ icon: "clipboard", title: "Tick off your checklist", detail: `${openChecklist.length} task${openChecklist.length === 1 ? "" : "s"} remaining`, tab: "Checklist" });
   const topTasks = tasks.slice(0, 3);
+  const doneCount = chips.filter((c) => c.state === "done").length;
 
   // ── Wedding summary rows ──
   const findArea = (re: RegExp) => selectedAreas.find((a) => re.test(`${a.kind} ${a.name}`));
@@ -248,8 +249,42 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
 
         {/* Welcome */}
         <div>
-          <h2 style={{ ...serifS, fontSize: 26, margin: 0, color: INK }}>Welcome back{coupleNames ? `, ${coupleNames.split("&")[0].trim()}` : ""}</h2>
+          <h2 style={{ ...serifS, fontSize: 26, margin: 0, color: INK }}>Welcome{coupleNames ? `, ${coupleNames.split("&")[0].trim()}` : ""}</h2>
           <p style={{ color: INK2, marginTop: 4 }}>Here&apos;s everything you need for your big day.</p>
+        </div>
+
+        {/* Your next step — one clear focal action so new couples aren't
+            overwhelmed by the full overview. Surfaces the #1 task as a big
+            button, the following steps as quieter chips, and a progress hint. */}
+        <div style={{ borderRadius: railRadius, padding: 18, border: `1px solid ${PRIMARY}33`, background: `${PRIMARY}0f` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ ...eyebrowS, color: PRIMARY }}>Start here</span>
+            <span style={{ fontSize: 11.5, color: INK2 }}>· {doneCount} of 6 areas done</span>
+          </div>
+          {topTasks.length > 0 ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 13, minWidth: 0 }}>
+                  <span style={{ width: 44, height: 44, borderRadius: 999, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", color: PRIMARY, border: `1px solid ${PRIMARY}33` }}>{lineIcon(topTasks[0].icon, 22)}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ ...serifS, fontSize: 20, color: INK, lineHeight: 1.15 }}>{topTasks[0].title}</div>
+                    <div style={{ fontSize: 12.5, color: INK2 }}>{topTasks[0].detail}</div>
+                  </div>
+                </div>
+                <button onClick={() => onNavigate(topTasks[0].tab)} style={{ background: PRIMARY, color: "#fff", border: "none", borderRadius: btnRadius, padding: "11px 22px", fontWeight: 700, cursor: "pointer", fontSize: 14, flexShrink: 0 }}>Let&apos;s do this →</button>
+              </div>
+              {topTasks.length > 1 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, flexWrap: "wrap", borderTop: `1px solid ${INK2}22`, paddingTop: 12 }}>
+                  <span style={{ fontSize: 11.5, color: INK2 }}>Then:</span>
+                  {topTasks.slice(1).map((tk) => (
+                    <button key={tk.tab} onClick={() => onNavigate(tk.tab)} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#fff", border: `1px solid ${INK2}33`, borderRadius: 999, padding: "5px 12px", fontSize: 12, color: INK, cursor: "pointer" }}>{lineIcon(tk.icon, 14)}{tk.title}</button>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ ...serifS, fontSize: 18, color: INK }}>🎉 You&apos;re all caught up — everything&apos;s on track. Explore your portal below.</div>
+          )}
         </div>
 
         {/* AI planner banner */}
