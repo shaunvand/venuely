@@ -562,6 +562,7 @@ function StepSpaces({
   type SugCategory = { category: string; location: "venue" | "offsite"; areas: SugArea[] };
   const [suggestions, setSuggestions] = useState<SugCategory[]>([]);
   const [suggestState, setSuggestState] = useState<"idle" | "loading" | "ready" | "empty">("idle");
+  const [suggestReason, setSuggestReason] = useState<string | null>(null);
   const [addingAll, setAddingAll] = useState(false);
   const total = areasCount + added.length;
   const done = spacesDone || added.length > 0;
@@ -581,9 +582,10 @@ function StepSpaces({
       .then((j) => {
         const list = Array.isArray(j?.categories) ? (j.categories as SugCategory[]) : [];
         setSuggestions(list);
+        setSuggestReason(j?.reason ?? j?.error ?? null);
         setSuggestState(list.length ? "ready" : "empty");
       })
-      .catch(() => setSuggestState("empty"));
+      .catch(() => { setSuggestReason("network"); setSuggestState("empty"); });
   }
   useEffect(() => { if (venueId) loadSuggestions(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [venueId]);
 
@@ -711,7 +713,15 @@ function StepSpaces({
       {(suggestState === "empty" || suggestState === "idle") && (
         <div className="rounded-xl p-4 mb-4 flex items-center justify-between gap-3 flex-wrap text-sm" style={{ border: "1px solid var(--line)", background: "var(--cream)" }}>
           <span style={{ color: "var(--ink-2)" }}>
-            {suggestState === "empty" ? "No new spaces found on your website automatically." : "Pull your spaces in from your website with AI."}
+            {suggestState === "idle"
+              ? "Pull your spaces in from your website with AI."
+              : suggestReason === "no_website"
+                ? "Add your website on the Basics step, then we can read your spaces from it."
+                : (suggestReason && suggestReason.startsWith("blocked_"))
+                  ? `Your website blocked our reader (HTTP ${suggestReason.replace("blocked_", "")}). Try again, or add spaces manually below.`
+                  : suggestReason === "unreachable" || suggestReason === "network"
+                    ? "Couldn't reach your website just now — try again, or add spaces manually below."
+                    : "No new spaces found on your website automatically — try again, or add them manually below."}
           </span>
           <button type="button" onClick={loadSuggestions} className="vy-btn vy-btn-secondary whitespace-nowrap">✨ Find spaces from my website</button>
         </div>

@@ -36,10 +36,10 @@ const INSTRUCTION =
   `Rules:\n` +
   `- category: a short grouping name (e.g. "Ceremony Spaces").\n` +
   `- location: "offsite" only if the area is clearly away from the venue grounds; else "venue".\n` +
-  `- areas[].name: the area's real name as on the site.\n` +
+  `- areas[].name: use the space's name if the site gives one. If a space is only DESCRIBED (e.g. "the jetty overlooking the mountain dam", "a poplar forest with a stream", "a poolside setting"), give it a clear, concise name ("Mountain Dam Jetty", "Poplar Forest", "Poolside"). INFER the ceremony, reception and gathering spaces a wedding couple could realistically use from the venue's described features (gardens, dam, forest, lawns, farmhouse, patio, etc.) — be generous; the owner reviews and edits everything before saving.\n` +
   `- areas[].pricing: "included" if it's part of the core venue hire, "separate" if it's an optional paid add-on. Default to "included" for core ceremony/reception areas.\n` +
   `- areas[].price: a NUMBER in Rand ONLY if the site clearly states a price for a separate-cost area; otherwise null. Never guess a price.\n` +
-  `Return at most 6 categories and 24 areas total. If you cannot find any spaces, return [].`;
+  `Return at most 6 categories and 24 areas total. Only return [] if the text has no venue/wedding content at all.`;
 
 function parseCategories(text: string) {
   const start = text.indexOf("[");
@@ -115,14 +115,20 @@ function discoverLinks(html: string, base: URL, max = 4): URL[] {
   return out;
 }
 
-async function fetchText(u: URL, cap: number): Promise<string> {
+// Browser-like UA: many WordPress / Cloudflare / Wordfence sites 403 a custom bot
+// UA (or datacenter request), which is why the homepage came back empty in prod.
+const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+async function fetchPage(u: URL, timeoutMs = 12000): Promise<{ html: string; status: number }> {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 9000);
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await safeFetch(u, { signal: ctrl.signal, headers: { "User-Agent": "VenuelySpacesBot/1.0 (+https://venuely.co.za)" } });
-    if (!res.ok) return "";
-    return (await res.text()).slice(0, 600_000);
-  } catch { return ""; }
+    const res = await safeFetch(u, {
+      signal: ctrl.signal,
+      headers: { "User-Agent": BROWSER_UA, "Accept": "text/html,application/xhtml+xml", "Accept-Language": "en" },
+    });
+    if (!res.ok) return { html: "", status: res.status };
+    return { html: (await res.text()).slice(0, 600_000), status: res.status };
+  } catch { return { html: "", status: 0 }; }
   finally { clearTimeout(timer); }
 }
 
@@ -142,14 +148,16 @@ export async function POST(req: NextRequest) {
     try { parsed = new URL(target); assertSafeUrl(parsed); }
     catch { return NextResponse.json({ ok: true, categories: [], reason: "bad_url" }); }
 
-    const homeHtml = await fetchText(parsed, 600_000);
-    if (!homeHtml) return NextResponse.json({ ok: true, categories: [], reason: "unreachable" });
+    // Homepage gets a generous timeout — slow/remote WordPress hosts were timing
+    // out before. Report the HTTP status so a block (403/503) is diagnosable.
+    const home = await fetchPage(parsed, 18000);
+    if (!home.html) return NextResponse.json({ ok: true, categories: [], reason: home.status ? `blocked_${home.status}` : "unreachable" });
 
     // Homepage text + a few relevant sub-pages (weddings/functions/venue/accommodation),
     // where the actual ceremony/reception/space listings usually live.
-    const subPages = discoverLinks(homeHtml, parsed, 4);
-    const subTexts = await Promise.all(subPages.map((u) => fetchText(u, 200_000).then((h) => h ? htmlToText(h, 12_000) : "")));
-    const text = [htmlToText(homeHtml, 16_000), ...subTexts.filter(Boolean)].join("\n\n---\n\n").slice(0, 40_000);
+    const subPages = discoverLinks(home.html, parsed, 4);
+    const subTexts = await Promise.all(subPages.map((u) => fetchPage(u, 10000).then((r) => r.html ? htmlToText(r.html, 12_000) : "")));
+    const text = [htmlToText(home.html, 16_000), ...subTexts.filter(Boolean)].join("\n\n---\n\n").slice(0, 40_000);
     if (text.length < 80) return NextResponse.json({ ok: true, categories: [], reason: "empty_site" });
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
