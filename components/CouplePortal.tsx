@@ -506,7 +506,19 @@ export function CouplePortal({
         )}
 
         {tab === "Our Venue" && (
-          <Section heading={heading} tokens={tokens} primary={primary} title="Our Venue" sub={venue.address || venue.region || ""}>
+          <Section heading={heading} tokens={tokens} primary={primary} title={venue.name} sub={venue.address || venue.region || ""}>
+            {weddingDate && (() => {
+              const fmtD = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" });
+              const multi = !!(weddingEndDate && weddingEndDate !== weddingDate);
+              const dateText = multi ? `${fmtD(weddingDate)} – ${fmtD(weddingEndDate as string)}` : fmtD(weddingDate);
+              return (
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 16, padding: "7px 14px", borderRadius: 999, background: `${primary}0f`, border: `1px solid ${primary}33`, fontSize: 13 }}>
+                  <span style={{ color: primary, fontWeight: 700 }}>Wedding {multi ? "dates" : "date"}:</span>
+                  <span style={{ fontWeight: 600, color: "#44403c" }}>{dateText}</span>
+                  {daysToGo != null && daysToGo >= 0 && <span style={{ color: "#78716c" }}>· {daysToGo} day{daysToGo === 1 ? "" : "s"} to go</span>}
+                </div>
+              );
+            })()}
             {venue.description && <p style={{ color: "#57534e", maxWidth: 720, marginBottom: 16 }}>{venue.description}</p>}
             {gallery.length === 0 ? <Empty radius={isClassic ? undefined : tokens.cardRadius}>No photos yet.</Empty> : groupBy(gallery, (g) => g.category || "The venue").map(([label, items]) => (
               <div key={label} style={{ marginBottom: 22 }}>
