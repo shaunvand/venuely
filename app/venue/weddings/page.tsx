@@ -5,6 +5,7 @@ import { createWedding, setPortalPassword, markCouplePaid, deleteWedding } from 
 import { WeddingRowActions } from "@/components/WeddingRowActions";
 import { WeddingsTable, type WeddingRow } from "@/components/WeddingsTable";
 import { SaveButton } from "@/components/SaveButton";
+import { BookingsCalendar } from "@/components/BookingsCalendar";
 import { computeWeddingsProgress } from "@/lib/venue/progress";
 
 export default async function VenueWeddings({
@@ -79,6 +80,19 @@ export default async function VenueWeddings({
         </div>
         <a href="#add-wedding" className="vy-btn vy-btn-primary">+ Add wedding</a>
       </header>
+
+      {/* Bookings calendar at a glance — every wedding on the month grid (multi-day
+          spans included). Clicking a day jumps to that wedding. */}
+      <BookingsCalendar
+        bookings={(weddings ?? []).map((w) => ({
+          slug: w.slug as string,
+          couple_names: w.couple_names as string,
+          wedding_date: w.wedding_date as string,
+          wedding_end_date: (w.wedding_end_date as string | null) ?? null,
+          status: String(w.status ?? "inquiry"),
+        }))}
+        weddingHref="/venue/weddings"
+      />
 
       {/* Add-wedding form — laid out per the dashboard mock: 3-column rows with
           inline hints, submit bottom-right. */}
