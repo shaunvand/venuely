@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 // Couple-side mediated supplier messaging. Couples never see supplier contact
 // details (the server redacts anything that looks like contact info) until the
@@ -377,8 +378,10 @@ export function CoupleMessages({ slug, initialThreads = [], startVendor = null, 
         )}
       </div>
 
-      {/* "We booked them" — optional final agreed price, logs the venue's commission */}
-      {bookOpen && activeThread && (
+      {/* "We booked them" — optional final agreed price, logs the venue's commission.
+          Portalled to <body> so position:fixed escapes the portal's transformed
+          `.anim-fade-up` ancestor (which would otherwise trap/hide it). */}
+      {bookOpen && activeThread && typeof document !== "undefined" && createPortal((
         <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => !booking && setBookOpen(false)}>
           <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 18, padding: 24, width: "min(420px,100%)" }}>
             <h3 style={{ ...heading, fontSize: 21, margin: "0 0 6px" }}>🎉 You booked {activeThread.supplierName}!</h3>
@@ -399,7 +402,7 @@ export function CoupleMessages({ slug, initialThreads = [], startVendor = null, 
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }
