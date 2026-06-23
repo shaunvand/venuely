@@ -343,6 +343,14 @@ export async function POST(req: NextRequest) {
       let imgIdx = 0;
       valid.forEach((it) => {
         if (fnameOverride) it.data.cost_treatment = fnameOverride;
+        // A priced item is a PAID extra, never a free inclusion — so a price
+        // overrides any "complimentary/included" filename signal. (Pat Busch's
+        // complimentary list still carries retail values, which previously made
+        // priced items land as "included with a cost".)
+        const priceVal = Number((it.data as { price?: unknown; price_per_night?: unknown; price_from?: unknown }).price
+          ?? (it.data as { price_per_night?: unknown }).price_per_night
+          ?? (it.data as { price_from?: unknown }).price_from ?? 0);
+        if (Number.isFinite(priceVal) && priceVal > 0) it.data.cost_treatment = "extra";
         let image_source: "embedded" | "online" | "none" = "none";
         if (!it.data.image_url && ordered[imgIdx]) {
           it.data.image_url = ordered[imgIdx].url;
