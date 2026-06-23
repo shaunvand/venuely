@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { TemplateTokens, PortalTheme } from "@/lib/portal/templates";
 import { GuestManager } from "@/components/GuestManager";
@@ -233,6 +234,7 @@ export function CouplePortal({
   const [state, setState] = useState<WState>(initialState ?? {});
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [billOpen, setBillOpen] = useState(false);
   const [, startTransition] = useTransition();
   const primary = theme.primary;
   const accent = theme.accent;
@@ -727,11 +729,11 @@ export function CouplePortal({
       {/* Running total + submit — non-classic picks up the template's surface + rule */}
       <div style={{ position: "sticky", bottom: 0, zIndex: 20, background: isClassic ? "#fff" : tokens.surfaceCard, borderTop: isClassic ? "1px solid rgba(0,0,0,0.1)" : tokens.divider, boxShadow: tokens.id === "editorial" ? "none" : "0 -4px 16px rgba(0,0,0,0.06)" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <div>
+          <button type="button" onClick={() => setBillOpen(true)} title="View your bill breakdown" style={{ background: "transparent", border: "none", textAlign: "left", cursor: "pointer", padding: 0 }}>
             <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: tokens.eyebrowTracking, color: "#57534e" }}>Estimated total{busy ? " · updating…" : ""}</div>
-            <div style={{ ...heading, fontSize: 24, color: primary }}>{rZA(totalDue)}</div>
-            <div style={{ fontSize: 11, color: "#8a8a8a" }}>{selectedCount} item{selectedCount === 1 ? "" : "s"} selected · final quote confirmed by {venue.name}</div>
-          </div>
+            <div style={{ ...heading, fontSize: 24, color: primary, display: "flex", alignItems: "center", gap: 7 }}>{rZA(totalDue)}<span style={{ fontSize: 13, opacity: 0.6 }}>▸</span></div>
+            <div style={{ fontSize: 11, color: "#8a8a8a", textDecoration: "underline" }}>{selectedCount} item{selectedCount === 1 ? "" : "s"} selected · view breakdown</div>
+          </button>
           {submitted ? (
             <span style={{ background: "#dcefe2", color: "#1f5d3e", padding: "10px 20px", borderRadius: tokens.buttonRadius, fontWeight: 600 }}>✓ Sent to {venue.name} for review</span>
           ) : (
@@ -743,6 +745,102 @@ export function CouplePortal({
       </div>
 
       </div>
+
+      {billOpen && typeof document !== "undefined" && (() => {
+        const dayCount = (s?: DaySel) => ["mg", "wed", "fb"].filter((d) => (s as Record<string, boolean> | undefined)?.[d]).length || 1;
+        const money = (s: unknown) => Number(String(s ?? "").replace(/[^\d.]/g, "")) || 0;
+        const catLines = catalogue.filter(catIsSelected);
+        const rentLines = rentals.filter((r) => rentSel[r.id]?.sel);
+        const roomLines = rooms.filter((r) => Array.isArray(rooms_[r.id]) && rooms_[r.id].length);
+        const customLines = (state.customRequests ?? []) as CustomRequest[];
+        const supplierLines = ((state.suppliers as Array<{ id: number; name: string; status?: string; price?: string }>) ?? []).filter((s) => s.status === "booked" || money(s.price) > 0);
+        const anyLines = catLines.length || rentLines.length || roomLines.length || customLines.length || supplierLines.length;
+        const rowWrap: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid rgba(0,0,0,0.06)" };
+        const secHead: React.CSSProperties = { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.4, color: "#a8a29e", fontWeight: 700, margin: "16px 0 2px" };
+        const delBtn: React.CSSProperties = { border: "1px solid rgba(0,0,0,0.12)", background: "#fff", color: "#b42318", borderRadius: 8, width: 26, height: 26, cursor: "pointer", fontSize: 14, lineHeight: 1, flexShrink: 0 };
+        return createPortal(
+          <div role="dialog" aria-modal="true" onClick={() => setBillOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(28,25,23,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "min(640px, 100%)", maxHeight: "88vh", overflowY: "auto", background: "#fff", borderRadius: 18, padding: "26px 26px 18px", boxShadow: "0 24px 70px rgba(0,0,0,0.35)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1.4, color: "#a8a29e", fontWeight: 700 }}>Your bill breakdown</div>
+                  <div style={{ ...heading, fontSize: 26, color: primary }}>{rZA(totalDue)}</div>
+                  <div style={{ fontSize: 12, color: "#8a8a8a" }}>{selectedCount} item{selectedCount === 1 ? "" : "s"} selected · final quote confirmed by {venue.name}</div>
+                </div>
+                <button onClick={() => setBillOpen(false)} aria-label="Close" style={{ background: "transparent", border: "none", fontSize: 22, color: "#a8a29e", cursor: "pointer" }}>×</button>
+              </div>
+
+              {!anyLines && <p style={{ color: "#57534e", fontSize: 14, marginTop: 18 }}>Nothing selected yet — add catering, rentals or accommodation from their tabs and they&apos;ll appear here.</p>}
+
+              {catLines.length > 0 && <>
+                <div style={secHead}>Catering &amp; menu <span style={{ color: "#c9c4be" }}>· per guest</span></div>
+                {catLines.map((it) => (
+                  <div key={it.id} style={rowWrap}>
+                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: "#1c1917" }}>{it.name}</div><div style={{ fontSize: 12, color: "#8a8a8a" }}>{dayCount(catSel[it.id])} day{dayCount(catSel[it.id]) === 1 ? "" : "s"}{it.included ? " · Included" : ""}</div></div>
+                    <div style={{ color: primary, fontWeight: 700, whiteSpace: "nowrap" }}>{it.price ? `${rZA(it.price)}/guest` : "—"}</div>
+                    {!it.included && <button title="Remove" style={delBtn} onClick={() => toggleCat(it)}>✕</button>}
+                  </div>
+                ))}
+              </>}
+
+              {rentLines.length > 0 && <>
+                <div style={secHead}>Rentals</div>
+                {rentLines.map((r) => { const sel = rentSel[r.id]; const qty = sel?.qty ?? 1; const days = dayCount(sel); const amt = r.price * qty * days; return (
+                  <div key={r.id} style={rowWrap}>
+                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: "#1c1917" }}>{r.name}</div><div style={{ fontSize: 12, color: "#8a8a8a" }}>{rZA(r.price)} each · {days} day{days === 1 ? "" : "s"}</div></div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <button aria-label="Less" onClick={() => setRentQty(r.id, qty - 1)} style={{ ...delBtn, color: "#57534e", width: 24, height: 24 }}>−</button>
+                      <span style={{ minWidth: 18, textAlign: "center", fontWeight: 600 }}>{qty}</span>
+                      <button aria-label="More" onClick={() => setRentQty(r.id, qty + 1)} style={{ ...delBtn, color: "#57534e", width: 24, height: 24 }}>+</button>
+                    </div>
+                    <div style={{ color: primary, fontWeight: 700, whiteSpace: "nowrap", minWidth: 70, textAlign: "right" }}>{rZA(amt)}</div>
+                    <button title="Remove" style={delBtn} onClick={() => toggleRent(r.id)}>✕</button>
+                  </div>
+                ); })}
+              </>}
+
+              {roomLines.length > 0 && <>
+                <div style={secHead}>Accommodation <span style={{ color: "#c9c4be" }}>· per night</span></div>
+                {roomLines.map((r) => (
+                  <div key={r.id} style={rowWrap}>
+                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: "#1c1917" }}>{r.name}</div><div style={{ fontSize: 12, color: "#8a8a8a" }}>Sleeps {r.sleeps}</div></div>
+                    <div style={{ color: primary, fontWeight: 700, whiteSpace: "nowrap" }}>{r.price ? `${rZA(r.price)}/night` : "—"}</div>
+                    <button title="Remove" style={delBtn} onClick={() => toggleRoom(r.id)}>✕</button>
+                  </div>
+                ))}
+              </>}
+
+              {supplierLines.length > 0 && <>
+                <div style={secHead}>Suppliers</div>
+                {supplierLines.map((s) => (
+                  <div key={s.id} style={rowWrap}>
+                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: "#1c1917" }}>{s.name}</div><div style={{ fontSize: 12, color: "#8a8a8a" }}>Manage in the Suppliers tab</div></div>
+                    <div style={{ color: primary, fontWeight: 700, whiteSpace: "nowrap" }}>{money(s.price) ? rZA(money(s.price)) : (s.status === "booked" ? "Booked" : "")}</div>
+                  </div>
+                ))}
+              </>}
+
+              {customLines.length > 0 && <>
+                <div style={secHead}>Custom requests</div>
+                {customLines.map((c) => (
+                  <div key={c.id} style={rowWrap}>
+                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: "#1c1917" }}>{c.name}</div><div style={{ fontSize: 12, color: "#9a6a00" }}>Awaiting venue quote</div></div>
+                    <button title="Remove" style={delBtn} onClick={() => removeCustomRequest(c.id)}>✕</button>
+                  </div>
+                ))}
+              </>}
+
+              <p style={{ fontSize: 11.5, color: "#a8a29e", marginTop: 16, lineHeight: 1.5 }}>
+                Catering is charged per guest and spaces are confirmed with your venue, so the figure above is your venue&apos;s authoritative quote — these lines show what&apos;s in it. Edit or remove items here, or in their own tabs.
+              </p>
+              <div style={{ textAlign: "right", marginTop: 10 }}>
+                <button onClick={() => setBillOpen(false)} style={{ ...btn, padding: "9px 22px", cursor: "pointer" }}>Done</button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
 
       <AiPlanner slug={slug} primary={primary} accent={accent} />
     </div>
