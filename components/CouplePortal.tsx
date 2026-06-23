@@ -200,6 +200,25 @@ export function CouplePortal({
     check(); window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+  // Persist the active tab in the URL hash so a refresh restores the same tab
+  // (e.g. Accommodation) instead of dropping back to Overview. Hydration-safe:
+  // the server + first client render are always "Overview"; this syncs on mount,
+  // and also honours back/forward navigation between tabs.
+  useEffect(() => {
+    const fromHash = () => {
+      const raw = decodeURIComponent(window.location.hash.replace(/^#/, ""));
+      if (raw && (TABS as readonly string[]).includes(raw)) setTab(raw as Tab);
+    };
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
+    return () => window.removeEventListener("hashchange", fromHash);
+  }, []);
+  useEffect(() => {
+    const target = `#${encodeURIComponent(tab)}`;
+    if (typeof window !== "undefined" && window.location.hash !== target) {
+      window.history.replaceState(null, "", target);
+    }
+  }, [tab]);
   const [rentFilter, setRentFilter] = useState("All");
   const [rentFolder, setRentFolder] = useState<"all" | "included" | "extra">("all");
   const [vibesOpen, setVibesOpen] = useState(false); // "For the Vibes" sidebar group
