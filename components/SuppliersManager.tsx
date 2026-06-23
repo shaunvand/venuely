@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 export type Supplier = {
   id: string; category: string; name: string; email?: string; phone?: string;
@@ -178,8 +179,10 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
         </div>
       )}
 
-      {/* Add / Edit modal */}
-      {editing && (
+      {/* Add / Edit modal — portalled to <body> so its position:fixed escapes the
+          portal's transformed `.anim-fade-up` ancestor (which would otherwise trap
+          and hide it, making Edit appear to do nothing). */}
+      {editing && typeof document !== "undefined" && createPortal((
         <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, overflow: "auto" }} onClick={() => setEditing(null)}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 18, padding: 24, width: "min(460px,100%)", maxHeight: "90vh", overflow: "auto" }}>
             <h3 style={{ ...serif, fontSize: 22, margin: "0 0 14px" }}>{editing.id ? "Edit vendor" : "Add vendor"}</h3>
@@ -203,7 +206,7 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }
