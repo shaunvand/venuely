@@ -138,6 +138,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
   const [imported, setImported] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [extractedImages, setExtractedImages] = useState<Array<{ url: string; source_file: string; ordinal: number }>>([]);
+  const [uploadingId, setUploadingId] = useState<number | null>(null);
   const [searchOpen, setSearchOpen] = useState<{ itemId: number; query: string; results: Array<{ url: string; thumb: string; alt: string; photographer_name: string; photographer_profile_url: string; source?: string; source_url?: string; unsplash_url?: string; download_location?: string }>; busy: boolean; err: string | null } | null>(null);
   const [fileReports, setFileReports] = useState<Array<{ filename: string; chars: number; items: number; status: string; error?: string; stop_reason?: string | null; truncated?: boolean; unsupported?: string }>>([]);
   const [filter, setFilter] = useState<string>("all");
@@ -352,6 +353,28 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
 
   function updateItem(id: number, patch: Partial<Item>) {
     setItems((curr) => curr.map((it) => it._id === id ? { ...it, ...patch } : it));
+  }
+  // "Pick from file" — upload an image straight off the user's computer to
+  // venue-media and pin it to this item. Works for every item regardless of
+  // whether the original upload carried embedded photos.
+  async function uploadLocalImage(itemId: number, file: File) {
+    setUploadingId(itemId);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("venue_id", venueId);
+      const res = await fetch("/api/venue/inventory/image", { method: "POST", body: fd });
+      const j = await res.json();
+      if (!res.ok || !j.ok || !j.url) {
+        setStatus({ tone: "error", text: `Image upload failed: ${j.error ?? "unknown error"}` });
+        return;
+      }
+      updateItem(itemId, { data: { ...(items.find((x) => x._id === itemId)?.data ?? {}), image_url: j.url }, image_source: "embedded" });
+    } catch (e) {
+      setStatus({ tone: "error", text: `Image upload failed: ${e instanceof Error ? e.message : String(e)}` });
+    } finally {
+      setUploadingId(null);
+    }
   }
   async function findOnline(itemId: number) {
     const it = items.find((x) => x._id === itemId);
@@ -810,9 +833,6 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                           <div className="relative w-full">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={String(it.data.image_url)} alt="" className="w-full aspect-[4/3] rounded-lg object-cover" style={{ border: "1px solid var(--line)" }} />
-                            {includedSource === "online" && (
-                              <span className="absolute bottom-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "var(--peach)", color: "var(--poppy-deep)" }} title="Stock photo">🌐</span>
-                            )}
                             {includedSource === "embedded" && (
                               <span className="absolute bottom-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "var(--leaf)", color: "#1f5d3e" }} title="From your file">📎</span>
                             )}
@@ -823,17 +843,19 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                           </div>
                         )}
                         <div className="flex flex-col gap-2 w-full">
-                          <select
-                            value=""
-                            onChange={(e) => { if (e.target.value) updateItem(it._id, { data: { ...it.data, image_url: e.target.value }, image_source: "embedded" }); }}
-                            className="w-full box-border rounded-full px-3 py-1.5 text-[11px] bg-white truncate"
-                            style={{ border: "1px solid var(--line)" }}
+                          <label
+                            className="w-full box-border rounded-full px-3 py-1.5 text-[11px] text-center truncate cursor-pointer bg-white"
+                            style={{ border: "1px solid var(--line)", opacity: uploadingId === it._id ? 0.6 : 1 }}
                           >
-                            <option value="">Pick from file…</option>
-                            {extractedImages.map((img) => (
-                              <option key={img.url} value={img.url}>{img.source_file.slice(0, 12)}…#{img.ordinal + 1}</option>
-                            ))}
-                          </select>
+                            {uploadingId === it._id ? "Uploading…" : "📁 Pick from file"}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={uploadingId === it._id}
+                              onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLocalImage(it._id, f); e.target.value = ""; }}
+                            />
+                          </label>
                           <button
                             type="button"
                             onClick={() => findOnline(it._id)}
@@ -868,12 +890,6 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                           {description}
                         </p>
                       )}
-
-                      {/* Status pill */}
-                      <div className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5"
-                           style={{ color: it._include ? "var(--poppy)" : "var(--ink-2)" }}>
-                        <span>●</span> {it._include ? "Will Import" : "Excluded"}
-                      </div>
 
                       {/* Edit fields disclosure */}
                       <details className="text-[11px]">
