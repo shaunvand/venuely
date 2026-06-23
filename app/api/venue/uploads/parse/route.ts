@@ -5,7 +5,7 @@ import { extractText, getDocumentProxy } from "unpdf";
 import Anthropic from "@anthropic-ai/sdk";
 import { INVENTORY_FIELDS, type InventoryType } from "@/lib/inventory/schemas";
 import { extractXlsxImages, extractPdfImages, type ExtractedImage } from "@/lib/imports/extract-images";
-import { searchOneImage, mapWithConcurrency } from "@/lib/imports/image-search";
+import { searchImagePool, mapWithConcurrency } from "@/lib/imports/image-search";
 import { requireVenueMember } from "@/lib/security/guards";
 
 export const runtime = "nodejs";
@@ -431,27 +431,31 @@ export async function POST(req: NextRequest) {
     const needSearch: number[] = [];
     allItems.forEach((it, i) => { if (!it.data.image_url) needSearch.push(i); });
     if (needSearch.length) {
-      // Build short, generic Unsplash queries — name first; fallback to category if no result.
-      const results = await mapWithConcurrency(needSearch, 4, async (i) => {
-        const it = allItems[i];
-        const simple = simplifyForSearch(String(it.data.name ?? ""));
-        if (simple) {
-          const hit = await searchOneImage(simple);
-          if (hit) return hit;
-        }
-        // Fall back to a generic category term ("rentals" → "wedding rentals", etc.)
-        const fallback = it.category === "accommodation" ? "wedding accommodation"
-          : it.category === "catalogue" ? "wedding catering"
-          : it.category === "rentals" ? "wedding decor"
-          : `wedding ${it.category}`;
-        return await searchOneImage(fallback);
+      // Phase 1: fetch a POOL of candidates per item (by its name), in parallel.
+      const pools = await mapWithConcurrency(needSearch, 4, async (i) => {
+        const simple = simplifyForSearch(String(allItems[i].data.name ?? ""));
+        return simple ? await searchImagePool(simple, 12) : [];
       });
-      results.forEach((url, k) => {
-        if (!url) return;
+      // Per-category fallback pools (one big search each) for items whose name
+      // search found nothing — distributed UNIQUELY so generic items never repeat.
+      const catTerm = (c: string) => c === "accommodation" ? "wedding accommodation"
+        : c === "catalogue" ? "wedding catering" : c === "rentals" ? "wedding decor" : `wedding ${c}`;
+      const catCache = new Map<string, string[]>();
+      async function catPool(c: string): Promise<string[]> {
+        if (!catCache.has(c)) catCache.set(c, await searchImagePool(catTerm(c), 80));
+        return catCache.get(c)!;
+      }
+      // Phase 2: assign sequentially with a GLOBAL used-set → every image unique.
+      const used = new Set<string>();
+      for (let k = 0; k < needSearch.length; k++) {
         const it = allItems[needSearch[k]];
-        it.data.image_url = url;
+        let pick = (pools[k] ?? []).find((u) => !used.has(u));
+        if (!pick) pick = (await catPool(it.category)).find((u) => !used.has(u));
+        if (!pick) continue; // pool exhausted → leave blank rather than repeat
+        used.add(pick);
+        it.data.image_url = pick;
         (it as { image_source?: string }).image_source = "online";
-      });
+      }
     }
 
     const items = allItems.map((it, i) => ({

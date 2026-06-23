@@ -3,47 +3,54 @@
 // 50/hr demo cap, which used to silently starve large imports), falling back to
 // Unsplash when no Pexels key is configured. Returns null on no key / no match.
 
-async function pexelsOne(q: string): Promise<string | null> {
+// Some hosts/CDNs 403 a non-browser UA — send a browser one to be safe.
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+
+async function pexelsPool(q: string, n: number): Promise<string[]> {
   const key = process.env.PEXELS_API_KEY;
-  if (!key) return null;
+  if (!key) return [];
   try {
     const url = new URL("https://api.pexels.com/v1/search");
     url.searchParams.set("query", q);
-    url.searchParams.set("per_page", "1");
+    url.searchParams.set("per_page", String(Math.min(80, Math.max(1, n))));
     url.searchParams.set("orientation", "landscape");
-    const res = await fetch(url, { headers: { Authorization: key } });
-    if (!res.ok) return null;
+    const res = await fetch(url, { headers: { Authorization: key, "User-Agent": UA, Accept: "application/json" } });
+    if (!res.ok) return [];
     const data = await res.json() as { photos?: Array<{ src?: { landscape?: string; large?: string; medium?: string } }> };
-    const src = data.photos?.[0]?.src;
-    return src?.landscape ?? src?.large ?? src?.medium ?? null;
+    return (data.photos ?? []).map((p) => p.src?.large ?? p.src?.landscape ?? p.src?.medium).filter(Boolean) as string[];
   } catch {
-    return null;
+    return [];
   }
 }
 
-async function unsplashOne(q: string): Promise<string | null> {
+async function unsplashPool(q: string, n: number): Promise<string[]> {
   const key = process.env.UNSPLASH_ACCESS_KEY;
-  if (!key) return null;
+  if (!key) return [];
   try {
     const url = new URL("https://api.unsplash.com/search/photos");
     url.searchParams.set("query", q);
-    url.searchParams.set("per_page", "1");
+    url.searchParams.set("per_page", String(Math.min(30, Math.max(1, n))));
     url.searchParams.set("content_filter", "high");
-    const res = await fetch(url, {
-      headers: { "Authorization": `Client-ID ${key}`, "Accept-Version": "v1" },
-    });
-    if (!res.ok) return null;
+    const res = await fetch(url, { headers: { "Authorization": `Client-ID ${key}`, "Accept-Version": "v1", "User-Agent": UA } });
+    if (!res.ok) return [];
     const data = await res.json() as { results?: Array<{ urls?: { regular?: string } }> };
-    return data.results?.[0]?.urls?.regular ?? null;
+    return (data.results ?? []).map((r) => r.urls?.regular).filter(Boolean) as string[];
   } catch {
-    return null;
+    return [];
   }
 }
 
-export async function searchOneImage(query: string): Promise<string | null> {
+// A POOL of candidate image URLs for a query — lets the caller pick a UNIQUE one
+// per item (no more "same photo on 78 items" when many share a generic query).
+export async function searchImagePool(query: string, n = 15): Promise<string[]> {
   const q = query.trim().slice(0, 120);
-  if (!q) return null;
-  return (await pexelsOne(q)) ?? (await unsplashOne(q));
+  if (!q) return [];
+  const pool = await pexelsPool(q, n);
+  return pool.length ? pool : await unsplashPool(q, n);
+}
+
+export async function searchOneImage(query: string): Promise<string | null> {
+  return (await searchImagePool(query, 1))[0] ?? null;
 }
 
 // Concurrency-limited parallel map. Keeps the provider under its rate cap on
