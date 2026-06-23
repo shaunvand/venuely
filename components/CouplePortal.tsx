@@ -419,13 +419,20 @@ export function CouplePortal({
         ? { width: 256, background: "#fffdfb", borderRight: "1px solid var(--line, #ece7e1)", display: "flex", flexDirection: "column", padding: "20px 14px", position: "fixed", top: 0, left: 0, height: "100vh", overflowY: "auto", zIndex: 60, transform: navOpen ? "translateX(0)" : "translateX(-100%)", transition: "transform 0.2s ease", boxShadow: navOpen ? "4px 0 24px rgba(0,0,0,0.18)" : "none" }
         : { width: 240, flexShrink: 0, background: "#fffdfb", borderRight: "1px solid var(--line, #ece7e1)", display: "flex", flexDirection: "column", padding: "20px 13px", position: "sticky", top: 0, height: "100vh", overflowY: "auto" }}>
         <div style={{ padding: "0 6px 18px" }}>
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt={venue.name} title={venue.name} style={{ maxWidth: "100%", maxHeight: 72, width: "auto", height: "auto", objectFit: "contain", objectPosition: "left center", display: "block" }} />
-          ) : (
-            <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: 19, color: primary, lineHeight: 1.15 }}>{venue.name}</div>
-          )}
-          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 7 }}>
+          {/* Venue identity — a circular photo/logo avatar next to the venue name,
+              like a profile chip (replaces the old stretched logo image). */}
+          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+            {(cover || logoUrl) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={(cover || logoUrl) as string} alt={venue.name} title={venue.name} style={{ width: 46, height: 46, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line,#ece7e1)" }} />
+            ) : (
+              <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: primary, color: "#fff", fontFamily: "'Fraunces', Georgia, serif", fontWeight: 700, fontSize: 17, lineHeight: 1 }}>
+                {venue.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("")}
+              </div>
+            )}
+            <div style={{ minWidth: 0, flex: 1, fontFamily: "'Fraunces', Georgia, serif", fontWeight: 700, fontSize: 15.5, lineHeight: 1.2, color: "var(--ink,#1c1917)" }}>{venue.name}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 12 }}>
             <LogoMark size={12} />
             <span style={{ fontSize: 10, letterSpacing: 0.3, color: "#a8a29e" }}>Powered by Venuely</span>
           </div>
