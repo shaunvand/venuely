@@ -612,8 +612,8 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
 
       <div className="flex gap-2 items-center flex-wrap">
         <label className={(busy ? BUBBLE_PRIMARY + " opacity-50 cursor-not-allowed" : BUBBLE_PRIMARY + " cursor-pointer")}>
-          {files.length ? "Change files" : "Choose files (PDF / Excel / CSV)"}
-          <input ref={fileRef} type="file" multiple accept=".pdf,.xlsx,.xls,.csv,.txt"
+          {files.length ? "Change files" : "Choose files (PDF / Excel / Word / CSV)"}
+          <input ref={fileRef} type="file" multiple accept=".pdf,.xlsx,.xls,.csv,.txt,.docx"
             disabled={busy}
             onChange={(e) => pickFiles(e.target.files)}
             className="hidden" />
