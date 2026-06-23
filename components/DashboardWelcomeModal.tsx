@@ -6,6 +6,7 @@
 // never again. The animation plays once and holds its final frame.
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 // Optional video override; otherwise the self-contained HTML animation is embedded.
 const EXPLAINER_VIDEO = process.env.NEXT_PUBLIC_WELCOME_VIDEO_URL || "";
@@ -40,9 +41,12 @@ export function DashboardWelcomeModal() {
     setTimeout(() => setOpen(false), 350);
   }
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  // Portal to <body> so the fixed overlay covers the FULL viewport — inside the
+  // dashboard tree it was trapped by an ancestor's transform/animation containing
+  // block, leaving the bottom of the screen un-dimmed.
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -50,7 +54,7 @@ export function DashboardWelcomeModal() {
       onClick={close}
       style={{
         position: "fixed", inset: 0, zIndex: 150,
-        background: "rgba(28,25,23,0.28)", backdropFilter: "blur(2px)",
+        background: "rgba(28,25,23,0.45)", backdropFilter: "blur(2px)",
         display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
         opacity: fading ? 0 : 1, transition: "opacity 0.35s ease",
       }}
@@ -100,6 +104,7 @@ export function DashboardWelcomeModal() {
           ×
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
