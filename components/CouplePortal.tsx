@@ -403,7 +403,11 @@ export function CouplePortal({
   const itemProps = { primary, accent, heading, cardRadius: tokens.cardRadius, cardBorder: tokens.cardBorder };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: tokens.surface, fontFamily: tokens.bodyFont, color: "var(--ink, #1c1917)" }}>
+    // Re-point the brand CSS variables to the VENUE's saved theme so the whole
+    // portal subtree (incl. sub-components that use var(--poppy)/var(--peach))
+    // renders in the venue's primary/accent, not the default Venuely coral.
+    <div style={{ display: "flex", minHeight: "100vh", background: tokens.surface, fontFamily: tokens.bodyFont, color: "var(--ink, #1c1917)",
+      "--poppy": primary, "--poppy-deep": primary, "--peach": accent, "--accent": accent } as React.CSSProperties}>
       {isMobile && navOpen && <div onClick={() => setNavOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 55 }} />}
       {/* SIDEBAR — classic keeps it on desktop; every template uses it as the mobile drawer */}
       {showAside && (
