@@ -203,6 +203,16 @@ export function WizardClient({
     } catch { /* SSR / no-window — ignore */ }
   }, [step]);
 
+  // The Review checklist reads a server-computed setup snapshot. Spaces/items added
+  // via the fetch-based flows (which deliberately don't route-refresh, to preserve
+  // wizard state) leave that snapshot stale — so refresh it whenever we land on
+  // Review, so progress reflects everything actually saved. Client `step` state
+  // survives the refresh (no remount) and ?step= keeps us on Review.
+  useEffect(() => {
+    if (step === 4) router.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
   // Auto pre-import the venue's own Google photos into "Your Venue" the first
   // time the wizard loads with a created venue. This reuses the proven
   // /api/venue/places-photos route (Google lookup → vision-tag → upload) so the
