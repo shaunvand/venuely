@@ -551,7 +551,7 @@ function PortalPreview({
   );
   const rail = (
     <>
-      <div className="p-2 text-center text-white" style={{ background: "#5F8B6A", borderRadius: t.cardRadius }}>
+      <div className="p-2 text-center text-white" style={{ background: primary, borderRadius: t.cardRadius }}>
         <div className="text-[7px] uppercase tracking-wider opacity-90">Your wedding day</div>
         <div className="text-xl leading-none my-0.5" style={headingStyle}>112</div>
         <div className="text-[7px] uppercase tracking-wider opacity-90">days to go</div>

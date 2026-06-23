@@ -70,7 +70,10 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
 
   // ── Template style bundle (t === null → classic, the untouched original) ──
   const t = tokens && tokens.id !== "classic" ? tokens : null;
-  const PRIMARY = t ? (themePrimary || POPPY) : POPPY;
+  // The venue's saved brand (primary) colour drives accents on EVERY template,
+  // including classic — the portal is meant to reflect the venue's brand, not a
+  // fixed Venuely coral. Falls back to coral only when no brand colour is set.
+  const PRIMARY = themePrimary || POPPY;
   const ACCENT = t ? (themeAccent || SAGE) : SAGE;
   const serifS: React.CSSProperties = t
     ? { fontFamily: t.headingFont, fontStyle: t.headingItalic ? "italic" : "normal", ...(t.headingWeight != null ? { fontWeight: t.headingWeight } : {}), ...(t.headingLetterSpacing ? { letterSpacing: t.headingLetterSpacing } : {}) }
@@ -376,8 +379,8 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
 
       {/* ── RIGHT RAIL ──────────────────────────────────────────── */}
       <div style={{ display: "grid", gap: 16, position: narrow ? "static" : "sticky", top: 16 }}>
-        {/* Countdown hero */}
-        <div style={{ borderRadius: railRadius, padding: 22, background: SAGE, color: "#fff", textAlign: "center" }}>
+        {/* Countdown hero — the venue's brand (primary) colour, not a fixed sage. */}
+        <div style={{ borderRadius: railRadius, padding: 22, background: PRIMARY, color: "#fff", textAlign: "center" }}>
           <div style={{ ...serifS, fontStyle: t && !t.headingItalic ? "normal" : "italic", fontSize: 14, opacity: 0.95 }}>Your wedding day</div>
           <div style={{ ...serifS, fontSize: 64, lineHeight: 1, margin: "6px 0" }}>{daysToGo ?? "—"}</div>
           <div style={{ fontSize: 12, letterSpacing: 2, textTransform: "uppercase", opacity: 0.9 }}>days to go</div>
