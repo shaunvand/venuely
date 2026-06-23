@@ -109,8 +109,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     supabase.from("venue_seasons").select("id, name, start_month, start_day, end_month, end_day, sort_order").eq("venue_id", venue.id),
   ]);
   // Weekend view + planning progress data.
-  const [{ data: timelineRows }, progressMap, { data: introRows }] = await Promise.all([
-    supabase.from("wedding_timeline").select("id, title, start_time, location, event_date, sort_order").eq("wedding_id", wedding.id).order("sort_order"),
+  const [progressMap, { data: introRows }] = await Promise.all([
     computeWeddingsProgress(supabase, [{ id: wedding.id, area_selections: wedding.area_selections }]),
     supabase.from("supplier_intros")
       .select("id, supplier_name, supplier_type, supplier_email, supplier_phone, commission_type, commission_value, status, booking_value, commission_amount, intro_sent_at, booked_at")
@@ -303,53 +302,6 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
         lastOpenedAt={lastOpenedAt}
         sendAction={sendPortalInvite.bind(null, wedding.id, wedding.slug)}
       />
-
-      {/* Wedding weekend at a glance — the run of days with the couple's timeline
-          grouped per day (venues think in weekends, not single dates). */}
-      {wedding.wedding_date && (() => {
-        const start = String(wedding.wedding_date).slice(0, 10);
-        const end = String(wedding.wedding_end_date ?? wedding.wedding_date).slice(0, 10);
-        const days: string[] = [];
-        for (let d = new Date(`${start}T12:00:00`); days.length < 7 && d.toISOString().slice(0, 10) <= end; d.setDate(d.getDate() + 1)) {
-          days.push(d.toISOString().slice(0, 10));
-        }
-        type TlRow = { id: string; title: string; start_time: string | null; location: string | null; event_date: string | null };
-        const tl = (timelineRows ?? []) as TlRow[];
-        if (days.length < 2 && tl.length === 0) return null;
-        const byDay = new Map<string, TlRow[]>();
-        for (const item of tl) {
-          const key = item.event_date && days.includes(String(item.event_date).slice(0, 10)) ? String(item.event_date).slice(0, 10) : days[0];
-          (byDay.get(key) ?? byDay.set(key, []).get(key)!).push(item);
-        }
-        const dayName = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "short" });
-        return (
-          <section className="vy-card">
-            <div className="vy-eyebrow">Wedding weekend</div>
-            <h2 className="vy-h2 mt-1 mb-4">{days.length > 1 ? `${days.length} days at a glance` : "The day at a glance"}</h2>
-            <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(days.length, 4)}, minmax(0, 1fr))` }}>
-              {days.map((d, i) => (
-                <div key={d} className="rounded-xl p-4" style={{ border: "1px solid var(--line)", background: i === 0 && days.length > 1 ? "var(--cream)" : "#fff" }}>
-                  <div className="text-sm font-semibold" style={{ color: "var(--poppy-deep)" }}>{dayName(d)}</div>
-                  <ul className="mt-2 space-y-1.5">
-                    {(byDay.get(d) ?? []).map((item) => (
-                      <li key={item.id} className="text-sm flex gap-2">
-                        <span className="tabular-nums shrink-0 font-medium" style={{ color: "var(--ink-2)" }}>{item.start_time || "—"}</span>
-                        <span>
-                          {item.title}
-                          {item.location && <span style={{ color: "var(--ink-2)" }}> · {item.location}</span>}
-                        </span>
-                      </li>
-                    ))}
-                    {!(byDay.get(d) ?? []).length && (
-                      <li className="text-xs" style={{ color: "var(--ink-2)" }}>Nothing scheduled yet — the couple builds this in their portal&apos;s Timeline tab.</li>
-                    )}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </section>
-        );
-      })()}
 
       {/* Couple's custom item requests — quote these and add them as charges. */}
       {(state.customRequests ?? []).length > 0 && (
