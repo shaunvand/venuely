@@ -9,13 +9,30 @@ export type Supplier = {
 type VenuePartner = { id: string; type: string; name: string; description: string; price: number | null; email: string | null; phone: string | null; website?: string | null; img?: string | null; commissionValue?: number | null; commissionType?: string | null };
 
 const serif: React.CSSProperties = { fontFamily: "'Fraunces', Georgia, serif" };
-const CATEGORIES = ["Venue", "Catering", "Photography", "Flowers", "Music", "Hair & Makeup", "Cake", "Waiter/Bar Staff", "Beverages", "Other"];
+const CATEGORIES = ["Venue", "Catering", "Photography", "Flowers", "Music", "Planning", "Décor", "Hair & Makeup", "Cake", "Waiter/Bar Staff", "Beverages", "Other"];
 const STATUS: Record<string, { label: string; color: string }> = {
   pending: { label: "Pending", color: "#8a8a8a" }, contacted: { label: "Contacted", color: "#b7791f" }, booked: { label: "Booked", color: "#1a7f4b" },
 };
 const rZA = (n: string | number | undefined) => { const v = Number(String(n ?? "").replace(/[^\d.]/g, "")); return v ? `R${Math.round(v).toLocaleString("en-ZA")}` : ""; };
 const fmtDate = (s?: string) => (s ? new Date(`${s.slice(0, 10)}T00:00:00`).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "");
-const labelFor = (t: string) => ({ photo: "Photography", catering: "Catering", music: "Music", flowers: "Flowers", cake: "Cake", beauty: "Hair & Makeup", bar: "Waiter/Bar Staff", beverages: "Beverages", venue: "Venue" } as Record<string, string>)[t] || (t ? t[0].toUpperCase() + t.slice(1) : "Other");
+// Maps a vendor's stored type (DB code OR a label) to a display category that
+// matches the filter chips, e.g. "photographer"/"photo" → "Photography".
+const labelFor = (t: string) => {
+  const k = String(t ?? "").toLowerCase();
+  return ({
+    photo: "Photography", photographer: "Photography", photographers: "Photography", photography: "Photography",
+    catering: "Catering", caterer: "Catering", caterers: "Catering",
+    music: "Music", dj: "Music", djs: "Music", band: "Music",
+    flowers: "Flowers", florist: "Flowers", florists: "Flowers", floral: "Flowers",
+    planner: "Planning", planners: "Planning", planning: "Planning", coordinator: "Planning",
+    decor: "Décor", "décor": "Décor", decorator: "Décor",
+    cake: "Cake", bakery: "Cake",
+    beauty: "Hair & Makeup", makeup: "Hair & Makeup", hair: "Hair & Makeup",
+    bar: "Waiter/Bar Staff", waiter: "Waiter/Bar Staff", staff: "Waiter/Bar Staff",
+    beverages: "Beverages", drinks: "Beverages",
+    venue: "Venue",
+  } as Record<string, string>)[k] || (k ? k[0].toUpperCase() + k.slice(1) : "Other");
+};
 
 const blank = (): Supplier => ({ id: "", category: "Photography", name: "", email: "", phone: "", price: "", status: "pending", dueDate: "", description: "" });
 
@@ -61,8 +78,14 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
 
   // Always show the full standard category set so couples can filter by any of them,
   // plus any custom categories they've added.
-  const cats = ["All", ...CATEGORIES, ...Array.from(new Set(list.map((s) => s.category).filter((c) => c && !CATEGORIES.includes(c)) as string[]))];
+  // Standard set + any extra categories present in the couple's list OR the
+  // venue's recommended vendors, so every category that has suppliers is filterable.
+  const extraCats = Array.from(new Set([...list.map((s) => s.category), ...vendors.map((v) => labelFor(v.type))].filter((c) => c && !CATEGORIES.includes(c)) as string[]));
+  const cats = ["All", ...CATEGORIES, ...extraCats];
   const shown = filter === "All" ? list : list.filter((s) => s.category === filter);
+  // Recommended vendors must honour the same filter (this was the bug — they showed
+  // all regardless of the selected category).
+  const shownVendors = filter === "All" ? vendors : vendors.filter((v) => labelFor(v.type) === filter);
 
   const card: React.CSSProperties = { background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius };
   // Shared card chrome matching the Accommodation / Catalogue cards.
@@ -114,12 +137,12 @@ export function SuppliersManager({ venueName, vendors, suppliers, onChange, prim
         </div>
       )}
 
-      {/* Recommended by venue — below the couple's own tracker */}
-      {vendors.length > 0 && (
+      {/* Recommended by venue — below the couple's own tracker, filtered to category */}
+      {shownVendors.length > 0 && (
         <div>
-          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1.5, color: "#a8a29e", fontWeight: 700, marginBottom: 10 }}>Recommended by {venueName}</div>
+          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1.5, color: "#a8a29e", fontWeight: 700, marginBottom: 10 }}>Recommended by {venueName}{filter !== "All" ? ` · ${filter}` : ""}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(230px,1fr))", gap: 12 }}>
-            {vendors.map((v) => {
+            {shownVendors.map((v) => {
               const added = list.some((x) => x.fromVendorId === v.id);
               const inConversation = introduced.has(v.id);
               return (
