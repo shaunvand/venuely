@@ -39,6 +39,10 @@ export async function setupVenue(_prevState: SetupVenueState, formData: FormData
   const contactPhone = (formData.get("contact_phone") as string || "").trim() || null;
   const logoUrl      = (formData.get("logo_url") as string || "").trim() || null;
   const description  = (formData.get("description") as string || "").trim() || null;
+  // The website the owner imported from — persisted so the wizard's "Find spaces"
+  // (and future re-imports) can read it. Normalised to an https URL.
+  let website = (formData.get("website") as string || "").trim() || null;
+  if (website && !/^https?:\/\//i.test(website)) website = `https://${website}`;
 
   let seed: SeedPayload = {};
   const rawSeed = (formData.get("seed_payload") as string || "").trim();
@@ -81,6 +85,7 @@ export async function setupVenue(_prevState: SetupVenueState, formData: FormData
         contact_email: contactEmail,
         contact_phone: contactPhone,
         branding_logo_url: logoUrl,
+        website,
         subscription_status: "trialing",
         trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
       })

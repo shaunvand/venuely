@@ -287,6 +287,8 @@ export function SetupVenueForm({
       ) : null}
 
       <input type="hidden" name="seed_payload" value={data ? JSON.stringify({ catalogue: data.catalogue ?? [], rentals: data.rentals ?? [], accommodation: data.accommodation ?? [] }) : ""} />
+      {/* The website the owner imported from — persisted so "Find spaces" can re-read it. */}
+      <input type="hidden" name="website" value={url} />
 
       {actionState?.error && (
         <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" aria-live="polite">
