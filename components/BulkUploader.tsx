@@ -114,6 +114,25 @@ const BUBBLE_PRIMARY_LG = "inline-flex items-center gap-2 rounded-full px-7 py-3
 const BUBBLE_SECONDARY = `${BUBBLE} bg-white border border-stone-300 text-stone-800 hover:bg-stone-100`;
 const BUBBLE_GHOST = `${BUBBLE} text-stone-700 hover:bg-stone-100`;
 
+// Thin-line stroke icons matching Venuely's iconography (same family as the
+// sidebar + couple portal) — replaces emoji so glyphs render identically on
+// every platform and stay on-brand. Colour follows currentColor.
+function vyIcon(name: string, size = 14): React.ReactNode {
+  const P: Record<string, React.ReactNode> = {
+    folder: <path d="M3 7a2 2 0 0 1 2-2h3.4l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
+    search: <><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4-4" /></>,
+    mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M4 7.5l8 5.5 8-5.5" /></>,
+    phone: <path d="M6.5 3.5h3l1.4 4.2-2 1.4a12 12 0 0 0 5.6 5.6l1.4-2 4.2 1.4v3a2 2 0 0 1-2.1 2A16.5 16.5 0 0 1 4.5 5.6 2 2 0 0 1 6.5 3.5z" />,
+    chevron: <path d="M5 8l5 5 5-5" />,
+    clip: <path d="M19 11.5l-7.3 7.3a4 4 0 0 1-5.7-5.7l7.6-7.6a2.6 2.6 0 0 1 3.7 3.7l-7.5 7.5a1.2 1.2 0 0 1-1.7-1.7l6.8-6.8" />,
+  };
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ display: "inline-block", verticalAlign: "-2px", flexShrink: 0 }}>
+      {P[name] ?? P.folder}
+    </svg>
+  );
+}
+
 type BulkUploaderProps = {
   venueId: string;
   embedded?: boolean;
@@ -619,7 +638,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
             className="hidden" />
         </label>
         <label className={(busy ? BUBBLE_SECONDARY + " opacity-50 cursor-not-allowed" : BUBBLE_SECONDARY + " cursor-pointer")}>
-          📁 Choose a folder
+          {vyIcon("folder")}<span>Choose a folder</span>
           <input ref={folderRef} type="file"
             disabled={busy}
             {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
@@ -834,7 +853,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={String(it.data.image_url)} alt="" className="w-full aspect-[4/3] rounded-lg object-cover" style={{ border: "1px solid var(--line)" }} />
                             {includedSource === "embedded" && (
-                              <span className="absolute bottom-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "var(--leaf)", color: "#1f5d3e" }} title="From your file">📎</span>
+                              <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-full inline-flex items-center" style={{ background: "var(--leaf)", color: "#1f5d3e" }} title="From your file">{vyIcon("clip", 11)}</span>
                             )}
                           </div>
                         ) : (
@@ -847,7 +866,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                             className="w-full box-border rounded-full px-3 py-1.5 text-[11px] text-center truncate cursor-pointer bg-white"
                             style={{ border: "1px solid var(--line)", opacity: uploadingId === it._id ? 0.6 : 1 }}
                           >
-                            {uploadingId === it._id ? "Uploading…" : "📁 Pick from file"}
+                            {uploadingId === it._id ? "Uploading…" : <span className="inline-flex items-center justify-center gap-1.5">{vyIcon("folder")} Pick from file</span>}
                             <input
                               type="file"
                               accept="image/*"
@@ -862,7 +881,7 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                             className="w-full box-border rounded-full px-3 py-1.5 text-[11px] text-center truncate"
                             style={{ background: "var(--ink)", color: "#fff" }}
                           >
-                            🔍 Find a different image online
+                            <span className="inline-flex items-center justify-center gap-1.5">{vyIcon("search")} Find a different image online</span>
                           </button>
                         </div>
                       </div>
@@ -870,8 +889,8 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
                       {/* Contact line */}
                       {(contactEmail || contactPhone) && (
                         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]" style={{ color: "var(--ink-2)" }}>
-                          {contactEmail && <span>✉ {contactEmail}</span>}
-                          {contactPhone && <span>📞 {contactPhone}</span>}
+                          {contactEmail && <span className="inline-flex items-center gap-1">{vyIcon("mail", 12)} {contactEmail}</span>}
+                          {contactPhone && <span className="inline-flex items-center gap-1">{vyIcon("phone", 12)} {contactPhone}</span>}
                         </div>
                       )}
 
@@ -893,8 +912,8 @@ export const BulkUploader = forwardRef<BulkUploaderHandle, BulkUploaderProps>(fu
 
                       {/* Edit fields disclosure */}
                       <details className="text-[11px]">
-                        <summary className="cursor-pointer select-none py-1 rounded" style={{ color: "var(--ink-2)" }}>
-                          Edit fields ▾
+                        <summary className="cursor-pointer select-none py-1 rounded inline-flex items-center gap-1" style={{ color: "var(--ink-2)" }}>
+                          Edit fields {vyIcon("chevron", 12)}
                         </summary>
                         <div className="mt-2 space-y-1.5">
                           <div>
