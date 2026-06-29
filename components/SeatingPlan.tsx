@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 type Guest = { id: string; full_name: string; seat_table_id: string | null; seat_index: number | null };
 type Table = { id: string; name: string; shape: string; seats: number; include_ends: boolean; sort_order: number | null };
@@ -188,8 +189,9 @@ export function SeatingPlan({ slug, primary, accent, heading, cardRadius }: {
         <div style={{ display: "grid", gap: 16 }}>{tables.map((t) => tableCard(t))}</div>
       )}
 
-      {/* Add Table modal */}
-      {showTableModal && (
+      {/* Add Table modal — portalled to body so position:fixed escapes the couple
+          portal's transformed `.anim-fade-up` ancestor (recurring trap). */}
+      {showTableModal && typeof document !== "undefined" && createPortal((
         <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setShowTableModal(false)}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 18, padding: 26, width: "min(440px,100%)" }}>
             <h3 style={{ ...serif, fontSize: 22, margin: "0 0 16px" }}>Add Table</h3>
@@ -214,7 +216,7 @@ export function SeatingPlan({ slug, primary, accent, heading, cardRadius }: {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }

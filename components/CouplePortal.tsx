@@ -549,7 +549,9 @@ export function CouplePortal({
                       const active = c.key === tab;
                       // Seating needs guests first — dim + lock until ≥1 guest added.
                       const locked = c.key === "Seating" && guestCount === 0;
-                      return <button key={c.key} disabled={locked} onClick={() => { if (locked) { setTab("Guests"); setNavOpen(false); return; } setTab(c.key); setNavOpen(false); }} title={locked ? "Add guests first to unlock seating" : undefined} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "none", cursor: locked ? "not-allowed" : "pointer", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#57534e", opacity: locked ? 0.45 : 1 }}>{navIcon(c.icon)}<span style={{ flex: 1 }}>{c.label}</span>{locked && <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}</button>;
+                      // Locked Seating stays clickable (not `disabled`, which would
+                      // swallow the click) and routes the couple to Guests instead.
+                      return <button key={c.key} aria-disabled={locked} onClick={() => { if (locked) { setTab("Guests"); setNavOpen(false); return; } setTab(c.key); setNavOpen(false); }} title={locked ? "Add a guest first to unlock seating" : undefined} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#57534e", opacity: locked ? 0.45 : 1 }}>{navIcon(c.icon)}<span style={{ flex: 1 }}>{c.label}</span>{locked && <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}</button>;
                     })}
                   </div>
                 )}
@@ -1084,6 +1086,12 @@ function PortalTour({ steps, onClose, primary }: { steps: TourStep[]; onClose: (
     return () => { cancelled = true; clearTimeout(t); cancelAnimationFrame(raf); window.removeEventListener("resize", onMove); window.removeEventListener("scroll", onMove, true); };
   }, [i]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   const PAD = 8;
   const hole = rect ? { left: rect.left - PAD, top: rect.top - PAD, w: rect.width + PAD * 2, h: rect.height + PAD * 2 } : null;
 
@@ -1123,7 +1131,7 @@ function PortalTour({ steps, onClose, primary }: { steps: TourStep[]; onClose: (
       ) : (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.58)", pointerEvents: "none" }} />
       )}
-      <div style={{ position: "fixed", width: TW, background: "#fff", borderRadius: 16, boxShadow: "0 18px 50px rgba(0,0,0,0.35)", padding: 18, zIndex: 9999, ...tip }}>
+      <div role="dialog" aria-modal="true" aria-label={`Tour: ${step.title}`} style={{ position: "fixed", width: TW, background: "#fff", borderRadius: 16, boxShadow: "0 18px 50px rgba(0,0,0,0.35)", padding: 18, zIndex: 9999, ...tip }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 10.5, fontWeight: 700, color: primary, textTransform: "uppercase", letterSpacing: 1 }}>Step {i + 1} of {steps.length}</span>
           <button onClick={onClose} aria-label="Skip tour" style={{ border: "none", background: "transparent", color: "#a8a29e", fontSize: 12, cursor: "pointer" }}>Skip ✕</button>
