@@ -1,5 +1,6 @@
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
+import { MoneyTabs } from "@/components/MoneyTabs";
 
 // Real receipts live in payment_ledger (one row per payment in / refund out,
 // written by the wedding ledger UI + the Paystack webhook). The old `payments`
@@ -56,6 +57,7 @@ export default async function VenuePayments() {
 
   return (
     <div className="space-y-6">
+      <MoneyTabs active="payments" />
       <div className="flex justify-between items-start">
         <h1 className="text-2xl font-semibold">Payments · {venue.name}</h1>
         <div className="text-right text-sm">

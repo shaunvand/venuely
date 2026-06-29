@@ -7,6 +7,7 @@ import { ConnectPayoutsForm } from "./ConnectPayoutsForm";
 import { isPaystackConfigured, listBanks } from "@/lib/billing/paystack";
 import { resolveInvoiceTemplate, resolveInvoiceTheme } from "@/lib/invoice/templates";
 import { resolveTheme } from "@/lib/portal/templates";
+import { MoneyTabs } from "@/components/MoneyTabs";
 
 export const metadata = {
   title: "Payouts & billing — Venuely",
@@ -52,6 +53,7 @@ export default async function VenueBillingPage() {
 
   return (
     <div className="space-y-8 max-w-3xl">
+      <MoneyTabs active="payouts" />
       <header>
         <h1 className="vy-h1">Payouts &amp; billing</h1>
         <p className="text-sm text-[color:var(--ink-2)] mt-1">
