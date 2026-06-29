@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 type Action = { label: string; type: string; payload: Record<string, unknown> };
 type Msg = { role: "user" | "assistant"; content: string; actions?: Action[]; applied?: Record<number, boolean> };
@@ -19,6 +20,12 @@ export function AiPlanner({ slug, primary, accent }: { slug: string; primary: st
 
   // Let the Overview "front door" (or anything) open the planner.
   useEffect(() => { const h = () => setOpen(true); window.addEventListener("venuely:open-planner", h); return () => window.removeEventListener("venuely:open-planner", h); }, []);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   // Apply an action: hand it to CouplePortal (single source of truth), mark the
   // button done, and close the drawer so the couple sees it set up in the tab.
@@ -51,10 +58,10 @@ export function AiPlanner({ slug, primary, accent }: { slug: string; primary: st
         ✨ Plan with AI
       </button>
 
-      {open && (
+      {open && typeof document !== "undefined" && createPortal((
         <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", justifyContent: "flex-end" }}>
           <div onClick={() => setOpen(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.25)" }} />
-          <div style={{ position: "relative", width: "min(420px, 100%)", height: "100%", background: "#fff", display: "flex", flexDirection: "column", boxShadow: "-8px 0 30px rgba(0,0,0,0.18)" }}>
+          <div role="dialog" aria-modal="true" aria-label="AI Wedding Planner" style={{ position: "relative", width: "min(420px, 100%)", height: "100%", background: "#fff", display: "flex", flexDirection: "column", boxShadow: "-8px 0 30px rgba(0,0,0,0.18)" }}>
             <div style={{ padding: "16px 18px", borderBottom: "1px solid rgba(0,0,0,0.08)", display: "flex", alignItems: "center", justifyContent: "space-between", background: `linear-gradient(135deg, ${primary}, ${accent})`, color: "#fff" }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 16 }}>✨ AI Wedding Planner</div>
@@ -94,7 +101,7 @@ export function AiPlanner({ slug, primary, accent }: { slug: string; primary: st
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </>
   );
 }

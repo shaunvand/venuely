@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { TemplateTokens } from "@/lib/portal/templates";
+import { readableOn } from "@/lib/portal/contrast";
 
 // Couple dashboard Overview — mirrors the venue dashboard's look & feel (Venuely
 // palette: poppy/sage/cream, Fraunces serif, soft cards). Aggregates the couple's
@@ -75,6 +76,8 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
   // fixed Venuely coral. Falls back to coral only when no brand colour is set.
   const PRIMARY = themePrimary || POPPY;
   const ACCENT = t ? (themeAccent || SAGE) : SAGE;
+  // Legible text/icon colour on solid PRIMARY backgrounds (guards light brand colours).
+  const ON_PRIMARY = readableOn(PRIMARY);
   const serifS: React.CSSProperties = t
     ? { fontFamily: t.headingFont, fontStyle: t.headingItalic ? "italic" : "normal", ...(t.headingWeight != null ? { fontWeight: t.headingWeight } : {}), ...(t.headingLetterSpacing ? { letterSpacing: t.headingLetterSpacing } : {}) }
     : serif;
@@ -210,7 +213,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
     // Modern — solid primary block (names / date / countdown chip) beside the cover.
     hero = (
       <div style={{ display: "grid", gridTemplateColumns: narrow ? "1fr" : "minmax(0,5fr) minmax(0,6fr)", borderRadius: t.cardRadius, overflow: "hidden", border: t.cardBorder }}>
-        <div style={{ background: PRIMARY, color: "#fff", padding: narrow ? "24px 20px" : "32px 28px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 8 }}>
+        <div style={{ background: PRIMARY, color: ON_PRIMARY, padding: narrow ? "24px 20px" : "32px 28px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 8 }}>
           <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: t.eyebrowTracking, fontWeight: 700, opacity: 0.85 }}>Wedding portal · {venue.name}</div>
           <div style={{ ...serifS, fontSize: narrow ? 28 : 36, lineHeight: 1.04 }}>{coupleNames}</div>
           <div style={{ fontSize: 14, opacity: 0.95 }}>{dateLabel}</div>
@@ -276,8 +279,8 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
               const isCurrent = idx === currentStageIdx;
               return (
                 <div key={s.key} style={{ display: "flex", alignItems: "center", flex: idx < stages.length - 1 ? 1 : "0 0 auto" }}>
-                  <button onClick={() => onNavigate(s.nav)} title={`Go to ${s.label}`} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, border: "none", background: "transparent", cursor: "pointer", flexShrink: 0, width: 56 }}>
-                    <span style={{ width: 30, height: 30, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, background: s.done ? PRIMARY : "#f1ece6", color: s.done ? "#fff" : isCurrent ? PRIMARY : "#a8a29e", border: isCurrent && !s.done ? `2px solid ${PRIMARY}` : s.done ? "none" : `1px solid ${LINE}` }}>
+                  <button onClick={() => onNavigate(s.nav)} aria-current={isCurrent ? "step" : undefined} title={`Go to ${s.label}`} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, border: "none", background: "transparent", cursor: "pointer", flexShrink: 0, width: 56 }}>
+                    <span style={{ width: 30, height: 30, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, background: s.done ? PRIMARY : "#f1ece6", color: s.done ? ON_PRIMARY : isCurrent ? PRIMARY : "#a8a29e", border: isCurrent && !s.done ? `2px solid ${PRIMARY}` : s.done ? "none" : `1px solid ${LINE}` }}>
                       {s.done ? "✓" : idx + 1}
                     </span>
                     <span style={{ fontSize: 10.5, fontWeight: isCurrent ? 700 : 500, color: isCurrent ? INK : INK2, whiteSpace: "nowrap" }}>{s.label}</span>
@@ -307,7 +310,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
                     <div style={{ fontSize: 12.5, color: INK2 }}>{topTasks[0].detail}</div>
                   </div>
                 </div>
-                <button onClick={() => onNavigate(topTasks[0].tab)} style={{ background: PRIMARY, color: "#fff", border: "none", borderRadius: btnRadius, padding: "11px 22px", fontWeight: 700, cursor: "pointer", fontSize: 14, flexShrink: 0 }}>Let&apos;s do this →</button>
+                <button onClick={() => onNavigate(topTasks[0].tab)} style={{ background: PRIMARY, color: ON_PRIMARY, border: "none", borderRadius: btnRadius, padding: "11px 22px", fontWeight: 700, cursor: "pointer", fontSize: 14, flexShrink: 0 }}>Let&apos;s do this →</button>
               </div>
               {topTasks.length > 1 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, flexWrap: "wrap", borderTop: `1px solid ${INK2}22`, paddingTop: 12 }}>
@@ -451,7 +454,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
       {/* ── RIGHT RAIL ──────────────────────────────────────────── */}
       <div style={{ display: "grid", gap: 16, position: narrow ? "static" : "sticky", top: 16 }}>
         {/* Countdown hero — the venue's brand (primary) colour, not a fixed sage. */}
-        <div style={{ borderRadius: railRadius, padding: 22, background: PRIMARY, color: "#fff", textAlign: "center" }}>
+        <div style={{ borderRadius: railRadius, padding: 22, background: PRIMARY, color: ON_PRIMARY, textAlign: "center" }}>
           <div style={{ ...serifS, fontStyle: t && !t.headingItalic ? "normal" : "italic", fontSize: 14, opacity: 0.95 }}>Your wedding day</div>
           <div style={{ ...serifS, fontSize: 64, lineHeight: 1, margin: "6px 0" }}>{daysToGo ?? "—"}</div>
           <div style={{ fontSize: 12, letterSpacing: 2, textTransform: "uppercase", opacity: 0.9 }}>days to go</div>
@@ -515,7 +518,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
           {(venue.email || venue.phone) && (
             <a
               href={venue.email ? `mailto:${venue.email}?subject=${encodeURIComponent(`Question from ${coupleNames || "your couple"}`)}` : `tel:${venue.phone}`}
-              style={{ display: "block", textAlign: "center", marginTop: 12, background: PRIMARY, color: "#fff", borderRadius: btnRadius, padding: "10px", fontWeight: 700, fontSize: 13, textDecoration: "none" }}
+              style={{ display: "block", textAlign: "center", marginTop: 12, background: PRIMARY, color: ON_PRIMARY, borderRadius: btnRadius, padding: "10px", fontWeight: 700, fontSize: 13, textDecoration: "none" }}
             >
               Message your venue team
             </a>

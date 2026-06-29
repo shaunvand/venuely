@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { catalogueQuantity } from "@/lib/billing/catalogue-qty";
+import { readableOn } from "@/lib/portal/contrast";
 import { useRouter } from "next/navigation";
 import type { TemplateTokens, PortalTheme } from "@/lib/portal/templates";
 import { GuestManager } from "@/components/GuestManager";
@@ -296,6 +297,9 @@ export function CouplePortal({
   const [, startTransition] = useTransition();
   const primary = theme.primary;
   const accent = theme.accent;
+  // Legible text colour for elements sitting on the brand primary (light brand
+  // colours would otherwise show unreadable white text).
+  const onPrimary = readableOn(primary);
   // Classic omits weight/letter-spacing tokens so headings inherit exactly as before.
   const heading: React.CSSProperties = {
     fontFamily: tokens.headingFont,
@@ -481,7 +485,7 @@ export function CouplePortal({
     // portal subtree (incl. sub-components that use var(--poppy)/var(--peach))
     // renders in the venue's primary/accent, not the default Venuely coral.
     <div style={{ display: "flex", minHeight: "100vh", background: tokens.surface, fontFamily: tokens.bodyFont, color: "var(--ink, #1c1917)",
-      "--poppy": primary, "--poppy-deep": primary, "--peach": accent, "--accent": accent } as React.CSSProperties}>
+      "--poppy": primary, "--poppy-deep": primary, "--peach": accent, "--accent": accent, "--on-poppy": onPrimary } as React.CSSProperties}>
       {isMobile && navOpen && <div onClick={() => setNavOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 55 }} />}
       {tourOpen && (
         <PortalTour
@@ -528,7 +532,7 @@ export function CouplePortal({
           {COUPLE_NAV.map((entry) => {
             if (!isGroup(entry)) {
               const active = entry.key === tab;
-              return <button key={entry.key} onClick={() => { setTab(entry.key); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{navIcon(entry.icon)}<span style={{ flex: 1 }}>{entry.label}</span>{entry.key === "Messages" && msgUnread > 0 && <span style={{ background: active ? "#fff" : "var(--poppy,#FA523C)", color: active ? "var(--poppy,#FA523C)" : "#fff", borderRadius: 999, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", lineHeight: 1.5 }}>{msgUnread}</span>}</button>;
+              return <button key={entry.key} aria-current={active ? "page" : undefined} onClick={() => { setTab(entry.key); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "var(--on-poppy,#fff)" : "#44403c" }}>{navIcon(entry.icon)}<span style={{ flex: 1 }}>{entry.label}</span>{entry.key === "Messages" && msgUnread > 0 && <span style={{ background: active ? "var(--on-poppy,#fff)" : "var(--poppy,#FA523C)", color: active ? "var(--poppy,#FA523C)" : "var(--on-poppy,#fff)", borderRadius: 999, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", lineHeight: 1.5 }}>{msgUnread}</span>}</button>;
             }
             const childActive = entry.children.some((c) => c.key === tab);
             const explicit = openGroups[entry.group];
@@ -536,7 +540,7 @@ export function CouplePortal({
             const meta = sectionMeta[entry.group] ?? {};
             return (
               <div key={entry.group}>
-                <button data-tour={`section-${entry.group}`} onClick={() => setOpenGroups((o) => ({ ...o, [entry.group]: !open }))} style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: childActive ? 700 : 600, background: "transparent", color: childActive ? "var(--poppy,#FA523C)" : "#44403c", opacity: meta.dim && !childActive && !open ? 0.55 : 1 }}>
+                <button data-tour={`section-${entry.group}`} aria-expanded={open} aria-controls={`section-panel-${entry.group.replace(/\W+/g, "-")}`} onClick={() => setOpenGroups((o) => ({ ...o, [entry.group]: !open }))} style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: childActive ? 700 : 600, background: "transparent", color: childActive ? "var(--poppy,#FA523C)" : "#44403c", opacity: meta.dim && !childActive && !open ? 0.55 : 1 }}>
                   {navIcon(entry.icon)}
                   <span style={{ flex: 1 }}>{entry.group}</span>
                   {meta.done && <span title="In progress" style={{ width: 15, height: 15, borderRadius: 999, background: "var(--poppy,#FA523C)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12l5 5 9-10" /></svg></span>}
@@ -544,14 +548,14 @@ export function CouplePortal({
                   <svg viewBox="0 0 12 12" width="11" height="11" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} aria-hidden><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </button>
                 {open && (
-                  <div style={{ display: "grid", gap: 2, marginLeft: 12, paddingLeft: 10, borderLeft: "1px solid rgba(0,0,0,0.08)" }}>
+                  <div id={`section-panel-${entry.group.replace(/\W+/g, "-")}`} style={{ display: "grid", gap: 2, marginLeft: 12, paddingLeft: 10, borderLeft: "1px solid rgba(0,0,0,0.08)" }}>
                     {entry.children.map((c) => {
                       const active = c.key === tab;
                       // Seating needs guests first — dim + lock until ≥1 guest added.
                       const locked = c.key === "Seating" && guestCount === 0;
                       // Locked Seating stays clickable (not `disabled`, which would
                       // swallow the click) and routes the couple to Guests instead.
-                      return <button key={c.key} aria-disabled={locked} onClick={() => { if (locked) { setTab("Guests"); setNavOpen(false); return; } setTab(c.key); setNavOpen(false); }} title={locked ? "Add a guest first to unlock seating" : undefined} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#57534e", opacity: locked ? 0.45 : 1 }}>{navIcon(c.icon)}<span style={{ flex: 1 }}>{c.label}</span>{locked && <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}</button>;
+                      return <button key={c.key} aria-disabled={locked} aria-current={active ? "page" : undefined} onClick={() => { if (locked) { setTab("Guests"); setNavOpen(false); return; } setTab(c.key); setNavOpen(false); }} title={locked ? "Add a guest first to unlock seating" : undefined} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "var(--on-poppy,#fff)" : "#57534e", opacity: locked ? 0.45 : 1 }}>{navIcon(c.icon)}<span style={{ flex: 1 }}>{c.label}</span>{locked && <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}</button>;
                     })}
                   </div>
                 )}
@@ -984,19 +988,36 @@ export function CouplePortal({
 // the Vibes" as one tab that opens a dropdown of its children.
 function TopNavBar({ tokens, primary, accent, tab, onTab, msgUnread = 0 }: { tokens: TemplateTokens; primary: string; accent: string; tab: Tab; onTab: (t: Tab) => void; msgUnread?: number }) {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [openRect, setOpenRect] = useState<DOMRect | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);
+  const dropRef = useRef<HTMLDivElement | null>(null);
+  const onPrimary = readableOn(primary);
+  const closeMenu = () => { setOpenGroup(null); setOpenRect(null); };
   useEffect(() => {
     if (!openGroup) return;
-    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpenGroup(null); };
+    // Close on outside click — but NOT when clicking inside the (portalled) menu.
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (ref.current?.contains(t) || dropRef.current?.contains(t)) return;
+      closeMenu();
+    };
+    // The menu is portalled to <body> at fixed coords, so keep it under its
+    // trigger as the bar scrolls/resizes.
+    const reposition = () => {
+      const el = document.querySelector(`[data-topnav-group="${openGroup}"]`) as HTMLElement | null;
+      if (el) setOpenRect(el.getBoundingClientRect());
+    };
     document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [openGroup]);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("resize", reposition); window.removeEventListener("scroll", reposition, true); };
+  }, [openGroup]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const variant = tokens.navStyle === "segmented" ? "segmented" : tokens.navStyle === "pills" ? "pills" : "editorial";
 
   // Per-variant button style for a single tab.
   const tabStyle = (active: boolean, i: number): React.CSSProperties => {
-    if (variant === "segmented") return { border: "none", borderLeft: i === 0 ? "none" : tokens.divider, padding: "8px 13px", fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer", fontWeight: active ? 700 : 500, background: active ? primary : "transparent", color: active ? "#fff" : "#57534e" };
+    if (variant === "segmented") return { border: "none", borderLeft: i === 0 ? "none" : tokens.divider, padding: "8px 13px", fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer", fontWeight: active ? 700 : 500, background: active ? primary : "transparent", color: active ? onPrimary : "#57534e" };
     if (variant === "pills") return { borderRadius: 999, padding: "7px 14px", fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer", fontWeight: active ? 700 : 500, border: `1px solid ${active ? `${primary}55` : "rgba(0,0,0,0.10)"}`, background: active ? `${accent}55` : "rgba(255,255,255,0.65)", color: active ? primary : "#57534e", display: "inline-flex", alignItems: "center", gap: 5 };
     return { border: "none", background: "transparent", cursor: "pointer", padding: "4px 0 10px", whiteSpace: "nowrap", fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: active ? 700 : 500, color: active ? "#1c1917" : "#78716c", boxShadow: active ? "inset 0 -2px 0 #1c1917" : "none", display: "inline-flex", alignItems: "center", gap: 5 };
   };
@@ -1016,10 +1037,10 @@ function TopNavBar({ tokens, primary, accent, tab, onTab, msgUnread = 0 }: { tok
     if (it.kind === "leaf") {
       const active = it.leaf.key === tab;
       return (
-        <button key={it.leaf.key} onClick={() => onTab(it.leaf.key)} style={tabStyle(active, it.num)}>
+        <button key={it.leaf.key} aria-current={active ? "page" : undefined} onClick={() => onTab(it.leaf.key)} style={tabStyle(active, it.num)}>
           {variant === "editorial" && <span style={{ fontSize: 9.5, color: active ? primary : "#a8a29e" }}>{String(it.num + 1).padStart(2, "0")}</span>}
           {it.leaf.label}
-          {it.leaf.key === "Messages" && msgUnread > 0 && <span style={{ background: "var(--poppy,#FA523C)", color: "#fff", border: "1px solid #fff", borderRadius: 999, fontSize: 9.5, fontWeight: 700, padding: "0px 6px", lineHeight: 1.6, marginLeft: 4 }}>{msgUnread}</span>}
+          {it.leaf.key === "Messages" && msgUnread > 0 && <span style={{ background: "var(--poppy,#FA523C)", color: onPrimary, border: "1px solid #fff", borderRadius: 999, fontSize: 9.5, fontWeight: 700, padding: "0px 6px", lineHeight: 1.6, marginLeft: 4 }}>{msgUnread}</span>}
         </button>
       );
     }
@@ -1028,24 +1049,40 @@ function TopNavBar({ tokens, primary, accent, tab, onTab, msgUnread = 0 }: { tok
     const isOpen = openGroup === g.group;
     return (
       <div key={g.group} style={{ position: "relative", display: "inline-flex" }}>
-        <button onClick={() => setOpenGroup((o) => o === g.group ? null : g.group)} style={tabStyle(childActive, it.num)}>
+        <button
+          data-tour={`section-${g.group}`}
+          data-topnav-group={g.group}
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
+          onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); if (isOpen) { closeMenu(); } else { setOpenGroup(g.group); setOpenRect(r); } }}
+          style={tabStyle(childActive, it.num)}
+        >
           {variant === "editorial" && <span style={{ fontSize: 9.5, color: childActive ? primary : "#a8a29e" }}>{String(it.num + 1).padStart(2, "0")}</span>}
           {g.group}
           <svg viewBox="0 0 12 12" width="10" height="10" style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} aria-hidden><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
-        {isOpen && (
-          <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 30, background: "#fff", border: "1px solid var(--line, #ece7e1)", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", padding: 6, minWidth: 180 }}>
-            {g.children.map((c) => {
-              const active = c.key === tab;
-              return <button key={c.key} onClick={() => { onTab(c.key); setOpenGroup(null); }} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", border: "none", cursor: "pointer", borderRadius: 8, padding: "8px 10px", fontSize: 13, whiteSpace: "nowrap", fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{navIcon(c.icon)}<span>{c.label}</span></button>;
-            })}
-          </div>
-        )}
       </div>
     );
   });
 
-  return <div ref={ref} style={wrapStyle}>{innerStyle ? <div style={innerStyle}>{renderTabs}</div> : renderTabs}</div>;
+  // The currently-open group's menu — portalled to <body> so it can't be clipped
+  // by the bar's `overflow-x: auto` (which the spec also turns into overflow-y).
+  const openG = openGroup ? (COUPLE_NAV.find((e) => isGroup(e) && e.group === openGroup) as NavGroup | undefined) : undefined;
+  const menuLeft = openRect ? Math.max(8, Math.min(openRect.left, (typeof window !== "undefined" ? window.innerWidth : 1200) - 200)) : 0;
+
+  return (
+    <>
+      <div ref={ref} data-tour="nav" style={wrapStyle}>{innerStyle ? <div style={innerStyle}>{renderTabs}</div> : renderTabs}</div>
+      {openG && openRect && typeof document !== "undefined" && createPortal((
+        <div ref={dropRef} role="menu" style={{ position: "fixed", top: openRect.bottom + 4, left: menuLeft, zIndex: 9990, background: "#fff", border: "1px solid var(--line, #ece7e1)", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.16)", padding: 6, minWidth: 184 }}>
+          {openG.children.map((c) => {
+            const active = c.key === tab;
+            return <button key={c.key} role="menuitem" aria-current={active ? "page" : undefined} onClick={() => { onTab(c.key); closeMenu(); }} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", border: "none", cursor: "pointer", borderRadius: 8, padding: "8px 10px", fontSize: 13, whiteSpace: "nowrap", fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? onPrimary : "#44403c" }}>{navIcon(c.icon)}<span>{c.label}</span></button>;
+          })}
+        </div>
+      ), document.body)}
+    </>
+  );
 }
 
 // ── First-run guided tour ──────────────────────────────────────────────────
@@ -1059,6 +1096,7 @@ function PortalTour({ steps, onClose, primary }: { steps: TourStep[]; onClose: (
   const [rect, setRect] = useState<DOMRect | null>(null);
   const step = steps[i];
   const last = i === steps.length - 1;
+  const onPrimary = readableOn(primary);
 
   useEffect(() => {
     step.before?.();
@@ -1143,7 +1181,7 @@ function PortalTour({ steps, onClose, primary }: { steps: TourStep[]; onClose: (
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           {i > 0 && <button onClick={() => setI(i - 1)} style={{ border: "1px solid var(--line,#e3ded7)", background: "#fff", color: "#57534e", borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Back</button>}
-          <button onClick={() => last ? onClose() : setI(i + 1)} style={{ border: "none", background: primary, color: "#fff", borderRadius: 999, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{last ? "Got it!" : "Next"}</button>
+          <button onClick={() => last ? onClose() : setI(i + 1)} style={{ border: "none", background: primary, color: onPrimary, borderRadius: 999, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{last ? "Got it!" : "Next"}</button>
         </div>
       </div>
     </div>,
