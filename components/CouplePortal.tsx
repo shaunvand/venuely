@@ -242,6 +242,20 @@ export function CouplePortal({
   // Per-section open state for the sidebar accordion (undefined → use the
   // section's defaultOpen; the section holding the active tab is always open).
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  // First-run guided tour — auto-starts once per couple, re-launchable from the
+  // sidebar "Take the tour" link. Seen-state in localStorage (survives refresh).
+  const [tourOpen, setTourOpen] = useState(false);
+  const startTour = () => setTourOpen(true);
+  const closeTour = () => { setTourOpen(false); try { localStorage.setItem(`venuely_tour_v1_${slug}`, "1"); } catch { /* ignore */ } };
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(`venuely_tour_v1_${slug}`)) {
+        const t = setTimeout(() => setTourOpen(true), 900);
+        return () => clearTimeout(t);
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug]);
   // "+ Add custom item" — a request to the venue (not self-priced; the venue
   // quotes/adds it to the proforma properly). Stored in wedding_state.
   const [customOpen, setCustomOpen] = useState(false);
@@ -452,6 +466,23 @@ export function CouplePortal({
     <div style={{ display: "flex", minHeight: "100vh", background: tokens.surface, fontFamily: tokens.bodyFont, color: "var(--ink, #1c1917)",
       "--poppy": primary, "--poppy-deep": primary, "--peach": accent, "--accent": accent } as React.CSSProperties}>
       {isMobile && navOpen && <div onClick={() => setNavOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 55 }} />}
+      {tourOpen && (
+        <PortalTour
+          primary={primary}
+          onClose={closeTour}
+          steps={[
+            { title: "Welcome to your wedding hub 🎉", body: `Everything for your day with ${venue.name} lives here. Here's a 30-second tour.`, before: () => { setTab("Overview"); if (isMobile) setNavOpen(false); } },
+            { sel: '[data-tour="nav"]', title: "Your plan, in 5 simple sections", body: "Tasks are grouped so nothing feels overwhelming. Open a section to see what's inside.", before: () => { if (isMobile) setNavOpen(true); } },
+            { sel: '[data-tour="start-here"]', title: "Always start here", body: "On Overview, this card always tells you the single most important thing to do next.", before: () => { setTab("Overview"); if (isMobile) setNavOpen(false); } },
+            { sel: '[data-tour="section-Our Venue"]', title: "1 · Our Venue", body: "Choose your ceremony & reception spaces, accommodation, and any paid extras.", before: () => { if (isMobile) setNavOpen(true); } },
+            { sel: '[data-tour="section-Our Guests"]', title: "2 · Our Guests", body: "Build your guest list — seating unlocks once you've added a guest.", before: () => { if (isMobile) setNavOpen(true); } },
+            { sel: '[data-tour="section-Money"]', title: "3 · Money", body: "Track your budget, view invoices & payments, and store your documents.", before: () => { if (isMobile) setNavOpen(true); } },
+            { sel: '[data-tour="section-Suppliers & Style"]', title: "4 · Suppliers & Style", body: "Message venue-recommended suppliers and build your inspiration board.", before: () => { if (isMobile) setNavOpen(true); } },
+            { sel: '[data-tour="section-The Day"]', title: "5 · The Day", body: "Plan your hour-by-hour timeline and tick off your checklist as the day nears.", before: () => { if (isMobile) setNavOpen(true); } },
+            { title: "You're all set! 💍", body: "Reopen this tour any time via “Take the tour” at the bottom of the menu.", before: () => { if (isMobile) setNavOpen(false); } },
+          ]}
+        />
+      )}
       {/* SIDEBAR — classic keeps it on desktop; every template uses it as the mobile drawer */}
       {showAside && (
       <aside style={isMobile
@@ -476,7 +507,7 @@ export function CouplePortal({
             <span style={{ fontSize: 10, letterSpacing: 0.3, color: "#a8a29e" }}>Powered by Venuely</span>
           </div>
         </div>
-        <nav style={{ display: "grid", gap: 2, flex: 1 }}>
+        <nav data-tour="nav" style={{ display: "grid", gap: 2, flex: 1 }}>
           {COUPLE_NAV.map((entry) => {
             if (!isGroup(entry)) {
               const active = entry.key === tab;
@@ -487,7 +518,7 @@ export function CouplePortal({
             const open = (explicit === undefined ? !!entry.defaultOpen : explicit) || childActive;
             return (
               <div key={entry.group}>
-                <button onClick={() => setOpenGroups((o) => ({ ...o, [entry.group]: !open }))} style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: childActive ? 700 : 600, background: "transparent", color: childActive ? "var(--poppy,#FA523C)" : "#44403c" }}>
+                <button data-tour={`section-${entry.group}`} onClick={() => setOpenGroups((o) => ({ ...o, [entry.group]: !open }))} style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: childActive ? 700 : 600, background: "transparent", color: childActive ? "var(--poppy,#FA523C)" : "#44403c" }}>
                   {navIcon(entry.icon)}
                   <span style={{ flex: 1 }}>{entry.group}</span>
                   <svg viewBox="0 0 12 12" width="11" height="11" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} aria-hidden><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -506,7 +537,11 @@ export function CouplePortal({
             );
           })}
         </nav>
-        <div style={{ marginTop: 14, background: "var(--bone,#FFF6F0)", borderRadius: 12, padding: 12 }}>
+        <button onClick={() => { setNavOpen(false); startTour(); }} style={{ marginTop: 14, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, border: "1px dashed var(--line,#e3ded7)", background: "transparent", color: "#78716c", borderRadius: 10, padding: "8px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M9.5 9a2.5 2.5 0 0 1 4.5 1.5c0 1.5-2 2-2 3" /><path d="M12 17h.01" /></svg>
+          Take the tour
+        </button>
+        <div style={{ marginTop: 10, background: "var(--bone,#FFF6F0)", borderRadius: 12, padding: 12 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700 }}>Need help?</div>
           <div style={{ fontSize: 11.5, color: "#78716c", margin: "2px 0 8px" }}>Your venue coordinator is here to help.</div>
           {venue.email && <a href={`mailto:${venue.email}`} style={{ display: "block", textAlign: "center", border: "1px solid var(--poppy,#FA523C)", color: "var(--poppy,#FA523C)", borderRadius: 999, padding: "6px", fontSize: 12.5, fontWeight: 600, textDecoration: "none" }}>Message Venue</a>}
@@ -989,6 +1024,91 @@ function TopNavBar({ tokens, primary, accent, tab, onTab, msgUnread = 0 }: { tok
   });
 
   return <div ref={ref} style={wrapStyle}>{innerStyle ? <div style={innerStyle}>{renderTabs}</div> : renderTabs}</div>;
+}
+
+// ── First-run guided tour ──────────────────────────────────────────────────
+// Hand-rolled spotlight: a dimmed overlay with a cut-out over the current target
+// + a tooltip card. Rendered via createPortal to document.body so position:fixed
+// escapes the portal's transformed/animated ancestors (the recurring trap here).
+type TourStep = { sel?: string; title: string; body: string; before?: () => void };
+
+function PortalTour({ steps, onClose, primary }: { steps: TourStep[]; onClose: () => void; primary: string }) {
+  const [i, setI] = useState(0);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const step = steps[i];
+  const last = i === steps.length - 1;
+
+  useEffect(() => {
+    step.before?.();
+    let raf = 0, tries = 0, cancelled = false;
+    const measure = () => {
+      if (cancelled) return;
+      const el = step.sel ? (document.querySelector(step.sel) as HTMLElement | null) : null;
+      if (el) {
+        el.scrollIntoView({ block: "nearest", behavior: "auto" });
+        setRect(el.getBoundingClientRect());
+      } else if (step.sel && tries < 12) {
+        tries++; raf = requestAnimationFrame(measure);
+      } else {
+        setRect(null); // centered fallback (no target / not visible)
+      }
+    };
+    // Give `before` (tab switch / drawer open) time to lay out before measuring.
+    const t = setTimeout(() => { raf = requestAnimationFrame(measure); }, step.before ? 340 : 60);
+    const onMove = () => {
+      const el = step.sel ? (document.querySelector(step.sel) as HTMLElement | null) : null;
+      setRect(el ? el.getBoundingClientRect() : null);
+    };
+    window.addEventListener("resize", onMove);
+    window.addEventListener("scroll", onMove, true);
+    return () => { cancelled = true; clearTimeout(t); cancelAnimationFrame(raf); window.removeEventListener("resize", onMove); window.removeEventListener("scroll", onMove, true); };
+  }, [i]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const PAD = 8;
+  const hole = rect ? { left: rect.left - PAD, top: rect.top - PAD, w: rect.width + PAD * 2, h: rect.height + PAD * 2 } : null;
+
+  // Tooltip placement: below the hole if there's room, else above; centered when
+  // there's no target. Clamped horizontally to the viewport.
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+  const TW = Math.min(300, vw - 24);
+  let tip: React.CSSProperties;
+  if (hole) {
+    const below = hole.top + hole.h + 12;
+    const placeBelow = below + 160 < vh;
+    const left = Math.max(12, Math.min(hole.left, vw - TW - 12));
+    tip = placeBelow
+      ? { top: below, left }
+      : { top: Math.max(12, hole.top - 12), left, transform: "translateY(-100%)" };
+  } else {
+    tip = { top: "50%", left: "50%", transform: "translate(-50%,-50%)" };
+  }
+
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: 9998 }}>
+      {hole ? (
+        <div style={{ position: "fixed", left: hole.left, top: hole.top, width: hole.w, height: hole.h, borderRadius: 12, boxShadow: "0 0 0 9999px rgba(0,0,0,0.58)", pointerEvents: "none", transition: "left .2s, top .2s, width .2s, height .2s" }} />
+      ) : (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.58)", pointerEvents: "none" }} />
+      )}
+      <div style={{ position: "fixed", width: TW, background: "#fff", borderRadius: 16, boxShadow: "0 18px 50px rgba(0,0,0,0.35)", padding: 18, zIndex: 9999, ...tip }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: primary, textTransform: "uppercase", letterSpacing: 1 }}>Step {i + 1} of {steps.length}</span>
+          <button onClick={onClose} aria-label="Skip tour" style={{ border: "none", background: "transparent", color: "#a8a29e", fontSize: 12, cursor: "pointer" }}>Skip ✕</button>
+        </div>
+        <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 18, fontWeight: 700, margin: "6px 0 6px", color: "#1c1917" }}>{step.title}</div>
+        <div style={{ fontSize: 13, color: "#57534e", lineHeight: 1.55 }}>{step.body}</div>
+        <div style={{ display: "flex", gap: 6, margin: "14px 0 12px" }}>
+          {steps.map((_, k) => <span key={k} style={{ height: 5, flex: 1, borderRadius: 999, background: k <= i ? primary : "#e7e2db" }} />)}
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          {i > 0 && <button onClick={() => setI(i - 1)} style={{ border: "1px solid var(--line,#e3ded7)", background: "#fff", color: "#57534e", borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Back</button>}
+          <button onClick={() => last ? onClose() : setI(i + 1)} style={{ border: "none", background: primary, color: "#fff", borderRadius: 999, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{last ? "Got it!" : "Next"}</button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
 }
 
 function Section({ title, sub, heading, tokens, primary, children }: { title: string; sub?: string; heading: React.CSSProperties; tokens: TemplateTokens; primary: string; children: React.ReactNode }) {

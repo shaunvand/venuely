@@ -256,7 +256,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
         {/* Your next step — one clear focal action so new couples aren't
             overwhelmed by the full overview. Surfaces the #1 task as a big
             button, the following steps as quieter chips, and a progress hint. */}
-        <div style={{ borderRadius: railRadius, padding: 18, border: `1px solid ${PRIMARY}33`, background: `${PRIMARY}0f` }}>
+        <div data-tour="start-here" style={{ borderRadius: railRadius, padding: 18, border: `1px solid ${PRIMARY}33`, background: `${PRIMARY}0f` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <span style={{ ...eyebrowS, color: PRIMARY }}>Start here</span>
             <span style={{ fontSize: 11.5, color: INK2 }}>· {doneCount} of 6 areas done</span>
