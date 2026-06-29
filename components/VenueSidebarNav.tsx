@@ -74,8 +74,8 @@ const TOP_LINKS: (Item & { icon: IconName })[] = [
   { href: "/venue", label: "Overview", icon: "overview" },
   { href: "/venue/your-venue", label: "Couple Experience", icon: "venue" },
   { href: "/venue/weddings", label: "Weddings", icon: "weddings" },
-  // Accommodation is half the business for farm/lodge venues — first-class nav.
-  { href: "/venue/accommodation", label: "Accommodation", icon: "bed" },
+  // One hub for everything couples choose (catalogue, rentals, areas, rooms, seating).
+  { href: "/venue/inventory", label: "Inventory", icon: "marketplace" },
   { href: "/venue/calendar", label: "Calendar", icon: "calendar" },
   { href: "/venue/suppliers", label: "Suppliers", icon: "vendors" },
   { href: "/venue/enquiries", label: "Enquiries", icon: "enquiries" },
@@ -84,24 +84,8 @@ const TOP_LINKS: (Item & { icon: IconName })[] = [
 ];
 
 const GROUPS: Group[] = [
-  {
-    label: "Marketplace",
-    icon: "marketplace",
-    items: [
-      { href: "/venue/catalogue", label: "Catalogue", icon: "catalogue" },
-      {
-        href: "/venue/rentals",
-        label: "Rentals",
-        icon: "box",
-        children: [
-          { href: "/venue/rentals?view=included", label: "Included" },
-          { href: "/venue/rentals?view=extras", label: "Extras" },
-        ],
-      },
-      { href: "/venue/areas", label: "Areas", icon: "areas" },
-      { href: "/venue/seating", label: "Seating & tables", icon: "seat" },
-    ],
-  },
+  // Catalogue / Rentals / Areas / Accommodation / Seating now live under the
+  // single "Inventory" hub (top-level link above), not a separate group.
   { label: "Money", icon: "money", items: [{ href: "/venue/payments", label: "Payments", icon: "card" }, { href: "/venue/billing", label: "Payouts & fees", icon: "payout" }] },
   { label: "Setup", icon: "setup", items: [{ href: "/venue/setup", label: "Checklist", icon: "check" }, { href: "/venue/settings", label: "Settings", icon: "settings" }, { href: "/venue/team", label: "Team", icon: "team" }] },
 ];
