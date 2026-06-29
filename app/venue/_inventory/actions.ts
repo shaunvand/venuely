@@ -65,6 +65,10 @@ export async function updateItem(type: InventoryType, id: string, patch: Record<
     if (v === undefined) continue;
     safe[k] = v;
   }
+  // commission_* are NOT NULL with DB defaults; a blank edit sends null → would
+  // 500. Coerce to the column default so the update succeeds.
+  if (safe.commission_value === null || safe.commission_value === "") safe.commission_value = 0;
+  if (safe.commission_type === null || safe.commission_type === "") safe.commission_type = "fixed";
   const { error } = await supabase.from(INVENTORY_TABLES[type]).update(safe).eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath(INVENTORY_PATHS[type]);
@@ -73,7 +77,13 @@ export async function updateItem(type: InventoryType, id: string, patch: Record<
 export async function addItem(type: InventoryType, venueId: string, patch: Record<string, unknown>) {
   const supabase = await client();
   const defaults = defaultsFor(type);
-  const row = { ...defaults, ...patch, venue_id: venueId };
+  const row: Record<string, unknown> = { ...defaults, ...patch, venue_id: venueId };
+  // Drop blank fields so each column's DB default applies — crucial for NOT NULL
+  // columns with defaults (commission_value=0, commission_type='fixed', etc.),
+  // which an explicit null would violate (a silent 500 on "Add item").
+  for (const k of Object.keys(row)) {
+    if ((row[k] === null || row[k] === "") && k !== "venue_id") delete row[k];
+  }
   const { error } = await supabase.from(INVENTORY_TABLES[type]).insert(row);
   if (error) throw new Error(error.message);
   revalidatePath(INVENTORY_PATHS[type]);
