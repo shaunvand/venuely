@@ -459,6 +459,20 @@ export function CouplePortal({
   const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 14 };
   const itemProps = { primary, accent, heading, cardRadius: tokens.cardRadius, cardBorder: tokens.cardBorder };
 
+  // Progressive disclosure — soft-dim sections that aren't the couple's focus yet
+  // (still clickable, just de-emphasised) + a ✓ pip on sections with real progress,
+  // so day 1 reads as a short journey rather than 19 equal tabs.
+  const spacesConfirmed = (initialAreaSelections?.length ?? 0) > 0
+    || Object.values(state.rentalSelections ?? {}).some((v) => v?.sel)
+    || Object.values(state.roomAssignments ?? {}).some((a) => Array.isArray(a) && a.length > 0);
+  const sectionMeta: Record<string, { dim?: boolean; hint?: string; done?: boolean }> = {
+    "Our Venue": { done: spacesConfirmed },
+    "Our Guests": { done: guestCount > 0 },
+    "Money": { done: totalDue > 0 },
+    "Suppliers & Style": { dim: !spacesConfirmed, hint: "after spaces", done: (((state as Record<string, unknown>).suppliers as unknown[] | undefined)?.length ?? 0) > 0 },
+    "The Day": { dim: daysToGo != null && daysToGo > 180, hint: "nearer the day" },
+  };
+
   return (
     // Re-point the brand CSS variables to the VENUE's saved theme so the whole
     // portal subtree (incl. sub-components that use var(--poppy)/var(--peach))
@@ -516,11 +530,14 @@ export function CouplePortal({
             const childActive = entry.children.some((c) => c.key === tab);
             const explicit = openGroups[entry.group];
             const open = (explicit === undefined ? !!entry.defaultOpen : explicit) || childActive;
+            const meta = sectionMeta[entry.group] ?? {};
             return (
               <div key={entry.group}>
-                <button data-tour={`section-${entry.group}`} onClick={() => setOpenGroups((o) => ({ ...o, [entry.group]: !open }))} style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: childActive ? 700 : 600, background: "transparent", color: childActive ? "var(--poppy,#FA523C)" : "#44403c" }}>
+                <button data-tour={`section-${entry.group}`} onClick={() => setOpenGroups((o) => ({ ...o, [entry.group]: !open }))} style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: childActive ? 700 : 600, background: "transparent", color: childActive ? "var(--poppy,#FA523C)" : "#44403c", opacity: meta.dim && !childActive && !open ? 0.55 : 1 }}>
                   {navIcon(entry.icon)}
                   <span style={{ flex: 1 }}>{entry.group}</span>
+                  {meta.done && <span title="In progress" style={{ width: 15, height: 15, borderRadius: 999, background: "var(--poppy,#FA523C)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12l5 5 9-10" /></svg></span>}
+                  {!meta.done && meta.dim && meta.hint && <span style={{ fontSize: 9, color: "#a8a29e", fontWeight: 600, textTransform: "lowercase", letterSpacing: 0.2, whiteSpace: "nowrap" }}>{meta.hint}</span>}
                   <svg viewBox="0 0 12 12" width="11" height="11" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} aria-hidden><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </button>
                 {open && (
