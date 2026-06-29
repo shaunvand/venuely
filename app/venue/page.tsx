@@ -3,7 +3,6 @@ import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
 import { computeSetupSteps } from "@/lib/venue/setup";
 import { applyMarkup } from "@/lib/billing/compute";
-import { WelcomeImportModal } from "@/components/WelcomeImportModal";
 import { DashboardWelcomeModal } from "@/components/DashboardWelcomeModal";
 import { VenuelyOpener } from "@/components/VenuelyOpener";
 import { OverviewCalendar } from "@/components/OverviewCalendar";
@@ -102,7 +101,7 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const firstName = String((user?.user_metadata as { full_name?: string } | undefined)?.full_name ?? "").trim().split(" ")[0];
-  const { doneCount, totalCount, pct, counts, hasImported } = await computeSetupSteps(supabase, venue);
+  const { doneCount, totalCount, pct, counts } = await computeSetupSteps(supabase, venue);
   // "Today" in Africa/Johannesburg (UTC+2, no DST) so date-only comparisons don't
   // drift overnight when the server clock runs in UTC.
   const todayIso = new Date(Date.now() + 2 * 3600 * 1000).toISOString().slice(0, 10);
@@ -402,12 +401,7 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
     });
   }
 
-  // Now that there's a dedicated onboarding wizard, only auto-open the welcome import
-  // modal when setup is still incomplete AND nothing has been imported yet (hasImported
-  // is the catalogue/rentals/rooms signal from computeSetupSteps). Once any inventory
-  // exists we stop nagging here and let the wizard / setup checklist take over. The modal
-  // itself still applies a 24-hour cooldown so it isn't shown on every page view.
-  const showWelcome = pct < 100 && !hasImported;
+  const isWelcomeVisit = welcome === "1" || welcome === "force";
 
   const stats = [
     { label: "Upcoming weddings", value: upcomingAll.length.toString(), sub: `${counts.weddings} total`, href: "/venue/weddings", accent: "var(--poppy)" },
@@ -426,12 +420,13 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-10 anim-fade-up">
-      {/* Onboarding-complete celebration: logo opener plays once (gated in-component;
-          ?welcome=force replays it for previewing). */}
-      {(welcome === "1" || welcome === "force") && <VenuelyOpener trigger="welcome" />}
-      {showWelcome && <WelcomeImportModal venueId={venue.id} venueName={venue.name} />}
-      {/* First-run "recommended steps" lightbox after the post-onboarding loader. */}
-      <DashboardWelcomeModal />
+      {/* ONE welcome per visit (no stacked overlays): the logo opener on the
+          just-onboarded ?welcome visit, otherwise the once-only steps modal. The
+          import nudge is retired here — Smart Import now lives on every inventory
+          page + the setup checklist below, so it no longer needs to auto-pop. */}
+      {isWelcomeVisit
+        ? <VenuelyOpener trigger="welcome" />
+        : <DashboardWelcomeModal />}
 
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
