@@ -96,27 +96,40 @@ const TABS = ["Overview", "Our Venue", "Messages", "Catalogue & Rentals", "Inspi
 type Tab = (typeof TABS)[number];
 
 type NavLeaf = { key: Tab; label: string; icon: string };
-type NavGroup = { group: string; icon: string; children: NavLeaf[] };
+type NavGroup = { group: string; icon: string; defaultOpen?: boolean; children: NavLeaf[] };
 type NavEntry = NavLeaf | NavGroup;
 const isGroup = (e: NavEntry): e is NavGroup => "group" in e;
 
-// Couple sidebar — leaves + one collapsible "For the Vibes" group bundling the
-// mood/styling tabs (Inspiration, Invites, Flowers, Dress, Décor, Music, Contacts).
+// Couple sidebar — simplified into 2 pinned leaves (Overview, Messages) + 5
+// collapsible journey sections so a first-time couple isn't faced with ~19 flat
+// tabs. Every planning tab lives inside the section that matches the couple's
+// mental model. See docs/couple-portal-ia-audit-2026-06.md.
 const COUPLE_NAV: NavEntry[] = [
   { key: "Overview", label: "Overview", icon: "home" },
-  { key: "Our Venue", label: "Our Venue", icon: "venue" },
   { key: "Messages", label: "Messages", icon: "chat" },
-  { key: "Guests", label: "Guest List", icon: "users" },
-  { key: "Accommodation", label: "Accommodation", icon: "bed" },
-  { key: "Suppliers", label: "Suppliers", icon: "store" },
-  { key: "Catalogue & Rentals", label: "Venue stock / Rentals", icon: "box" },
-  { key: "Budget", label: "Budget", icon: "wallet" },
-  { key: "Payments", label: "Payments", icon: "card" },
-  { key: "Seating", label: "Seating plan", icon: "seat" },
-  { key: "Timeline", label: "Wedding day Timeline", icon: "clock" },
-  { key: "Checklist", label: "Checklist", icon: "check" },
   {
-    group: "For the Vibes", icon: "sparkle", children: [
+    group: "Our Venue", icon: "venue", defaultOpen: true, children: [
+      { key: "Our Venue", label: "Spaces & Rooms", icon: "venue" },
+      { key: "Accommodation", label: "Accommodation", icon: "bed" },
+      { key: "Catalogue & Rentals", label: "Extras & Rentals", icon: "box" },
+    ],
+  },
+  {
+    group: "Our Guests", icon: "users", children: [
+      { key: "Guests", label: "Guest List", icon: "users" },
+      { key: "Seating", label: "Seating plan", icon: "seat" },
+    ],
+  },
+  {
+    group: "Money", icon: "wallet", children: [
+      { key: "Budget", label: "Budget", icon: "wallet" },
+      { key: "Payments", label: "Payments", icon: "card" },
+      { key: "Documents", label: "Documents", icon: "box" },
+    ],
+  },
+  {
+    group: "Suppliers & Style", icon: "store", children: [
+      { key: "Suppliers", label: "Suppliers", icon: "store" },
       { key: "Inspiration", label: "Inspiration", icon: "sparkle" },
       { key: "Invites", label: "Invites", icon: "mail" },
       { key: "Flowers", label: "Flowers", icon: "flower" },
@@ -124,6 +137,12 @@ const COUPLE_NAV: NavEntry[] = [
       { key: "Décor", label: "Décor", icon: "decor" },
       { key: "Music", label: "Music", icon: "music" },
       { key: "Contacts", label: "Contacts", icon: "phone" },
+    ],
+  },
+  {
+    group: "The Day", icon: "clock", children: [
+      { key: "Timeline", label: "Wedding day Timeline", icon: "clock" },
+      { key: "Checklist", label: "Checklist", icon: "check" },
     ],
   },
 ];
@@ -220,7 +239,9 @@ export function CouplePortal({
   }, [tab, slug]);
   const [rentFilter, setRentFilter] = useState("All");
   const [rentFolder, setRentFolder] = useState<"all" | "included" | "extra">("all");
-  const [vibesOpen, setVibesOpen] = useState(false); // "For the Vibes" sidebar group
+  // Per-section open state for the sidebar accordion (undefined → use the
+  // section's defaultOpen; the section holding the active tab is always open).
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   // "+ Add custom item" — a request to the venue (not self-priced; the venue
   // quotes/adds it to the proforma properly). Stored in wedding_state.
   const [customOpen, setCustomOpen] = useState(false);
@@ -462,10 +483,11 @@ export function CouplePortal({
               return <button key={entry.key} onClick={() => { setTab(entry.key); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{navIcon(entry.icon)}<span style={{ flex: 1 }}>{entry.label}</span>{entry.key === "Messages" && msgUnread > 0 && <span style={{ background: active ? "#fff" : "var(--poppy,#FA523C)", color: active ? "var(--poppy,#FA523C)" : "#fff", borderRadius: 999, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", lineHeight: 1.5 }}>{msgUnread}</span>}</button>;
             }
             const childActive = entry.children.some((c) => c.key === tab);
-            const open = vibesOpen || childActive;
+            const explicit = openGroups[entry.group];
+            const open = (explicit === undefined ? !!entry.defaultOpen : explicit) || childActive;
             return (
               <div key={entry.group}>
-                <button onClick={() => setVibesOpen((o) => !o)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: childActive ? 700 : 500, background: "transparent", color: childActive ? "var(--poppy,#FA523C)" : "#44403c" }}>
+                <button onClick={() => setOpenGroups((o) => ({ ...o, [entry.group]: !open }))} style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: childActive ? 700 : 600, background: "transparent", color: childActive ? "var(--poppy,#FA523C)" : "#44403c" }}>
                   {navIcon(entry.icon)}
                   <span style={{ flex: 1 }}>{entry.group}</span>
                   <svg viewBox="0 0 12 12" width="11" height="11" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} aria-hidden><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -474,7 +496,9 @@ export function CouplePortal({
                   <div style={{ display: "grid", gap: 2, marginLeft: 12, paddingLeft: 10, borderLeft: "1px solid rgba(0,0,0,0.08)" }}>
                     {entry.children.map((c) => {
                       const active = c.key === tab;
-                      return <button key={c.key} onClick={() => { setTab(c.key); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#57534e" }}>{navIcon(c.icon)}<span>{c.label}</span></button>;
+                      // Seating needs guests first — dim + lock until ≥1 guest added.
+                      const locked = c.key === "Seating" && guestCount === 0;
+                      return <button key={c.key} disabled={locked} onClick={() => { if (locked) { setTab("Guests"); setNavOpen(false); return; } setTab(c.key); setNavOpen(false); }} title={locked ? "Add guests first to unlock seating" : undefined} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "none", cursor: locked ? "not-allowed" : "pointer", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#57534e", opacity: locked ? 0.45 : 1 }}>{navIcon(c.icon)}<span style={{ flex: 1 }}>{c.label}</span>{locked && <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}</button>;
                     })}
                   </div>
                 )}
@@ -902,14 +926,14 @@ export function CouplePortal({
 // drawer). Renders the SAME grouped nav as the sidebar: leaves as tabs, and "For
 // the Vibes" as one tab that opens a dropdown of its children.
 function TopNavBar({ tokens, primary, accent, tab, onTab, msgUnread = 0 }: { tokens: TemplateTokens; primary: string; accent: string; tab: Tab; onTab: (t: Tab) => void; msgUnread?: number }) {
-  const [vibesOpen, setVibesOpen] = useState(false);
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (!vibesOpen) return;
-    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setVibesOpen(false); };
+    if (!openGroup) return;
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpenGroup(null); };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [vibesOpen]);
+  }, [openGroup]);
 
   const variant = tokens.navStyle === "segmented" ? "segmented" : tokens.navStyle === "pills" ? "pills" : "editorial";
 
@@ -920,9 +944,9 @@ function TopNavBar({ tokens, primary, accent, tab, onTab, msgUnread = 0 }: { tok
     return { border: "none", background: "transparent", cursor: "pointer", padding: "4px 0 10px", whiteSpace: "nowrap", fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: active ? 700 : 500, color: active ? "#1c1917" : "#78716c", boxShadow: active ? "inset 0 -2px 0 #1c1917" : "none", display: "inline-flex", alignItems: "center", gap: 5 };
   };
 
-  // Flatten leaves + a single "vibes" group token, preserving order + numbering.
-  let n = 0;
-  const entries = COUPLE_NAV.map((e) => isGroup(e) ? { kind: "group" as const, group: e } : { kind: "leaf" as const, leaf: e, num: n++ });
+  // Leaves + group dropdowns, one sequential index per top-level entry (editorial
+  // numbering). Each group opens its own dropdown of children.
+  const entries = COUPLE_NAV.map((e, idx) => isGroup(e) ? { kind: "group" as const, group: e, num: idx } : { kind: "leaf" as const, leaf: e, num: idx });
 
   const wrapStyle: React.CSSProperties =
     variant === "segmented" ? { padding: "0 16px 12px", overflowX: "auto" }
@@ -944,18 +968,19 @@ function TopNavBar({ tokens, primary, accent, tab, onTab, msgUnread = 0 }: { tok
     }
     const g = it.group;
     const childActive = g.children.some((c) => c.key === tab);
+    const isOpen = openGroup === g.group;
     return (
-      <div key="vibes" ref={ref} style={{ position: "relative", display: "inline-flex" }}>
-        <button onClick={() => setVibesOpen((o) => !o)} style={tabStyle(childActive, n)}>
-          {variant === "editorial" && <span style={{ fontSize: 9.5, color: childActive ? primary : "#a8a29e" }}>✦</span>}
+      <div key={g.group} style={{ position: "relative", display: "inline-flex" }}>
+        <button onClick={() => setOpenGroup((o) => o === g.group ? null : g.group)} style={tabStyle(childActive, it.num)}>
+          {variant === "editorial" && <span style={{ fontSize: 9.5, color: childActive ? primary : "#a8a29e" }}>{String(it.num + 1).padStart(2, "0")}</span>}
           {g.group}
-          <svg viewBox="0 0 12 12" width="10" height="10" style={{ transform: vibesOpen ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} aria-hidden><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <svg viewBox="0 0 12 12" width="10" height="10" style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} aria-hidden><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
-        {vibesOpen && (
-          <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 30, background: "#fff", border: "1px solid var(--line, #ece7e1)", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", padding: 6, minWidth: 170 }}>
+        {isOpen && (
+          <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 30, background: "#fff", border: "1px solid var(--line, #ece7e1)", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", padding: 6, minWidth: 180 }}>
             {g.children.map((c) => {
               const active = c.key === tab;
-              return <button key={c.key} onClick={() => { onTab(c.key); setVibesOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", border: "none", cursor: "pointer", borderRadius: 8, padding: "8px 10px", fontSize: 13, whiteSpace: "nowrap", fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{navIcon(c.icon)}<span>{c.label}</span></button>;
+              return <button key={c.key} onClick={() => { onTab(c.key); setOpenGroup(null); }} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", border: "none", cursor: "pointer", borderRadius: 8, padding: "8px 10px", fontSize: 13, whiteSpace: "nowrap", fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "#fff" : "#44403c" }}>{navIcon(c.icon)}<span>{c.label}</span></button>;
             })}
           </div>
         )}
@@ -963,7 +988,7 @@ function TopNavBar({ tokens, primary, accent, tab, onTab, msgUnread = 0 }: { tok
     );
   });
 
-  return <div style={wrapStyle}>{innerStyle ? <div style={innerStyle}>{renderTabs}</div> : renderTabs}</div>;
+  return <div ref={ref} style={wrapStyle}>{innerStyle ? <div style={innerStyle}>{renderTabs}</div> : renderTabs}</div>;
 }
 
 function Section({ title, sub, heading, tokens, primary, children }: { title: string; sub?: string; heading: React.CSSProperties; tokens: TemplateTokens; primary: string; children: React.ReactNode }) {
