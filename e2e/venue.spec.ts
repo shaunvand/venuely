@@ -56,11 +56,7 @@ test.describe.serial("Venue — core actions", () => {
     }
   });
 
-  // KNOWN-OPEN: the add-item lightbox closes on Save but the row doesn't persist
-  // under automation, while the plain server-action forms (wedding create below)
-  // DO persist — so it's an isolated lightbox-flow quirk, not auth/RLS. Needs an
-  // interactive trace review (`npx playwright show-trace`). Skipped to keep green.
-  test.fixme("Add a catalogue item via the UI", async ({ page }) => {
+  test("Add a catalogue item via the UI", async ({ page }) => {
     await page.goto("/venue/catalogue");
     await page.getByRole("button", { name: /^\+?\s*Add item$/i }).first().click();
     await expect(page.getByText("Add new item")).toBeVisible();

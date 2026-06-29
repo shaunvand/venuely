@@ -21,6 +21,6 @@ export default defineConfig({
   projects: [
     { name: "setup", testMatch: /auth\.setup\.ts/ },
     { name: "venue", testMatch: /venue\.spec\.ts/, dependencies: ["setup"], use: { storageState: "e2e/.auth/venue.json" } },
-    { name: "couple", testMatch: /couple\.spec\.ts/, dependencies: ["venue"] },
+    { name: "couple", testMatch: /couple\.spec\.ts/ },
   ],
 });

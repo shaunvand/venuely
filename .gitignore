@@ -49,3 +49,4 @@ __pycache__/
 /playwright-report/
 /e2e-report/
 /e2e/.auth/
+/e2e/.ids.txt
