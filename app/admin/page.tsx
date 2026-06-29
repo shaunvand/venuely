@@ -132,7 +132,7 @@ export default async function OwnerDashboard() {
               </div>
               {w.venue && (
                 <Link
-                  href={`/portal/${w.venue.slug}/${w.slug}`}
+                  href={`/${w.slug}`}
                   className="text-sm px-3 py-1.5 rounded bg-stone-900 text-white hover:bg-stone-800"
                 >
                   Open portal →

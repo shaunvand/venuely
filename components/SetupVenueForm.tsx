@@ -242,7 +242,7 @@ export function SetupVenueForm({
       <div className="space-y-1">
         <label className="text-sm font-medium">URL slug</label>
         <div className="flex items-center gap-1 text-sm">
-          <span className="text-stone-500">venuely.co.za/portal/</span>
+          <span className="text-stone-500">venuely.co.za/v/</span>
           <input
             name="slug"
             required

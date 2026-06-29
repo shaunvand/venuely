@@ -48,7 +48,10 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
   // dyno host (localhost:10000).
   const host = h.get("x-forwarded-host") || h.get("host") || "venuely.co.za";
   const proto = h.get("x-forwarded-proto") || "https";
-  const portalUrl = `${proto}://${host}/p/${slug}`;
+  // Canonical share URL = the clean password gate at /{slug} (same link the
+  // invite email sends). /p/{slug} is the internal post-auth page (the venue's
+  // own "open" button below uses it directly since they're already signed in).
+  const portalUrl = `${proto}://${host}/${slug}`;
 
   const { data: wedding } = await supabase
     .from("weddings")
@@ -299,18 +302,55 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
         <Link href={`/p/${wedding.slug}`} target="_blank" className="vy-btn vy-btn-secondary">Open Couples Portal →</Link>
       </div>
 
-      <PortalLinkCard
-        portalUrl={portalUrl}
-        passwordSet={!!wedding.portal_password_hash}
-        setPasswordAction={setPortalPassword.bind(null, wedding.id, wedding.slug)}
-      />
+      {/* ── Share the couple portal — ONE place: the link, the invite, access ── */}
+      <section className="space-y-3">
+        <header>
+          <div className="vy-eyebrow">Share with the couple</div>
+          <h2 className="vy-h2 mt-1">Their private portal</h2>
+          <p className="text-sm text-stone-600 mt-0.5">One link to share, send their invite, and manage who has access — all in one place.</p>
+        </header>
 
-      <SendPortalInvite
-        portalUrl={portalUrl}
-        passwordSet={!!wedding.portal_password_hash}
-        lastOpenedAt={lastOpenedAt}
-        sendAction={sendPortalInvite.bind(null, wedding.id, wedding.slug)}
-      />
+        <PortalLinkCard
+          portalUrl={portalUrl}
+          passwordSet={!!wedding.portal_password_hash}
+          setPasswordAction={setPortalPassword.bind(null, wedding.id, wedding.slug)}
+        />
+
+        <SendPortalInvite
+          portalUrl={portalUrl}
+          passwordSet={!!wedding.portal_password_hash}
+          lastOpenedAt={lastOpenedAt}
+          sendAction={sendPortalInvite.bind(null, wedding.id, wedding.slug)}
+        />
+
+        {/* Access: rotate the code, or remove a couple's account access. */}
+        <div className="vy-card space-y-3">
+          <div className="vy-eyebrow">Portal access</div>
+          <div className="flex gap-2 flex-wrap items-center">
+            <form action={rotatePortalAccess.bind(null, wedding.id, wedding.slug)}>
+              <button className="vy-btn vy-btn-secondary text-sm">Rotate access code</button>
+            </form>
+            <p className="text-xs text-stone-500">
+              Rotating issues a fresh code and invalidates the old link/cookie. Re-send the invite afterwards.
+            </p>
+          </div>
+          {coupleMembers.length > 0 && (
+            <div className="border-t border-stone-200 pt-3 space-y-2">
+              <div className="text-xs font-medium text-stone-600">Couple accounts with access</div>
+              <ul className="space-y-1.5">
+                {coupleMembers.map((m) => (
+                  <li key={m.user_id} className="flex items-center justify-between gap-2 py-1.5 border-b border-stone-100 last:border-0">
+                    <span className="text-sm">{m.profiles?.full_name ?? m.user_id}</span>
+                    <form action={revokeCoupleAccess.bind(null, wedding.id, m.user_id, wedding.slug)}>
+                      <button className="text-xs text-stone-500 hover:text-red-700">Remove access</button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Couple's custom item requests — quote these and add them as charges. */}
       {(state.customRequests ?? []).length > 0 && (
@@ -329,36 +369,6 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
           </ul>
         </section>
       )}
-
-      {/* Link lifecycle: rotate the access code, or remove a couple's account access. */}
-      <div className="vy-card space-y-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="vy-eyebrow">Access lifecycle</div>
-        </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          <form action={rotatePortalAccess.bind(null, wedding.id, wedding.slug)}>
-            <button className="vy-btn vy-btn-secondary text-sm">Rotate access code</button>
-          </form>
-          <p className="text-xs text-stone-500">
-            Rotating issues a fresh code and invalidates the old link/cookie. Re-send the invite afterwards.
-          </p>
-        </div>
-        {coupleMembers.length > 0 && (
-          <div className="border-t border-stone-200 pt-3 space-y-2">
-            <div className="text-xs font-medium text-stone-600">Couple accounts with access</div>
-            <ul className="space-y-1.5">
-              {coupleMembers.map((m) => (
-                <li key={m.user_id} className="flex items-center justify-between gap-2 py-1.5 border-b border-stone-100 last:border-0">
-                  <span className="text-sm">{m.profiles?.full_name ?? m.user_id}</span>
-                  <form action={revokeCoupleAccess.bind(null, wedding.id, m.user_id, wedding.slug)}>
-                    <button className="text-xs text-stone-500 hover:text-red-700">Remove access</button>
-                  </form>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
 
       <form action={updateWeddingBasics.bind(null, wedding.id, wedding.slug)} className="vy-card grid gap-3 md:grid-cols-6">
         <div className="md:col-span-3 space-y-1"><label className="vy-label">Couple names</label><input name="couple_names" required defaultValue={wedding.couple_names} className="vy-input" /></div>
