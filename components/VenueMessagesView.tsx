@@ -45,8 +45,10 @@ function fmtWhen(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-ZA", { day: "numeric", month: "short" }) + " " +
-    d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" });
+  // Pin the timezone — without it the server (UTC) and client (SAST) format the
+  // same instant differently, tripping React #418 hydration mismatch.
+  return d.toLocaleDateString("en-ZA", { day: "numeric", month: "short", timeZone: "Africa/Johannesburg" }) + " " +
+    d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" });
 }
 
 const SENDER_LABEL: Record<VenueThreadMessage["sender"], string> = {
