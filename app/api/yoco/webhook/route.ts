@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
   const ok = await verifyWebhook(request.headers, raw);
   if (!ok) return NextResponse.json({ error: "invalid signature" }, { status: 401 });
 
-  const event = JSON.parse(raw);
+  let event: { id?: string; type?: string; payload?: { metadata?: Record<string, string>; customerId?: string; amount?: number; currency?: string; status?: string; [k: string]: unknown } };
+  try { event = JSON.parse(raw); } catch { return NextResponse.json({ error: "invalid JSON" }, { status: 400 }); }
 
   // Idempotency key: prefer the signed `webhook-id` header, fall back to the
   // event body id. Same delivery seen twice in this process is a no-op.

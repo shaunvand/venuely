@@ -51,9 +51,16 @@ export async function POST(req: NextRequest) {
 
     const sb = admin();
     const inserted: Array<{ id: string; url: string }> = [];
+    // Validated MIME → extension allowlist (PUBLIC bucket → reject svg/html and
+    // anything script-bearing; never trust the uploaded filename for the ext).
+    const TYPE_EXT: Record<string, string> = {
+      "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "image/avif": "avif", "image/heic": "heic",
+      "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "video/x-m4v": "m4v",
+    };
     for (const file of files) {
+      const ext = TYPE_EXT[file.type];
+      if (!ext) return NextResponse.json({ error: `Unsupported file type "${file.name}" — use JPEG/PNG/WebP/GIF/AVIF images or MP4/MOV/WebM video.` }, { status: 415 });
       const isVideo = (file.type || "").startsWith("video/");
-      const ext = (file.name.split(".").pop() || (isVideo ? "mp4" : "jpg")).toLowerCase().replace(/[^a-z0-9]/g, "");
       const path = `gallery/${venueId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const buf = Buffer.from(await file.arrayBuffer());
       const { error: upErr } = await sb.storage.from("venue-media").upload(path, buf, {
