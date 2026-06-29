@@ -23,8 +23,10 @@ export default defineConfig({
     { name: "couple", testMatch: /couple\.spec\.ts/ },
     { name: "flow", testMatch: /flow\.spec\.ts/ },
     { name: "couple-actions", testMatch: /couple-actions\.spec\.ts/ },
+    { name: "couple-deep", testMatch: /couple-deep\.spec\.ts/ },
     { name: "venue", testMatch: /venue\.spec\.ts/, dependencies: ["setup"], use: { storageState: "e2e/.auth/venue.json" } },
-    // CRUD runs after couple-actions because its last tests rotate the portal
+    { name: "venue-deep", testMatch: /venue-deep\.spec\.ts/, dependencies: ["setup"], use: { storageState: "e2e/.auth/venue.json" } },
+    // CRUD runs after the couple projects because its last tests rotate the portal
     // access code, which invalidates the couple's "couplepass123" login.
     { name: "venue-crud", testMatch: /venue-crud\.spec\.ts/, dependencies: ["setup"], use: { storageState: "e2e/.auth/venue.json" } },
   ],
