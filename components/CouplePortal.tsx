@@ -188,7 +188,7 @@ function groupBy<T>(items: T[], key: (t: T) => string): [string, T[]][] {
 }
 
 export function CouplePortal({
-  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, weddingDate, weddingEndDate, totalDue, guestCount = 0, initialState, catalogue, rentals, rooms, vendors, introducedVendorIds = [], gallery, tables, areas = [], initialAreaSelections = [], messageThreads = [],
+  slug, tokens, theme, cover, logoUrl, venue, coupleNames, daysToGo, dateLabel, weddingDate, weddingEndDate, totalDue, guestCount = 0, billingGuests, guestListCount, initialState, catalogue, rentals, rooms, vendors, introducedVendorIds = [], gallery, tables, areas = [], initialAreaSelections = [], messageThreads = [],
 }: {
   slug: string;
   tokens: TemplateTokens;
@@ -203,6 +203,8 @@ export function CouplePortal({
   weddingEndDate: string | null;
   totalDue: number;
   guestCount?: number;
+  billingGuests?: number;
+  guestListCount?: number;
   initialState: WState;
   catalogue: CatItem[];
   rentals: RentItem[];
@@ -300,6 +302,15 @@ export function CouplePortal({
   // Legible text colour for elements sitting on the brand primary (light brand
   // colours would otherwise show unreadable white text).
   const onPrimary = readableOn(primary);
+  // Billing breakdown uses CONFIRMED-RSVP heads (matches the headline total);
+  // section unlocks use the actual guest-LIST size, not the booking estimate.
+  const billGuests = billingGuests ?? guestCount;
+  const guestsOnList = guestListCount ?? 0;
+  const billNights = (() => {
+    if (!weddingDate || !weddingEndDate || weddingEndDate === weddingDate) return 1;
+    const a = new Date(weddingDate).getTime(); const b = new Date(weddingEndDate).getTime();
+    return Number.isFinite(a) && Number.isFinite(b) ? Math.max(1, Math.round((b - a) / 86400000)) : 1;
+  })();
   // Classic omits weight/letter-spacing tokens so headings inherit exactly as before.
   const heading: React.CSSProperties = {
     fontFamily: tokens.headingFont,
@@ -474,7 +485,7 @@ export function CouplePortal({
     || Object.values(state.roomAssignments ?? {}).some((a) => Array.isArray(a) && a.length > 0);
   const sectionMeta: Record<string, { dim?: boolean; hint?: string; done?: boolean }> = {
     "Our Venue": { done: spacesConfirmed },
-    "Our Guests": { done: guestCount > 0 },
+    "Our Guests": { done: guestsOnList > 0 },
     "Money": { done: totalDue > 0 },
     "Suppliers & Style": { dim: !spacesConfirmed, hint: "after spaces", done: (((state as Record<string, unknown>).suppliers as unknown[] | undefined)?.length ?? 0) > 0 },
     "The Day": { dim: daysToGo != null && daysToGo > 180, hint: "nearer the day" },
@@ -552,7 +563,7 @@ export function CouplePortal({
                     {entry.children.map((c) => {
                       const active = c.key === tab;
                       // Seating needs guests first — dim + lock until ≥1 guest added.
-                      const locked = c.key === "Seating" && guestCount === 0;
+                      const locked = c.key === "Seating" && guestsOnList === 0;
                       // Locked Seating stays clickable (not `disabled`, which would
                       // swallow the click) and routes the couple to Guests instead.
                       return <button key={c.key} aria-disabled={locked} aria-current={active ? "page" : undefined} onClick={() => { if (locked) { setTab("Guests"); setNavOpen(false); return; } setTab(c.key); setNavOpen(false); }} title={locked ? "Add a guest first to unlock seating" : undefined} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "var(--on-poppy,#fff)" : "#57534e", opacity: locked ? 0.45 : 1 }}>{navIcon(c.icon)}<span style={{ flex: 1 }}>{c.label}</span>{locked && <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}</button>;
@@ -749,7 +760,15 @@ export function CouplePortal({
 
         {tab === "Accommodation" && (
           <div style={{ display: "grid", gap: 26 }}>
-            <GuestManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} rooms={rooms.map((r) => ({ id: r.id, name: r.name }))} />
+            {/* One source of truth: full guest editing lives in the Guests tab.
+                Here the couple just allocates guests to rooms (no duplicate,
+                desyncing guest editor). */}
+            {rooms.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", borderRadius: tokens.cardRadius, padding: "12px 16px", background: `${primary}0f`, border: `1px solid ${primary}33` }}>
+                <span style={{ fontSize: 13, color: "#57534e" }}>Add or edit who&apos;s coming in the <strong>Guest List</strong> tab, then assign them to rooms below.</span>
+                <button onClick={() => setTab("Guests")} style={{ border: "none", background: primary, color: onPrimary, borderRadius: 999, padding: "7px 16px", fontWeight: 700, fontSize: 12.5, cursor: "pointer", whiteSpace: "nowrap" }}>Open Guest List →</button>
+              </div>
+            )}
             {rooms.length === 0 ? <Section heading={heading} tokens={tokens} primary={primary} title="Accommodation" sub="On-site stays for you and your guests"><Empty radius={isClassic ? undefined : tokens.cardRadius}>No accommodation listed by your venue yet.</Empty></Section> : (
               <RoomAllocator
                 slug={slug}
@@ -900,12 +919,12 @@ export function CouplePortal({
                 <div style={secHead}>Catering &amp; venue extras</div>
                 {catLines.map((it) => {
                   const days = dayCount(catSel[it.id]);
-                  const q = catalogueQuantity({ name: it.name, priceUnit: it.priceUnit, guests: guestCount, days });
+                  const q = catalogueQuantity({ name: it.name, priceUnit: it.priceUnit, guests: billGuests, days });
                   const rate = it.price ?? 0;
                   const amount = rate * q.units;
                   // Sub-line: how it's charged (flat / per guest × N / per day / threshold).
                   const sub = it.included ? `${days} day${days === 1 ? "" : "s"} · Included`
-                    : q.basis === "per_person" ? `${rZA(rate)} × ${guestCount || "—"} guest${guestCount === 1 ? "" : "s"}${days > 1 ? ` × ${days} days` : ""}`
+                    : q.basis === "per_person" ? `${rZA(rate)} × ${billGuests || "—"} guest${billGuests === 1 ? "" : "s"}${days > 1 ? ` × ${days} days` : ""}`
                     : q.basis === "tier_overage" ? `${rZA(rate)} × ${q.applies ? q.units : 0} (${q.perUnitNote})`
                     : q.basis === "conditional" ? (q.applies ? `${rZA(rate)}${days > 1 ? ` × ${days} days` : ""} · ${q.perUnitNote}` : q.perUnitNote)
                     : q.basis === "per_day" ? `${rZA(rate)} × ${days} day${days === 1 ? "" : "s"}` : "Flat fee";
@@ -936,11 +955,11 @@ export function CouplePortal({
               </>}
 
               {roomLines.length > 0 && <>
-                <div style={secHead}>Accommodation <span style={{ color: "#c9c4be" }}>· per night</span></div>
+                <div style={secHead}>Accommodation <span style={{ color: "#c9c4be" }}>· {billNights} night{billNights === 1 ? "" : "s"}</span></div>
                 {roomLines.map((r) => (
                   <div key={r.id} style={rowWrap}>
-                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: "#1c1917" }}>{r.name}</div><div style={{ fontSize: 12, color: "#8a8a8a" }}>Sleeps {r.sleeps}</div></div>
-                    <div style={{ color: primary, fontWeight: 700, whiteSpace: "nowrap" }}>{r.price ? `${rZA(r.price)}/night` : "—"}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, color: "#1c1917" }}>{r.name}</div><div style={{ fontSize: 12, color: "#8a8a8a" }}>Sleeps {r.sleeps}{r.price ? ` · ${rZA(r.price)}/night × ${billNights} night${billNights === 1 ? "" : "s"}` : ""}</div></div>
+                    <div style={{ color: primary, fontWeight: 700, whiteSpace: "nowrap" }}>{r.price ? rZA(r.price * billNights) : "—"}</div>
                     <button title="Remove" style={delBtn} onClick={() => toggleRoom(r.id)}>✕</button>
                   </div>
                 ))}

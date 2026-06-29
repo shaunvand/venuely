@@ -125,7 +125,7 @@ export async function buildWeddingCharges(
   // else the couple's guest_count estimate.
   const { data: guestRows } = await supabase
     .from("guests").select("rsvp_status, party_size").eq("wedding_id", weddingId);
-  const attending = (guestRows ?? []).filter((g) => /attend|yes|going|accept|confirm/i.test(String(g.rsvp_status ?? "")));
+  const attending = (guestRows ?? []).filter((g) => g.rsvp_status === "attending");
   const confirmedHeads = attending.reduce((s, g) => s + Math.max(1, Number(g.party_size) || 1), 0);
   const guestCount = confirmedHeads > 0 ? confirmedHeads : (wedding.guest_count ?? 0);
   for (const [code, v] of Object.entries(state.catalogueSelections ?? {})) {

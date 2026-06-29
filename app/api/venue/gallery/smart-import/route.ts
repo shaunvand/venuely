@@ -4,6 +4,7 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { VENUE_LOCATIONS } from "../route";
 import { extractPdfImages } from "@/lib/imports/extract-images";
+import { safeFetch } from "@/lib/security/guards";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
     const pdfRowIds: string[] = [];
     for (const pdf of pdfRows) {
       try {
-        const resp = await fetch(pdf.url);
+        const resp = await safeFetch(pdf.url); // SSRF guard (blocks private/loopback hosts)
         if (!resp.ok) continue;
         const buf = Buffer.from(await resp.arrayBuffer());
         const pages = await extractPdfImages(buf, pdf.label || "document.pdf", venueId);

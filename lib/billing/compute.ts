@@ -116,9 +116,10 @@ export function computeTotals(rules: PaymentRules, charges: Charge[], payments: 
     }, 0) * 100
   ) / 100;
 
-  // Venuely fee = rate × (grand_total − venue commission); the venue keeps 100%
-  // of its commission. platform_fee_base is that commission-excluding base.
-  const platform_fee_base = Math.round(Math.max(0, grand_total - commission_total) * 100) / 100;
+  // Venuely fee = rate × (grand_total − venue commission − refundable breakage).
+  // The venue keeps 100% of its commission, and the platform fee is charged on
+  // revenue only — never on the refundable breakage deposit (which is returned).
+  const platform_fee_base = Math.round(Math.max(0, grand_total - commission_total - breakage) * 100) / 100;
 
   return {
     rules, charges,

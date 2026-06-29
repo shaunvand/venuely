@@ -28,7 +28,7 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
   const wId = access.wedding.id;
   const vId = access.wedding.venue_id;
 
-  const [wedRes, venRes, catRes, rentRes, roomRes, vendRes, galRes, tableRes, areaRes, areaPriceRes, areaImgRes, areaGroupRes, seasonRes] = await Promise.all([
+  const [wedRes, venRes, catRes, rentRes, roomRes, vendRes, galRes, tableRes, areaRes, areaPriceRes, areaImgRes, areaGroupRes, seasonRes, guestsRes] = await Promise.all([
     db.from("weddings").select("id, slug, couple_names, wedding_date, wedding_end_date, wedding_state, area_selections, guest_count").eq("id", wId).single(),
     db.from("venues").select("name, region, address, portal_template, portal_theme, branding_logo_url, contact_email, contact_phone, google_maps_url, description").eq("id", vId).single(),
     db.from("catalogue_items").select("id, category, name, description, price, price_unit, image_url, cost_treatment, commission_value, commission_type, event_part, sort_order").eq("venue_id", vId).eq("active", true).order("sort_order"),
@@ -42,11 +42,23 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
     db.from("media_assets").select("owner_id, url, sort_order").eq("venue_id", vId).eq("owner_type", "area").order("sort_order"),
     db.from("venue_area_groups").select("id, name, included, location, sort_order").eq("venue_id", vId).order("sort_order"),
     db.from("venue_seasons").select("id, name, start_month, start_day, end_month, end_day, sort_order").eq("venue_id", vId),
+    db.from("guests").select("rsvp_status, party_size").eq("wedding_id", wId),
   ]);
 
   const wedding = wedRes.data;
   const venue = venRes.data;
   if (!wedding || !venue) notFound();
+
+  // Guest figures: actual list size (drives Seating unlock / "Our Guests" done)
+  // and confirmed-RSVP headcount (drives the per-head billing breakdown so it
+  // reconciles to the headline total). Falls back to the booking estimate.
+  const guestRows = (guestsRes.data ?? []) as Array<{ rsvp_status: string | null; party_size: number | null }>;
+  const guestListCount = guestRows.length;
+  const estimateGuests = Number((wedding as { guest_count?: number }).guest_count ?? 0);
+  const confirmedHeads = guestRows
+    .filter((g) => g.rsvp_status === "attending")
+    .reduce((s, g) => s + Math.max(1, Number(g.party_size) || 1), 0);
+  const billingGuests = confirmedHeads > 0 ? confirmedHeads : estimateGuests;
 
   const tokens = resolveTemplate(venue.portal_template);
   const theme = resolveTheme(venue.portal_theme);
@@ -181,7 +193,9 @@ export default async function CouplePortalPage({ params }: { params: Promise<{ w
       weddingDate={wedding.wedding_date ? String(wedding.wedding_date).slice(0, 10) : null}
       weddingEndDate={wedding.wedding_end_date ? String(wedding.wedding_end_date).slice(0, 10) : null}
       totalDue={totals?.grandTotal ?? 0}
-      guestCount={Number((wedding as { guest_count?: number }).guest_count ?? 0)}
+      guestCount={estimateGuests}
+      billingGuests={billingGuests}
+      guestListCount={guestListCount}
       initialState={state}
       catalogue={catalogue}
       rentals={rentals}

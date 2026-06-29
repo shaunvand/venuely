@@ -58,11 +58,14 @@ export function SpacesSection({ slug, areas, initialSelections, primary, accent,
   const isIncluded = (a: AreaItem, offsite: boolean) => !offsite && a.kind === "main";
 
   function persist(next: Set<string>) {
+    const prev = sel; // for rollback if the save fails
     setSel(next);
     setBusy(true);
     const selections = Array.from(next).map((k) => { const [area_id, day_type] = k.split(":"); return { area_id, day_type }; });
     fetch(`/api/wedding/${slug}/areas`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ selections }) })
-      .finally(() => { startTransition(() => router.refresh()); setBusy(false); });
+      .then((r) => { if (!r.ok) throw new Error(`save failed (${r.status})`); startTransition(() => router.refresh()); })
+      .catch(() => { setSel(prev); if (typeof window !== "undefined") window.alert("Couldn't save that space — please check your connection and try again."); })
+      .finally(() => setBusy(false));
   }
   function toggle(areaId: string, day: string) {
     const k = `${areaId}:${day}`;

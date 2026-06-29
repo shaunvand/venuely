@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useLoading } from "@/components/LoadingProvider";
 
 // Row actions matching the dashboard mock: [Open ↗] [⚙ Manage] [⋯ menu] —
@@ -33,15 +34,24 @@ export function WeddingRowActions({
   const [pw, setPw] = useState("");
   const [isPending, startTransition] = useTransition();
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+  const dropRef = useRef<HTMLDivElement | null>(null);
+  const [rect, setRect] = useState<DOMRect | null>(null);
   const loading = useLoading();
 
   useEffect(() => {
     if (!open) return;
+    // Don't close when clicking inside the (portalled) menu.
     const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) { setOpen(false); setPwOpen(false); }
+      const t = e.target as Node;
+      if (menuRef.current?.contains(t) || dropRef.current?.contains(t)) return;
+      setOpen(false); setPwOpen(false);
     };
+    const reposition = () => { if (btnRef.current) setRect(btnRef.current.getBoundingClientRect()); };
     document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("resize", reposition); window.removeEventListener("scroll", reposition, true); };
   }, [open]);
 
   function copy() {
@@ -110,16 +120,18 @@ export function WeddingRowActions({
 
       <div className="relative" ref={menuRef}>
         <button
+          ref={btnRef}
           type="button"
-          onClick={() => { setOpen((v) => !v); setPwOpen(false); }}
+          onClick={(e) => { const willOpen = !open; setOpen(willOpen); setPwOpen(false); if (willOpen) setRect(e.currentTarget.getBoundingClientRect()); }}
           aria-label="More actions"
+          aria-expanded={open}
           className="inline-flex items-center justify-center w-9 h-8 rounded-lg border border-stone-200 bg-white transition hover:bg-stone-50 font-semibold tracking-widest"
           style={{ color: "var(--ink-2)" }}
         >
           …
         </button>
-        {open && (
-          <div className="absolute right-0 top-9 z-20 w-52 rounded-xl bg-white shadow-lg overflow-hidden anim-fade-in" style={{ border: "1px solid var(--line)" }}>
+        {open && rect && typeof document !== "undefined" && createPortal((
+          <div ref={dropRef} className="fixed z-[60] w-52 rounded-xl bg-white shadow-lg overflow-hidden" style={{ border: "1px solid var(--line)", top: rect.bottom + 4, left: Math.max(8, rect.right - 208) }}>
             <button type="button" onClick={copy} className={itemCls}>{copied ? "✓ Copied" : "📋 Copy portal URL"}</button>
             <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider border-t" style={{ color: "var(--ink-2)", borderColor: "var(--line)" }}>
               Portal access · {passwordSet ? "🔒 password set" : "🔓 open"}
@@ -147,7 +159,7 @@ export function WeddingRowActions({
               </div>
             ) : null}
           </div>
-        )}
+        ), document.body)}
       </div>
     </div>
   );

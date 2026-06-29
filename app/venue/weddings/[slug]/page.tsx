@@ -82,7 +82,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
   // Confirmed-RSVP headcount for per-head billing — identical rule to
   // lib/billing/charges.ts so the proforma matches the invoice + couple total.
   const billingGuests = (() => {
-    const attending = gl.filter((g) => /attend|yes|going|accept|confirm/i.test(String(g.rsvp_status ?? "")));
+    const attending = gl.filter((g) => g.rsvp_status === "attending");
     const heads = attending.reduce((s, g) => s + Math.max(1, Number(g.party_size) || 1), 0);
     return heads > 0 ? heads : (wedding.guest_count ?? 0);
   })();
