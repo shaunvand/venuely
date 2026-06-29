@@ -50,6 +50,8 @@ insert into accommodation_rooms (venue_id, name, room_type, sleeps, price_per_ni
 insert into venue_areas (venue_id, name, slug, area_kind, active) values
  ('{vid}','Oak Lawn','oak-lawn','main',true),
  ('{vid}','Vineyard Deck','vineyard-deck','extra',true);
+insert into vendor_partners (venue_id, vendor_type, name, description, price_from, contact_email, contact_phone, active) values
+ ('{vid}','photographer','E2E Photography','Test recommended photographer',8000,'photog@venuely.test','+27821234567',true);
 insert into weddings (id, venue_id, slug, couple_names, guest_count, wedding_date, status, portal_password_hash) values
  ('{wid}','{vid}','TestAndPartnerWedding','Test & Partner',80,(now()+interval '200 days')::date,'booked','{chash}');
 """

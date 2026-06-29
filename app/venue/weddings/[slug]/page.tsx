@@ -270,6 +270,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
 
   const payments = (paymentsRes.data ?? []).map((p) => ({
     id: p.id, amount: Number(p.amount), direction: p.direction as "in" | "out", kind: p.kind, paid_at: p.paid_at,
+    method: p.method ?? null, reference: p.reference ?? null, notes: p.notes ?? null,
   })) as Payment[];
 
   const totals = computeTotals(rules, charges, payments);
@@ -576,8 +577,8 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
                   <tr key={p.id}>
                     <td>{new Date(p.paid_at).toLocaleDateString()}</td>
                     <td><span className="vy-tag vy-tag-soft">{p.kind}</span></td>
-                    <td>{(p as Payment & { method?: string }).method ?? "—"}</td>
-                    <td className="font-mono text-xs">{(p as Payment & { reference?: string }).reference ?? "—"}</td>
+                    <td>{p.method ?? "—"}</td>
+                    <td className="font-mono text-xs">{p.reference ?? "—"}</td>
                     <td>{p.direction === "in" ? "↘ in" : "↗ out"}</td>
                     <td className={`text-right ${p.direction === "in" ? "text-emerald-700" : "text-stone-700"}`}>R{p.amount.toLocaleString()}</td>
                     <td className="text-right">

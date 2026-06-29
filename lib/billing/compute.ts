@@ -29,7 +29,7 @@ export type Charge = {
   base_amount?: number;
 };
 
-export type Payment = { id: string; amount: number; direction: "in" | "out"; kind: string; paid_at: string };
+export type Payment = { id: string; amount: number; direction: "in" | "out"; kind: string; paid_at: string; method?: string | null; reference?: string | null; notes?: string | null };
 
 export type Computed = {
   rules: PaymentRules;
