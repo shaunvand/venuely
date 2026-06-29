@@ -56,8 +56,8 @@ export function SendPortalInvite({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="vy-eyebrow">Invite the couple</div>
         {lastOpenedAt ? (
-          <span className="vy-tag vy-tag-active text-xs">
-            Couple last opened: {new Date(lastOpenedAt).toLocaleString()}
+          <span className="vy-tag vy-tag-active text-xs" suppressHydrationWarning>
+            Couple last opened: {new Date(lastOpenedAt).toLocaleString("en-ZA", { timeZone: "Africa/Johannesburg" })}
           </span>
         ) : (
           <span className="vy-tag vy-tag-soft text-xs">Not opened yet</span>
