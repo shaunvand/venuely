@@ -333,7 +333,7 @@ export function InventoryManager({
             + Add item
           </button>
           <button type="button" onClick={() => setImportOpen(true)} className={BUBBLE_SECONDARY}>
-            ⬆ Smart import (Excel)
+            ⬆ Import a spreadsheet
           </button>
           <a href={`/api/venue/inventory/template?type=${type}`} className={BUBBLE_GHOST}>
             ↓ Download template
@@ -381,7 +381,7 @@ export function InventoryManager({
 
       {/* Item list */}
       {items.length === 0 ? (
-        <div className="vy-empty">Nothing here yet. Add your first above or use Smart import.</div>
+        <div className="vy-empty">Nothing here yet. Add your first above, or use Smart Import at the top of the page.</div>
       ) : displayed.length === 0 ? (
         <div className="vy-empty">No items match &ldquo;{query}&rdquo;.</div>
       ) : (
@@ -708,11 +708,11 @@ export function InventoryManager({
 
       {/* Smart import lightbox */}
       {importOpen && (
-        <Lightbox onClose={() => { setImportOpen(false); setImportPreview([]); setImportMsg(null); }} title={`Smart import — ${type}`}>
+        <Lightbox onClose={() => { setImportOpen(false); setImportPreview([]); setImportMsg(null); }} title={`Import a spreadsheet — ${type}`}>
           <div className="space-y-3">
             <p className="text-xs text-stone-600">
-              Upload any Excel/CSV file. Our AI maps your columns to the right fields. Review and edit below, then confirm.
-              {" "}Got a <strong>PDF</strong> price list? Use <a href="/venue/uploads" className="underline" style={{ color: "var(--poppy)" }}>Smart Import</a> in the sidebar — it reads PDFs too.
+              Upload an Excel/CSV file and our AI maps your columns to the right fields. Review and edit below, then confirm.
+              {" "}Got a <strong>PDF</strong>, Word doc or mixed file? Use <strong>Smart Import</strong> at the top of the page — it reads everything.
             </p>
             <div className="flex gap-2 items-center flex-wrap">
               <label className={BUBBLE_PRIMARY + " cursor-pointer"}>

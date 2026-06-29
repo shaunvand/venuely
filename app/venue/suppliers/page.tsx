@@ -1,7 +1,7 @@
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
 import { VendorPartnersManager } from "@/components/VendorPartnersManager";
-import { BulkUploader } from "@/components/BulkUploader";
+import { SmartImportPanel } from "@/components/SmartImportPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -28,24 +28,7 @@ export default async function VenueSuppliers() {
         </p>
       </header>
 
-      {/* Missed the supplier step in setup? Re-open Smart Import here. Collapsed
-          by default so it doesn't crowd the list once suppliers exist. */}
-      <details className="rounded-2xl group" style={{ border: "1px solid var(--line)", background: "var(--cream)" }}>
-        <summary className="cursor-pointer select-none list-none px-5 py-4 flex items-center gap-3">
-          <span className="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-shrink-0" style={{ background: "var(--peach)" }}>📄</span>
-          <span className="flex-1 min-w-0">
-            <span className="font-serif text-lg block leading-tight" style={{ fontWeight: 700 }}>Import a list of preferred suppliers</span>
-            <span className="text-sm" style={{ color: "var(--ink-2)" }}>Missed this in setup? Upload a PDF, Excel, Word or CSV of your suppliers and we&apos;ll add them for you.</span>
-          </span>
-          <span className="text-xs flex-shrink-0" style={{ color: "var(--poppy)" }}>
-            <span className="group-open:hidden">Open ▾</span>
-            <span className="hidden group-open:inline">Close ▴</span>
-          </span>
-        </summary>
-        <div className="px-5 pb-5 pt-1">
-          <BulkUploader venueId={venue.id} />
-        </div>
-      </details>
+      <SmartImportPanel venueId={venue.id} title="Smart Import a list of preferred suppliers" blurb="Upload a PDF, Excel, Word or CSV of your suppliers and Smart Import adds them — you review before it saves." />
 
       <div className="vy-card">
         <VendorPartnersManager venueId={venue.id} items={(rows ?? []) as Array<Record<string, unknown> & { id: string }>} />

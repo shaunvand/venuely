@@ -2,6 +2,7 @@ import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
 import { InventoryManager } from "@/components/InventoryManager";
 import { INVENTORY_FIELDS } from "@/lib/inventory/schemas";
+import { SmartImportPanel } from "@/components/SmartImportPanel";
 
 export default async function VenueAccommodation() {
   const venue = await getCurrentVenue();
@@ -21,6 +22,8 @@ export default async function VenueAccommodation() {
           Cottages, suites, tents — anything on the property. Couples assign their guests to rooms.
         </p>
       </header>
+
+      <SmartImportPanel venueId={venue.id} title="Smart Import your rooms" blurb="Upload a PDF, Excel, Word or CSV rooming list and Smart Import fills your accommodation — you review before it saves." />
 
       <InventoryManager
         type="accommodation"

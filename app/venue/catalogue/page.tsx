@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { InventoryManager } from "@/components/InventoryManager";
 import { INVENTORY_FIELDS } from "@/lib/inventory/schemas";
 import { AutoGroupCatalogueButton } from "@/components/AutoGroupCatalogueButton";
+import { SmartImportPanel } from "@/components/SmartImportPanel";
 
 export default async function VenueCatalogue() {
   const venue = await getCurrentVenue();
@@ -26,6 +27,8 @@ export default async function VenueCatalogue() {
         </div>
         <AutoGroupCatalogueButton venueId={venue.id} />
       </header>
+
+      <SmartImportPanel venueId={venue.id} title="Smart Import your catalogue" blurb="Upload a PDF, Excel, Word or CSV menu/price list and Smart Import fills your catalogue — you review before it saves." />
 
       <InventoryManager
         type="catalogue"
