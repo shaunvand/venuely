@@ -41,11 +41,12 @@ const eyebrow: React.CSSProperties = { fontSize: 10.5, textTransform: "uppercase
 type Venue = { name: string; region: string | null; address: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
 type RoomItem = { id: string; name: string };
 type RentItem = { id: string };
-type WState = { rentalSelections?: Record<string, { sel?: boolean }>; roomAssignments?: Record<string, string[]>; sharedNote?: string };
+type WState = { rentalSelections?: Record<string, { sel?: boolean }>; catalogueSelections?: Record<string, { sel?: boolean }>; roomAssignments?: Record<string, string[]>; sharedNote?: string };
+type CatItem = { id: string; included?: boolean };
 
-export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, totalDue, rooms, rentals, state, cover, onNavigate, weddingDate = null, weddingEndDate = null, selectedAreas = [], tokens, themePrimary, themeAccent }: {
+export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, totalDue, rooms, rentals, catalogue = [], state, cover, onNavigate, weddingDate = null, weddingEndDate = null, selectedAreas = [], tokens, themePrimary, themeAccent }: {
   slug: string; venue: Venue; coupleNames: string; daysToGo: number | null; dateLabel: string; totalDue: number;
-  rooms: RoomItem[]; rentals: RentItem[]; state: WState; cover: string | null; onNavigate: (tab: string) => void;
+  rooms: RoomItem[]; rentals: RentItem[]; catalogue?: CatItem[]; state: WState; cover: string | null; onNavigate: (tab: string) => void;
   weddingDate?: string | null; weddingEndDate?: string | null; selectedAreas?: Array<{ name: string; kind: string }>;
   tokens?: TemplateTokens; themePrimary?: string; themeAccent?: string;
 }) {
@@ -97,6 +98,10 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
   const roomsBooked = Object.values(state.roomAssignments ?? {}).filter((a) => Array.isArray(a) && a.length).length;
   const roomsTotal = rooms.length;
   const rentReserved = Object.values(state.rentalSelections ?? {}).filter((v) => v?.sel).length;
+  // Catering = effectively-selected CATALOGUE (menu) items, not rentals. Included
+  // items count unless explicitly deselected; extras count only when added.
+  const catSel = state.catalogueSelections ?? {};
+  const catReserved = catalogue.filter((c) => { const e = catSel[c.id]; return c.included ? (e ? e.sel !== false : true) : !!e?.sel; }).length;
   const rentTotal = rentals.length;
   const invoiced = pay?.invoiced || totalDue || 0;
   const paid = pay?.paid || 0;
@@ -133,7 +138,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
   };
 
   // ── Wedding progress (6 signals, mirrors the venue-side engine) ──
-  const cateringDone = rentReserved > 0;
+  const cateringDone = catReserved > 0;
   const checklistFrac = checklist.length ? tasksDone / checklist.length : 0;
   const progressPct = Math.round(
     ([weddingDate ? 1 : 0, roomsBooked > 0 ? 1 : 0, cateringDone ? 1 : 0, invited > 0 ? 1 : 0, checklistFrac, paid > 0 ? 1 : 0]

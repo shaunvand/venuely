@@ -72,8 +72,10 @@ export default async function OnboardingWizard({
     .order("wedding_date", { ascending: true })
     .limit(1)
     .maybeSingle<{ slug: string }>();
+  // Preview the REAL couple portal (the password gate → /p/<slug>), not the dead
+  // legacy /portal/[venue]/[wedding] grid which reads obsolete tables.
   const previewHref = firstWedding?.slug
-    ? `/portal/${venue.slug}/${firstWedding.slug}`
+    ? `/${firstWedding.slug}`
     : "/venue/weddings";
 
   // Default landing step when a venue already exists: jump past Basics to Import (step 2).

@@ -115,8 +115,10 @@ export async function POST(request: NextRequest) {
   } else if (amountType === "balance") {
     amountMajor = totals.balance_due;
   } else {
-    // Deposit, but never more than what's still outstanding.
-    amountMajor = Math.min(totals.deposit_amount, totals.balance_due || totals.deposit_amount);
+    // Deposit, but never more than what's still outstanding. NB: must NOT fall
+    // back to deposit_amount when balance_due is 0 — a fully-paid couple would
+    // otherwise be re-charged the whole deposit (the <=0 guard below blocks it).
+    amountMajor = Math.min(totals.deposit_amount, totals.balance_due);
   }
 
   if (!Number.isFinite(amountMajor) || amountMajor <= 0) {

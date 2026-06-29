@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { BulkUploader, type BulkUploaderHandle } from "@/components/BulkUploader";
 import { LogoMark } from "@/components/Logo";
@@ -48,12 +49,14 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
     uploaderRef.current?.commit();
   }
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   const { includedCount, isImporting, imported, hasItems } = uploaderState;
   const canImport = hasItems && includedCount > 0 && !isImporting && !imported;
 
-  return (
+  // Portalled to <body> so position:fixed isn't trapped by the dashboard's
+  // transformed `.anim-fade-up` ancestor (would otherwise render below the fold).
+  return createPortal((
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8 anim-fade-in"
       style={{ background: "rgba(28,25,23,0.55)" }}
@@ -170,5 +173,5 @@ export function WelcomeImportModal({ venueId, venueName }: { venueId: string; ve
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }

@@ -791,7 +791,7 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
               <Link key={w.id} href={`/venue/weddings/${w.slug}`} className="vy-card hover:shadow-md transition-shadow">
                 <div className="font-medium text-[15px]">{w.couple_names}</div>
                 <div className="text-xs mt-0.5" style={{ color: "var(--ink-2)" }}>
-                  {new Date(w.wedding_date).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}
+                  {w.wedding_date ? new Date(w.wedding_date).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" }) : "Date TBD"}
                 </div>
               </Link>
             ))}

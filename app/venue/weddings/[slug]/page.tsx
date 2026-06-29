@@ -8,6 +8,7 @@ import {
   markInvoiced, markCouplePaid, markPlatformFeePaid,
   sendPortalInvite, rotatePortalAccess, revokeCoupleAccess, approveSubmission,
 } from "../actions";
+import { catalogueQuantity } from "@/lib/billing/catalogue-qty";
 import { statusColor } from "@/lib/wedding/status";
 import { computeWeddingsProgress, HEALTH_COLOR, HEALTH_LABEL } from "@/lib/venue/progress";
 import { SaveButton } from "@/components/SaveButton";
@@ -75,9 +76,16 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
   // Guest RSVP + dietary/accessibility roll-up for the caterer handover.
   const { data: guestRows } = await supabase
     .from("guests")
-    .select("rsvp_status, dietary, accessibility_needs, is_child")
+    .select("rsvp_status, dietary, accessibility_needs, is_child, party_size")
     .eq("wedding_id", wedding.id);
-  const gl = (guestRows ?? []) as Array<{ rsvp_status: string | null; dietary: string | null; accessibility_needs: string | null; is_child: boolean | null }>;
+  const gl = (guestRows ?? []) as Array<{ rsvp_status: string | null; dietary: string | null; accessibility_needs: string | null; is_child: boolean | null; party_size: number | null }>;
+  // Confirmed-RSVP headcount for per-head billing — identical rule to
+  // lib/billing/charges.ts so the proforma matches the invoice + couple total.
+  const billingGuests = (() => {
+    const attending = gl.filter((g) => /attend|yes|going|accept|confirm/i.test(String(g.rsvp_status ?? "")));
+    const heads = attending.reduce((s, g) => s + Math.max(1, Number(g.party_size) || 1), 0);
+    return heads > 0 ? heads : (wedding.guest_count ?? 0);
+  })();
   const dietaryList = gl.filter((g) => (g.dietary ?? "").trim()).map((g) => (g.dietary as string).trim());
   const dietaryCounts = dietaryList.reduce<Record<string, number>>((m, d) => { const k = d.toLowerCase(); m[k] = (m[k] || 0) + 1; return m; }, {});
   const guestStats = {
@@ -98,7 +106,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
 
   const [rentalsRes, cataRes, accomRes, vendorsRes, areasRes, areaPricingRes, paymentsRes, chargesRes, docsRes, seasonsRes] = await Promise.all([
     supabase.from("rental_items").select("id, name, price, commission_value, commission_type, item_code, cost_treatment").eq("venue_id", venue.id),
-    supabase.from("catalogue_items").select("id, name, price, commission_value, commission_type, cost_treatment").eq("venue_id", venue.id),
+    supabase.from("catalogue_items").select("id, name, price, price_unit, commission_value, commission_type, cost_treatment").eq("venue_id", venue.id),
     supabase.from("accommodation_rooms").select("id, name, price_per_night, commission_value, commission_type, tier, cost_treatment, contact_name, contact_phone, contact_email, website_url, address").eq("venue_id", venue.id),
     supabase.from("vendor_partners").select("id, name, vendor_type, price_from, commission_value, commission_type, cost_treatment, contact_phone, contact_email, website_url").eq("venue_id", venue.id),
     supabase.from("venue_areas").select("id, name, slug, area_kind").eq("venue_id", venue.id).eq("active", true),
@@ -164,24 +172,25 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
     });
   }
 
-  // Catalogue (per-head)
-  const guestCount = wedding.guest_count ?? 0;
+  // Catalogue — quantity respects price_unit + name thresholds (flat extras are
+  // NOT × guests; per-head items scale by confirmed RSVPs; ">N pax" fees only
+  // apply past the threshold), identical to lib/billing/charges.ts so the
+  // proforma total agrees with the invoiced + couple-facing total.
   for (const [code, v] of Object.entries(state.catalogueSelections ?? {})) {
     if (!v.sel && !v.mg && !v.wed && !v.fb) continue;
     const item = cataMap.get(code); if (!item) continue;
-    const days = [v.mg ? "M&G" : null, v.wed ? "Wed" : null, v.fb ? "FB" : null].filter(Boolean);
-    const dayCount = days.length || 1;
+    const dayCount = [v.mg, v.wed, v.fb].filter(Boolean).length || 1;
     const baseUnit = Number(item.price);
     const unit = applyMarkup(baseUnit, item.commission_value, item.commission_type);
-    const units = dayCount * guestCount;
-    const total = unit * units;
     const included = (item as { cost_treatment?: string }).cost_treatment === "included";
+    const q = catalogueQuantity({ name: item.name, priceUnit: (item as { price_unit?: string }).price_unit, guests: billingGuests, days: dayCount });
+    const units = q.units;
     charges.push({
       kind: "catalogue",
-      label: `${item.name} (${dayCount} day${dayCount>1?"s":""} × ${guestCount} guests)${included ? " (included)" : ""}`,
+      label: `${item.name} (${q.perUnitNote})${included ? " (included)" : ""}`,
       qty: units,
       unit_price: unit,
-      amount: included ? 0 : total,
+      amount: included ? 0 : unit * units,
       base_amount: included ? 0 : baseUnit * units,
       is_refundable: false,
     });

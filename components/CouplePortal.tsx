@@ -594,7 +594,7 @@ export function CouplePortal({
           <div style={{ display: "grid", gap: 16 }}>
             <CoupleOverview
               slug={slug} venue={venue} coupleNames={coupleNames} daysToGo={daysToGo} dateLabel={dateLabel} totalDue={totalDue}
-              rooms={rooms} rentals={rentals} state={state} cover={cover} onNavigate={(t) => setTab(t as Tab)}
+              rooms={rooms} rentals={rentals} catalogue={catalogue} state={state} cover={cover} onNavigate={(t) => setTab(t as Tab)}
               weddingDate={weddingDate} weddingEndDate={weddingEndDate}
               selectedAreas={areas.filter((a) => initialAreaSelections.some((s) => s.area_id === a.id)).map((a) => ({ name: a.name, kind: a.kind }))}
               tokens={tokens} themePrimary={primary} themeAccent={accent}
