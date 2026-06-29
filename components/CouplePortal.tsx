@@ -92,7 +92,10 @@ type GalleryItem = { url: string; category: string; label: string };
 type TableItem = { id: string; label: string; shape: string; seats: number; quantity: number };
 type Venue = { name: string; region: string | null; address: string | null; description: string | null; email: string | null; phone: string | null; mapsUrl: string | null };
 
-const TABS = ["Overview", "Our Venue", "Messages", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Invites", "Reminders", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Payments", "Documents"] as const;
+// NB: "Reminders" intentionally omitted — RemindersManager is rendered inside the
+// Invites tab, there's no standalone Reminders render block, so keeping it as a
+// valid Tab key risked a blank screen if it were ever restored/selected.
+const TABS = ["Overview", "Our Venue", "Messages", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Invites", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Payments", "Documents"] as const;
 type Tab = (typeof TABS)[number];
 
 type NavLeaf = { key: Tab; label: string; icon: string };
@@ -708,7 +711,7 @@ export function CouplePortal({
               )}
 
               {/* Add-custom-item dialog */}
-              {customOpen && (
+              {customOpen && typeof document !== "undefined" && createPortal((
                 <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setCustomOpen(false)}>
                   <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 18, padding: 24, width: "min(440px,100%)" }}>
                     <h3 style={{ ...heading, fontSize: 21, margin: "0 0 6px" }}>Request a custom item</h3>
@@ -723,7 +726,7 @@ export function CouplePortal({
                     </div>
                   </div>
                 </div>
-              )}
+              ), document.body)}
               {shown.length === 0 ? <Empty radius={isClassic ? undefined : tokens.cardRadius}>Nothing in this folder.</Empty> : groupBy(shown, (m) => keyOf(m.item)).map(([catName, items]) => (
                 <div key={catName} style={{ marginBottom: 22 }}>
                   <div style={{ ...eyebrow, color: primary, marginBottom: 8 }}>{catName}</div>

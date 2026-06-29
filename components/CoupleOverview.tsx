@@ -156,7 +156,19 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
   if (timeline.length === 0) tasks.push({ icon: "calendar", title: "Build your wedding timeline", detail: "Plan your day hour by hour", tab: "Timeline" });
   if (openChecklist.length > 0) tasks.push({ icon: "clipboard", title: "Tick off your checklist", detail: `${openChecklist.length} task${openChecklist.length === 1 ? "" : "s"} remaining`, tab: "Checklist" });
   const topTasks = tasks.slice(0, 3);
-  const doneCount = chips.filter((c) => c.state === "done").length;
+
+  // 5-stage journey model — mirrors the 5 sidebar sections. Drives the phase
+  // stepper + the "Step N of 5" language on the Start-here card.
+  const stages: Array<{ key: string; label: string; nav: string; done: boolean }> = [
+    { key: "Our Venue", label: "Venue", nav: "Our Venue", done: !!weddingDate || roomsBooked > 0 || rentReserved > 0 || selectedAreas.length > 0 },
+    { key: "Our Guests", label: "Guests", nav: "Guests", done: invited > 0 },
+    { key: "Money", label: "Money", nav: "Payments", done: paid > 0 || invoiced > 0 },
+    { key: "Style", label: "Style", nav: "Suppliers", done: (((state as Record<string, unknown>).suppliers as unknown[] | undefined)?.length ?? 0) > 0 },
+    { key: "The Day", label: "The Day", nav: "Timeline", done: timeline.length > 0 || tasksDone > 0 },
+  ];
+  const stagesDone = stages.filter((s) => s.done).length;
+  const currentStageIdx = stages.findIndex((s) => !s.done); // -1 once all done
+  const currentStage = currentStageIdx === -1 ? stages.length : currentStageIdx + 1;
 
   // ── Wedding summary rows ──
   const findArea = (re: RegExp) => selectedAreas.find((a) => re.test(`${a.kind} ${a.name}`));
@@ -253,13 +265,37 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
           <p style={{ color: INK2, marginTop: 4 }}>Here&apos;s everything you need for your big day.</p>
         </div>
 
+        {/* Phase stepper — the 5-stage journey at a glance; tap a stage to jump. */}
+        <div style={{ ...cardS, padding: "14px 18px" }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12, gap: 8, flexWrap: "wrap" }}>
+            <span style={{ ...serifS, fontSize: 15, color: INK }}>{flo}Your planning journey</span>
+            <span style={{ fontSize: 12, color: INK2 }}>{stagesDone === stages.length ? "All 5 stages complete 🎉" : `Step ${currentStage} of ${stages.length}`}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-start" }}>
+            {stages.map((s, idx) => {
+              const isCurrent = idx === currentStageIdx;
+              return (
+                <div key={s.key} style={{ display: "flex", alignItems: "center", flex: idx < stages.length - 1 ? 1 : "0 0 auto" }}>
+                  <button onClick={() => onNavigate(s.nav)} title={`Go to ${s.label}`} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, border: "none", background: "transparent", cursor: "pointer", flexShrink: 0, width: 56 }}>
+                    <span style={{ width: 30, height: 30, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, background: s.done ? PRIMARY : "#f1ece6", color: s.done ? "#fff" : isCurrent ? PRIMARY : "#a8a29e", border: isCurrent && !s.done ? `2px solid ${PRIMARY}` : s.done ? "none" : `1px solid ${LINE}` }}>
+                      {s.done ? "✓" : idx + 1}
+                    </span>
+                    <span style={{ fontSize: 10.5, fontWeight: isCurrent ? 700 : 500, color: isCurrent ? INK : INK2, whiteSpace: "nowrap" }}>{s.label}</span>
+                  </button>
+                  {idx < stages.length - 1 && <span style={{ flex: 1, height: 2, background: s.done ? PRIMARY : "#e7e2db", marginBottom: 18 }} />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Your next step — one clear focal action so new couples aren't
             overwhelmed by the full overview. Surfaces the #1 task as a big
             button, the following steps as quieter chips, and a progress hint. */}
         <div data-tour="start-here" style={{ borderRadius: railRadius, padding: 18, border: `1px solid ${PRIMARY}33`, background: `${PRIMARY}0f` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <span style={{ ...eyebrowS, color: PRIMARY }}>Start here</span>
-            <span style={{ fontSize: 11.5, color: INK2 }}>· {doneCount} of 6 areas done</span>
+            <span style={{ fontSize: 11.5, color: INK2 }}>· {stagesDone === stages.length ? "all stages done" : `Step ${currentStage} of ${stages.length}`}</span>
           </div>
           {topTasks.length > 0 ? (
             <>
