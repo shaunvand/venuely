@@ -1087,19 +1087,31 @@ function PortalTour({ steps, onClose, primary }: { steps: TourStep[]; onClose: (
   const PAD = 8;
   const hole = rect ? { left: rect.left - PAD, top: rect.top - PAD, w: rect.width + PAD * 2, h: rect.height + PAD * 2 } : null;
 
-  // Tooltip placement: below the hole if there's room, else above; centered when
-  // there's no target. Clamped horizontally to the viewport.
+  // Tooltip placement: prefer the RIGHT of the highlight (natural left-to-right
+  // reading, ideal for the left sidebar), then left, then below/above. Always
+  // clamp fully inside the viewport using a generous height estimate so the
+  // Next/Back buttons are never cropped off-screen. Centered when no target.
   const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
   const TW = Math.min(300, vw - 24);
+  const TH = 250; // generous so the button row always fits on-screen
   let tip: React.CSSProperties;
   if (hole) {
-    const below = hole.top + hole.h + 12;
-    const placeBelow = below + 160 < vh;
-    const left = Math.max(12, Math.min(hole.left, vw - TW - 12));
-    tip = placeBelow
-      ? { top: below, left }
-      : { top: Math.max(12, hole.top - 12), left, transform: "translateY(-100%)" };
+    // Vertically near the top of the highlight, clamped so the whole card fits.
+    const vTop = Math.max(12, Math.min(hole.top, vh - TH - 12));
+    const rightLeft = hole.left + hole.w + 14;
+    const leftLeft = hole.left - TW - 14;
+    if (rightLeft + TW <= vw - 12) {
+      tip = { top: vTop, left: rightLeft };          // ← preferred: to the right
+    } else if (leftLeft >= 12) {
+      tip = { top: vTop, left: leftLeft };           // to the left
+    } else {
+      const left = Math.max(12, Math.min(hole.left, vw - TW - 12));
+      const below = hole.top + hole.h + 12;
+      tip = below + TH <= vh - 12
+        ? { top: below, left }                       // below, fits
+        : { top: Math.max(12, vh - TH - 12), left }; // clamp up so buttons show
+    }
   } else {
     tip = { top: "50%", left: "50%", transform: "translate(-50%,-50%)" };
   }
