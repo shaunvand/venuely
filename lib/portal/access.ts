@@ -5,7 +5,15 @@
 // Returns { ok: true, wedding } when allowed; { ok: false, status } otherwise.
 
 import { type NextRequest } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+
+// Constant-time string compare (length-guarded so timingSafeEqual never throws).
+function safeEqual(a: string | undefined | null, b: string): boolean {
+  if (!a) return false;
+  const ba = Buffer.from(a), bb = Buffer.from(b);
+  return ba.length === bb.length && timingSafeEqual(ba, bb);
+}
 import { cookies } from "next/headers";
 
 type WeddingAccessInfo = {
@@ -43,7 +51,7 @@ export async function portalAccess(slug: string, req?: NextRequest): Promise<Acc
     const cookieValue = req
       ? req.cookies.get(cookieName)?.value
       : (await cookies()).get(cookieName)?.value;
-    if (cookieValue === wedding.portal_password_hash) {
+    if (safeEqual(cookieValue, wedding.portal_password_hash)) {
       return { ok: true, wedding: wedding as WeddingAccessInfo, via: "password" };
     }
   }

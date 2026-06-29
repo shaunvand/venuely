@@ -17,14 +17,22 @@
 - **wedding-document DELETE** now verifies venue membership (404/403, not a silent RLS no-op).
 - **yoco webhook** `JSON.parse` guarded (malformed body → 400, not 500).
 
-## 🔧 REMAINING BUGS (recommend fixing next — safe, scoped)
-- **Couple bill-breakdown modal** (`CouplePortal.tsx` ~903) still uses the *estimate* guest count and omits accommodation nights, so itemized lines don't sum to the headline once RSVPs exist. Fix: pass confirmed-RSVP heads + show `× nights`. (billing M2/M3)
-- **WeddingRowActions ⋯ menu clipped** (`WeddingRowActions.tsx:122` inside `WeddingsTable` `overflow-x-auto`) → delete / mark-paid unreachable on bottom rows. Fix: portal the menu.
-- **Accommodation tab double guest editor** (`CouplePortal.tsx` ~751) — `GuestManager` + `RoomAllocator` both fetch guests, desync live. Fix: show only `RoomAllocator` here.
-- **SpacesSection toggle** (`SpacesSection.tsx:60`) has no failure rollback — a failed save leaves a paid space looking selected.
-- **Latent fixed-modal fragility** — InventoryManager/AreaManager/VendorPartnersManager modals aren't portalled (work today only because their pages lack a transformed ancestor). Recommend a shared portalled `<Modal>` primitive to kill the whole class.
-- Minor security: smart-import `fetch` should use `safeFetch` (SSRF); enquiry/review endpoints want rate-limiting/captcha before launch; timing-safe compares on cron secret + portal password.
-- Minor billing: platform fee taxes the refundable breakage deposit; Paystack refunds don't mirror to the wedding ledger; RSVP "attending" defined two ways (regex vs exact).
+## ✅ FIXED & DEPLOYED — Batch 3 (f4e4bf7) + hardening
+- **Couple bill-breakdown** now uses confirmed-RSVP heads + shows accommodation `× nights` → reconciles to the headline. (M2/M3)
+- **Seating unlock / "Our Guests" done** now use the actual guest-LIST size, not the booking estimate (so Seating genuinely locks until a guest exists).
+- **WeddingRowActions ⋯ menu** portalled to body → delete / mark-paid reachable on every row.
+- **Accommodation tab** shows ONE guest source (RoomAllocator + a link to the Guests tab); the desyncing duplicate editor removed.
+- **SpacesSection toggle** rolls back + alerts on save failure.
+- **smart-import** uses `safeFetch` (SSRF guard).
+- **Platform fee** no longer taxes the refundable breakage deposit.
+- **RSVP "attending"** standardized to exact match everywhere (regex used to count "not attending").
+- **Portal-password compare** is now constant-time (`timingSafeEqual`).
+
+## 🔧 STILL OPEN (need infra or a deliberate effort — not yet done)
+- **Defensive shared `<Modal>`** — InventoryManager/AreaManager/VendorPartnersManager modals still aren't portalled (they work today; risk only if a transformed wrapper is added later).
+- **Rate-limiting / captcha** on public `enquiry` + `review` endpoints (needs a shared store/Upstash before launch).
+- **Paystack refund mirroring** to the wedding ledger (needs `charge.refunded` webhook handling).
+- **Cron-secret** compare still `===` (internal-only, negligible).
 
 ## 🧭 STRATEGIC SIMPLIFICATIONS (product decisions — need sign-off)
 These shorten the customer journey for GTM but change UX, so they're recommendations, not auto-applied:
