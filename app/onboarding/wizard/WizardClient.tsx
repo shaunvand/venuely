@@ -452,7 +452,7 @@ function StepBasics({
           <span className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.7)", color: "#1f5d3e" }}>✓</span>
           <div className="text-sm">
             <div className="font-medium">{venue.name}</div>
-            <div style={{ color: "var(--ink-2)" }}>venuely.co.za/portal/{venue.slug}</div>
+            <div style={{ color: "var(--ink-2)" }}>venuely.co.za/v/{venue.slug}</div>
           </div>
         </div>
         <div className="mt-5 flex flex-wrap items-center gap-3">

@@ -119,7 +119,7 @@ export default async function OwnerDashboard() {
       <section>
         <h2 className="font-semibold mb-3">Open a couple portal</h2>
         <p className="text-sm text-gray-600 mb-4">
-          Each wedding has its own branded portal at <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">venuely.co.za/portal/[venue]/[wedding]</code>. As owner you can open any of them.
+          Each wedding has its own branded portal at <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">venuely.co.za/[wedding]</code>. As owner you can open any of them.
         </p>
         <ul className="border rounded-lg divide-y">
           {weddings.map((w) => (

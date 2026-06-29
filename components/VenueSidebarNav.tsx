@@ -18,8 +18,21 @@ const STEP_MATCH: { n: number; path: string }[] = [
 const STEP_FOR_TOP: Record<string, number> = { "/venue/your-venue": 1, "/venue/weddings": 5 };
 // Steps that live INSIDE a group → badged on the group's matching child item when
 // expanded, and the group header carries the lowest-unfinished of them when collapsed.
-const STEP_FOR_ITEM: Record<string, number> = { "/venue/billing": 2, "/venue/seating": 3, "/venue/catalogue": 4 };
-const STEPS_IN_GROUP: Record<string, number[]> = { Money: [2], Marketplace: [3, 4] };
+const STEP_FOR_ITEM: Record<string, number> = { "/venue/billing": 2 };
+const STEPS_IN_GROUP: Record<string, number[]> = { Money: [2] };
+
+// Catalogue/Rentals/Areas/Accommodation/Seating now live under the single
+// "Inventory" hub: those child pages highlight the Inventory nav link, and its
+// onboarding pulse carries steps 3 (seating) + 4 (catalogue).
+const INVENTORY_HUB = "/venue/inventory";
+const INVENTORY_CHILDREN = ["/venue/catalogue", "/venue/rentals", "/venue/areas", "/venue/accommodation", "/venue/seating"];
+const INVENTORY_STEPS = [3, 4];
+
+function topLinkActive(href: string, pathname: string): boolean {
+  if (href === "/venue") return pathname === "/venue";
+  if (href === INVENTORY_HUB) return pathname.startsWith(INVENTORY_HUB) || INVENTORY_CHILDREN.some((c) => pathname.startsWith(c));
+  return pathname.startsWith(href);
+}
 
 type Hints = { active: boolean; done: number[] };
 
@@ -152,11 +165,18 @@ export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) 
   // A group's header badge = the lowest still-unfinished step that lives in it.
   const groupStep = (label: string): number | undefined =>
     (STEPS_IN_GROUP[label] ?? []).filter((n) => showStep(n)).sort((a, b) => a - b)[0];
+  // Top-link badge: Inventory carries the lowest unfinished of its steps (3,4);
+  // other links carry their own single step. Returns only when it should show.
+  const topStep = (href: string): number | undefined => {
+    if (href === INVENTORY_HUB) return INVENTORY_STEPS.filter((n) => showStep(n)).sort((a, b) => a - b)[0];
+    const s = STEP_FOR_TOP[href];
+    return s && showStep(s) ? s : undefined;
+  };
 
   // Collapsed: a flat icon rail (top links + one icon per group → its first item).
   if (collapsed) {
     const rail: { href: string; label: string; icon: IconName; step?: number }[] = [
-      ...TOP_LINKS.map((l) => ({ ...l, step: STEP_FOR_TOP[l.href] })),
+      ...TOP_LINKS.map((l) => ({ ...l, step: topStep(l.href) })),
       ...GROUPS.map((g) => ({ href: g.items[0].href, label: g.label, icon: g.icon, step: groupStep(g.label) })),
     ];
     return (
@@ -164,7 +184,7 @@ export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) 
         <style>{STEP_PULSE_CSS}</style>
         {rail.map((it) => {
           const base = it.href.split("?")[0];
-          const active = base === "/venue" ? pathname === "/venue" : pathname.startsWith(base);
+          const active = topLinkActive(base, pathname);
           return (
             <Link
               key={it.href}
@@ -187,8 +207,8 @@ export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) 
     <nav className="flex flex-col flex-1">
       <style>{STEP_PULSE_CSS}</style>
       {TOP_LINKS.map((l) => {
-        const active = l.href === "/venue" ? pathname === "/venue" : pathname.startsWith(l.href);
-        const step = STEP_FOR_TOP[l.href];
+        const active = topLinkActive(l.href, pathname);
+        const step = topStep(l.href);
         return (
           <Link
             key={l.href}
@@ -197,7 +217,7 @@ export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) 
           >
             <Icon name={l.icon} className="w-[18px] h-[18px] flex-shrink-0" />
             {l.label}
-            {step && showStep(step) && <StepPulse n={step} />}
+            {step && <StepPulse n={step} />}
           </Link>
         );
       })}
