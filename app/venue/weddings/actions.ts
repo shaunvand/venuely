@@ -133,7 +133,7 @@ export async function deleteWedding(weddingId: string, _slug: string) {
   revalidatePath("/venue/weddings");
 }
 
-export const WEDDING_STATUSES = ["inquiry", "provisional", "booked", "completed", "cancelled"] as const;
+const WEDDING_STATUSES = ["inquiry", "provisional", "booked", "completed", "cancelled"] as const;
 
 // Inline status change from the weddings list (RLS confines it to the caller's venue).
 export async function updateWeddingStatus(weddingId: string, status: string) {
