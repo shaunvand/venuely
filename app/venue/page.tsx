@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { computeSetupSteps } from "@/lib/venue/setup";
 import { applyMarkup } from "@/lib/billing/compute";
 import { DashboardWelcomeModal } from "@/components/DashboardWelcomeModal";
-import { VenuelyOpener } from "@/components/VenuelyOpener";
 import { OverviewCalendar } from "@/components/OverviewCalendar";
 
 // Expand an accommodation booking's check_in..check_out into one ISO night per
@@ -420,13 +419,13 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-10 anim-fade-up">
-      {/* ONE welcome per visit (no stacked overlays): the logo opener on the
-          just-onboarded ?welcome visit, otherwise the once-only steps modal. The
-          import nudge is retired here — Smart Import now lives on every inventory
-          page + the setup checklist below, so it no longer needs to auto-pop. */}
-      {isWelcomeVisit
-        ? <VenuelyOpener trigger="welcome" />
-        : <DashboardWelcomeModal />}
+      {/* First arrival after onboarding gets the SAME gentle entrance as any
+          dashboard open/refresh (the anim-fade-up above) — NOT the grand logo
+          opener (that's the public landing animation). The step-by-step features
+          explainer runs once here, like the couple portal's guided tour. */}
+      <DashboardWelcomeModal isWelcome={isWelcomeVisit} />
+      {/* WelcomeLoader hand-off (WelcomeCover, in the layout) still bridges the
+          wizard → dashboard so there's no skeleton flash. */}
 
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>

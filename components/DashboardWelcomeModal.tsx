@@ -11,19 +11,25 @@ import { createPortal } from "react-dom";
 // Optional video override; otherwise the self-contained HTML animation is embedded.
 const EXPLAINER_VIDEO = process.env.NEXT_PUBLIC_WELCOME_VIDEO_URL || "";
 
-export function DashboardWelcomeModal() {
+export function DashboardWelcomeModal({ isWelcome = false }: { isWelcome?: boolean }) {
   const [open, setOpen] = useState(false);
   const [fading, setFading] = useState(false);
 
+  // Run once on mount. The reliable trigger is the server-rendered `isWelcome`
+  // (the ?welcome=1 arrival) — the legacy sessionStorage flag (set by WelcomeCover)
+  // is kept as a fallback, but it raced this child effect vs the parent layout's,
+  // so the steps explainer sometimes never ran. Empty deps = trigger off the
+  // mount-time value; a later prop flip (WelcomeCover strips the URL) can't cancel it.
   useEffect(() => {
-    let show = false;
+    let show = isWelcome;
     try {
-      show = sessionStorage.getItem("vy-welcome-steps") === "1";
+      if (sessionStorage.getItem("vy-welcome-steps") === "1") show = true;
       if (show) sessionStorage.removeItem("vy-welcome-steps");
     } catch {}
     if (!show) return;
     const id = setTimeout(() => setOpen(true), 2000);
     return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function close() {
