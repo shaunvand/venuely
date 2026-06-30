@@ -124,13 +124,8 @@ const COUPLE_NAV: NavEntry[] = [
       { key: "Seating", label: "Seating plan", icon: "seat" },
     ],
   },
-  {
-    group: "Money", icon: "wallet", children: [
-      { key: "Budget", label: "Budget", icon: "wallet" },
-      { key: "Payments", label: "Payments", icon: "card" },
-      { key: "Documents", label: "Documents", icon: "box" },
-    ],
-  },
+  // One "Budget" tab; Budget / Payments / Documents are gate-bubble sub-tabs on its page.
+  { key: "Budget", label: "Budget", icon: "wallet" },
   {
     group: "Suppliers & Style", icon: "store", children: [
       { key: "Suppliers", label: "Suppliers", icon: "store" },
@@ -508,7 +503,7 @@ export function CouplePortal({
             { sel: '[data-tour="start-here"]', title: "Always start here", body: "On Overview, this card always tells you the single most important thing to do next.", before: () => { setTab("Overview"); if (isMobile) setNavOpen(false); } },
             { sel: '[data-tour="section-Our Venue"]', title: "1 · Our Venue", body: "Choose your ceremony & reception spaces, accommodation, and any paid extras.", before: () => { if (isMobile) setNavOpen(true); } },
             { sel: '[data-tour="section-Our Guests"]', title: "2 · Our Guests", body: "Build your guest list — seating unlocks once you've added a guest.", before: () => { if (isMobile) setNavOpen(true); } },
-            { sel: '[data-tour="section-Money"]', title: "3 · Money", body: "Track your budget, view invoices & payments, and store your documents.", before: () => { if (isMobile) setNavOpen(true); } },
+            { sel: '[data-tour="section-Money"]', title: "3 · Budget", body: "Track your budget, view invoices & payments, and store your documents — all under Budget, with quick tabs at the top.", before: () => { if (isMobile) setNavOpen(true); } },
             { sel: '[data-tour="section-Suppliers & Style"]', title: "4 · Suppliers & Style", body: "Message venue-recommended suppliers and build your inspiration board.", before: () => { if (isMobile) setNavOpen(true); } },
             { sel: '[data-tour="section-The Day"]', title: "5 · The Day", body: "Plan your hour-by-hour timeline and tick off your checklist as the day nears.", before: () => { if (isMobile) setNavOpen(true); } },
             { title: "You're all set! 💍", body: "Reopen this tour any time via “Take the tour” at the bottom of the menu.", before: () => { if (isMobile) setNavOpen(false); } },
@@ -542,8 +537,9 @@ export function CouplePortal({
         <nav data-tour="nav" style={{ display: "grid", gap: 2, flex: 1 }}>
           {COUPLE_NAV.map((entry) => {
             if (!isGroup(entry)) {
-              const active = entry.key === tab;
-              return <button key={entry.key} aria-current={active ? "page" : undefined} onClick={() => { setTab(entry.key); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "var(--on-poppy,#fff)" : "#44403c" }}>{navIcon(entry.icon)}<span style={{ flex: 1 }}>{entry.label}</span>{entry.key === "Messages" && msgUnread > 0 && <span style={{ background: active ? "var(--on-poppy,#fff)" : "var(--poppy,#FA523C)", color: active ? "var(--poppy,#FA523C)" : "var(--on-poppy,#fff)", borderRadius: 999, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", lineHeight: 1.5 }}>{msgUnread}</span>}</button>;
+              // The Budget leaf stays highlighted for its Payments/Documents sub-tabs.
+              const active = entry.key === tab || (entry.key === "Budget" && (tab === "Payments" || tab === "Documents"));
+              return <button key={entry.key} data-tour={entry.key === "Budget" ? "section-Money" : undefined} aria-current={active ? "page" : undefined} onClick={() => { setTab(entry.key); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "var(--on-poppy,#fff)" : "#44403c" }}>{navIcon(entry.icon)}<span style={{ flex: 1 }}>{entry.label}</span>{entry.key === "Messages" && msgUnread > 0 && <span style={{ background: active ? "var(--on-poppy,#fff)" : "var(--poppy,#FA523C)", color: active ? "var(--poppy,#FA523C)" : "var(--on-poppy,#fff)", borderRadius: 999, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", lineHeight: 1.5 }}>{msgUnread}</span>}</button>;
             }
             const childActive = entry.children.some((c) => c.key === tab);
             const explicit = openGroups[entry.group];
@@ -831,9 +827,6 @@ export function CouplePortal({
         {tab === "Inspiration" && (
           <InspirationBoard slug={slug} initialPalette={(state as Record<string, unknown>).palette as string[] ?? []} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
-        {tab === "Documents" && (
-          <DocumentManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
-        )}
         {tab === "Timeline" && (
           <TimelineBoard slug={slug} weddingDate={weddingDate} weddingEndDate={weddingEndDate} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
@@ -855,15 +848,27 @@ export function CouplePortal({
         {tab === "Décor" && (
           <ListManager slug={slug} kind="decor" title="Décor" sub="Centrepieces, ceremony arch and styling notes" fields={DECOR_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
-        {tab === "Budget" && (
-          <BudgetBoard slug={slug} totalDue={totalDue} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
-        )}
-        {tab === "Payments" && (
-          <div style={{ display: "grid", gap: 28 }}>
-            <PaymentsManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
-            <div style={{ borderTop: tokens.divider, paddingTop: 20 }}>
-              <DocumentManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
+        {(tab === "Budget" || tab === "Payments" || tab === "Documents") && (
+          <div style={{ display: "grid", gap: 22 }}>
+            {/* Gate bubbles — one "Budget" tab, three sub-pages. */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {(["Budget", "Payments", "Documents"] as const).map((k) => {
+                const on = tab === k;
+                return (
+                  <button
+                    key={k}
+                    onClick={() => setTab(k)}
+                    aria-current={on ? "page" : undefined}
+                    style={{ padding: "9px 20px", borderRadius: 999, border: on ? "none" : "1px solid rgba(0,0,0,0.12)", background: on ? primary : "#fff", color: on ? onPrimary : "#57534e", fontWeight: on ? 700 : 600, fontSize: 13.5, cursor: "pointer" }}
+                  >
+                    {k}
+                  </button>
+                );
+              })}
             </div>
+            {tab === "Budget" && <BudgetBoard slug={slug} totalDue={totalDue} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />}
+            {tab === "Payments" && <PaymentsManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />}
+            {tab === "Documents" && <DocumentManager slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />}
           </div>
         )}
         </div>

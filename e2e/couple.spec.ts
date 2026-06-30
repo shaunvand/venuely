@@ -24,10 +24,10 @@ async function unlock(page: Page) {
 }
 
 // Every couple destination: 2 pinned leaves + 5 sections × their children.
+// Money is now a single "Budget" leaf (Budget/Payments/Documents are in-page bubbles).
 const SECTIONS: Record<string, string[]> = {
   "Our Venue": ["Spaces & Rooms", "Accommodation", "Extras & Rentals"],
   "Our Guests": ["Guest List", "Seating plan"],
-  "Money": ["Budget", "Payments", "Documents"],
   "Suppliers & Style": ["Suppliers", "Inspiration", "Invites", "Flowers", "The Dress", "Décor", "Music", "Contacts"],
   "The Day": ["Wedding day Timeline", "Checklist"],
 };
@@ -52,7 +52,7 @@ test.describe.serial("Couple portal journey", () => {
     const tap = async (loc: ReturnType<Page["locator"]>) => {
       if (await loc.count()) { await loc.first().click({ timeout: 8_000 }).catch(() => {}); await page.waitForTimeout(350); }
     };
-    for (const leaf of ["Overview", "Messages"]) {
+    for (const leaf of ["Overview", "Messages", "Budget"]) {
       await tap(page.getByRole("button", { name: new RegExp(`^${leaf}$`) }));
     }
     for (const [section, children] of Object.entries(SECTIONS)) {
