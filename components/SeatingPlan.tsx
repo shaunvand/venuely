@@ -44,8 +44,34 @@ export function SeatingPlan({ slug, primary, accent, heading, cardRadius }: {
   const [tForm, setTForm] = useState({ name: "", shape: "long", seats: 8, include_ends: true });
 
   function loadGuests() { return fetch(`/api/wedding/${slug}/guests`).then((r) => r.json()).then((j) => setGuests(j.guests ?? [])); }
-  function loadTables() { return fetch(`/api/wedding/${slug}/tables`).then((r) => r.json()).then((j) => setTables(j.tables ?? [])); }
-  useEffect(() => { Promise.all([loadGuests(), loadTables()]).finally(() => setLoading(false)); }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await loadGuests();
+      let t: Table[] = (await fetch(`/api/wedding/${slug}/tables`).then((r) => r.json())).tables ?? [];
+      // Always start from the venue's tables — auto-import on the first visit
+      // (when the wedding has none yet). Couples can add or remove tables after.
+      if (t.length === 0) {
+        await fetch(`/api/wedding/${slug}/tables`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ importVenue: true }) });
+        t = (await fetch(`/api/wedding/${slug}/tables`).then((r) => r.json())).tables ?? [];
+      }
+      if (!cancelled) { setTables(t); setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [slug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-scroll the page while dragging a guest near the top/bottom edge, so the
+  // lower tables are reachable (native HTML5 drag doesn't scroll on its own).
+  useEffect(() => {
+    if (!dragId) return;
+    const onDragOver = (e: DragEvent) => {
+      const y = e.clientY, h = window.innerHeight, EDGE = 100;
+      if (y < EDGE) window.scrollBy(0, -Math.ceil((EDGE - y) / 5));
+      else if (y > h - EDGE) window.scrollBy(0, Math.ceil((y - (h - EDGE)) / 5));
+    };
+    window.addEventListener("dragover", onDragOver);
+    return () => window.removeEventListener("dragover", onDragOver);
+  }, [dragId]);
 
   async function seatPatch(guestId: string, tableId: string | null, index: number | null) {
     setGuests((gs) => gs.map((g) => g.id === guestId ? { ...g, seat_table_id: tableId, seat_index: index } : g));
@@ -73,11 +99,6 @@ export function SeatingPlan({ slug, primary, accent, heading, cardRadius }: {
     setGuests((gs) => gs.map((g) => g.seat_table_id === id ? { ...g, seat_table_id: null, seat_index: null } : g));
     await fetch(`/api/wedding/${slug}/tables`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }) });
   }
-  async function importVenue() {
-    await fetch(`/api/wedding/${slug}/tables`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ importVenue: true }) });
-    await loadTables();
-  }
-
   const seated = guests.filter((g) => g.seat_table_id).length;
   const card: React.CSSProperties = { background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: cardRadius };
   const btnSolid: React.CSSProperties = { background: primary, color: "#fff", border: "none", borderRadius: 999, padding: "9px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer", letterSpacing: 0.5 };
@@ -92,7 +113,7 @@ export function SeatingPlan({ slug, primary, accent, heading, cardRadius }: {
         draggable={!!occ} onDragStart={() => occ && setDragId(occ.id)}
         onDragOver={(e) => { if (dragId && !occ) e.preventDefault(); }}
         onDrop={(e) => { e.preventDefault(); if (dragId && !occ) seatPatch(dragId, table.id, index); setDragId(null); }}
-        style={{ width: 70, minHeight: 46, borderRadius: 8, cursor: occ ? "grab" : "pointer", fontSize: 11, lineHeight: 1.15, padding: "4px 3px", textAlign: "center",
+        style={{ width: 56, minHeight: 36, borderRadius: 8, cursor: occ ? "grab" : "pointer", fontSize: 10.5, lineHeight: 1.1, padding: "3px 2px", textAlign: "center",
           border: occ ? `1px solid ${primary}` : "1px dashed rgba(0,0,0,0.22)", background: occ ? "#fff" : (selected || dragId ? `${accent}14` : "transparent"), color: "#1c1917" }}>
         {occ ? <><div style={{ fontWeight: 700 }}>{first}</div>{rest.length > 0 && <div style={{ color: "#57534e" }}>{rest.join(" ")}</div>}</> : ""}
       </button>
@@ -106,11 +127,11 @@ export function SeatingPlan({ slug, primary, accent, heading, cardRadius }: {
     const row = (arr: number[]) => <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>{arr.map((i) => seat(table, i))}</div>;
     const col = (arr: number[]) => <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>{arr.map((i) => seat(table, i))}</div>;
     return (
-      <div key={table.id} style={{ ...card, padding: 18 }}>
+      <div key={table.id} style={{ ...card, padding: 13 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div style={{ ...serif, fontSize: 18, color: primary }}>{table.name}</div>
-            <div style={{ fontSize: 12, color: "#8a8a8a" }}>{shapeLabel} · {filled}/{table.seats} seats filled</div>
+            <div style={{ ...serif, fontSize: 16, color: primary }}>{table.name}</div>
+            <div style={{ fontSize: 11.5, color: "#8a8a8a" }}>{shapeLabel} · {filled}/{table.seats} seats filled</div>
           </div>
           <button onClick={() => removeTable(table.id)} title="Remove table" style={{ border: "none", background: "transparent", color: "#c0b9b1", cursor: "pointer", fontSize: 16 }}>✕</button>
         </div>
@@ -119,7 +140,7 @@ export function SeatingPlan({ slug, primary, accent, heading, cardRadius }: {
           {lay.top.length > 0 && row(lay.top)}
           <div style={{ display: "flex", gap: 8, alignItems: "stretch", width: "100%", justifyContent: "center" }}>
             {lay.left.length > 0 && col(lay.left)}
-            <div style={{ flex: 1, maxWidth: 620, minHeight: 50, borderRadius: 10, background: `${accent}22`, border: `1px solid ${accent}66`, display: "flex", alignItems: "center", justifyContent: "center", ...serif, color: "#57534e" }}>{table.name}</div>
+            <div style={{ flex: 1, maxWidth: 440, minHeight: 40, borderRadius: 10, background: `${accent}22`, border: `1px solid ${accent}66`, display: "flex", alignItems: "center", justifyContent: "center", ...serif, color: "#57534e", fontSize: 13 }}>{table.name}</div>
             {lay.right.length > 0 && col(lay.right)}
           </div>
           {lay.bottom.length > 0 && row(lay.bottom)}
@@ -179,14 +200,13 @@ export function SeatingPlan({ slug, primary, accent, heading, cardRadius }: {
       {tables.length === 0 ? (
         <div style={{ ...card, padding: 28, textAlign: "center" }}>
           <div style={{ ...serif, fontSize: 18, color: "#1c1917" }}>No tables yet</div>
-          <p style={{ color: "#57534e", fontSize: 13, margin: "6px 0 16px" }}>Add your own tables, or start from the tables your venue already offers.</p>
+          <p style={{ color: "#57534e", fontSize: 13, margin: "6px 0 16px" }}>Your venue hasn&apos;t set up any tables yet — add your own to start your seating plan.</p>
           <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
             <button onClick={() => setShowTableModal(true)} style={btnSolid}>+ Add a table</button>
-            <button onClick={importVenue} style={btnSoft}>Use my venue&apos;s tables</button>
           </div>
         </div>
       ) : (
-        <div style={{ display: "grid", gap: 16 }}>{tables.map((t) => tableCard(t))}</div>
+        <div style={{ display: "grid", gap: 12 }}>{tables.map((t) => tableCard(t))}</div>
       )}
 
       {/* Add Table modal — portalled to body so position:fixed escapes the couple
