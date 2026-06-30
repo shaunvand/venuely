@@ -86,7 +86,7 @@ const DAY_TYPES: { key: "mg" | "wed" | "fb"; label: string }[] = [
 ];
 
 type CatItem = { id: string; category: string; name: string; description: string; img: string | null; price?: number; priceUnit?: string | null; included: boolean; eventPart?: string | null };
-type RentItem = CatItem & { price: number };
+type RentItem = CatItem & { price: number; stock?: number | null };
 type RoomItem = { id: string; name: string; type: string; sleeps: number; description: string; img: string | null; price: number };
 type VendorItem = { id: string; type: string; name: string; description: string; img: string | null; price: number | null; email: string | null; phone: string | null; website: string | null; commissionValue?: number | null; commissionType?: string | null };
 type GalleryItem = { url: string; category: string; label: string };
@@ -753,10 +753,10 @@ export function CouplePortal({
               {shown.length === 0 ? <Empty radius={isClassic ? undefined : tokens.cardRadius}>Nothing in this folder.</Empty> : groupBy(shown, (m) => keyOf(m.item)).map(([catName, items]) => (
                 <div key={catName} style={{ marginBottom: 22 }}>
                   <div style={{ ...eyebrow, color: primary, marginBottom: 8 }}>{catName}</div>
-                  <div style={grid}>{items.map((m) => m.kind === "cat" ? (
-                    <PortalItemCard key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} paidItem={!m.item.included} selected={catIsSelected(m.item)} onToggle={() => toggleCat(m.item)} days={catSel[m.item.id]} onDay={(d) => toggleCatDay(m.item, d)} {...itemProps} />
+                  <div style={{ display: "grid", gap: 8 }}>{items.map((m) => m.kind === "cat" ? (
+                    <PortalLineItem key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} paidItem={!m.item.included} selected={catIsSelected(m.item)} onToggle={() => toggleCat(m.item)} days={catSel[m.item.id]} onDay={(d) => toggleCatDay(m.item, d)} {...itemProps} />
                   ) : (
-                    <PortalItemCard key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} paidItem={!m.item.included} selected={!!rentSel[m.item.id]?.sel} onToggle={() => toggleRent(m.item.id)} days={rentSel[m.item.id]} onDay={(d) => toggleRentDay(m.item.id, d)} qty={rentSel[m.item.id]?.qty} onQty={(n) => setRentQty(m.item.id, n)} {...itemProps} />
+                    <PortalLineItem key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} paidItem={!m.item.included} selected={!!rentSel[m.item.id]?.sel} onToggle={() => toggleRent(m.item.id)} days={rentSel[m.item.id]} onDay={(d) => toggleRentDay(m.item.id, d)} qty={rentSel[m.item.id]?.qty} onQty={(n) => setRentQty(m.item.id, n)} stock={(m.item as RentItem).stock} {...itemProps} />
                   ))}</div>
                 </div>
               ))}
@@ -1341,6 +1341,60 @@ function PortalItemCard({ name, description, img, price, badge, paidItem, select
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Compact LINE-ITEM row (vs the cube card) for Extras & Rentals — name + price on
+// one line, a typeable quantity capped at the venue's available stock, and the
+// day toggles when selected.
+function PortalLineItem({ name, description, img, price, badge, paidItem, selected, onToggle, days, onDay, qty, onQty, stock, primary, accent, heading, cardBorder }: {
+  name: string; description: string; img: string | null; price?: number; badge?: string; paidItem?: boolean;
+  selected?: boolean; onToggle?: () => void;
+  days?: DaySel; onDay?: (d: "mg" | "wed" | "fb") => void;
+  qty?: number; onQty?: (n: number) => void; stock?: number | null;
+  primary: string; accent: string; heading: React.CSSProperties; cardRadius: string; cardBorder?: string;
+}) {
+  const included = badge === "Included";
+  const paid = paidItem ?? (!included && price != null && price > 0);
+  return (
+    <div style={{ background: "#fff", border: selected ? `1.5px solid ${primary}` : (cardBorder ?? "1px solid rgba(0,0,0,0.08)"), borderRadius: 12, padding: "9px 12px", display: "grid", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {img ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={img} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+        ) : <div style={{ width: 44, height: 44, borderRadius: 8, background: `${accent}33`, flexShrink: 0 }} />}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ ...heading, fontWeight: 700, fontSize: 14.5, lineHeight: 1.2 }}>{name}</div>
+          {description && <div style={{ fontSize: 12, color: "#57534e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{description}</div>}
+        </div>
+        <div style={{ textAlign: "right", flexShrink: 0, minWidth: 64 }}>
+          {included ? <span style={{ fontSize: 11, fontWeight: 600, color: "#1f5d3e" }}>Included</span>
+            : paid ? ((price ?? 0) > 0 ? <span style={{ color: primary, fontWeight: 700, fontSize: 14 }}>{rZA(price!)}</span> : <span style={{ color: "#8a6116", fontWeight: 600, fontSize: 11.5 }}>On request</span>)
+            : null}
+        </div>
+        {onToggle && (included ? (
+          <button onClick={onToggle} style={{ flexShrink: 0, padding: "7px 13px", borderRadius: 999, border: "1px solid rgba(0,0,0,0.12)", background: selected ? "#eef0e9" : "#fff", color: selected ? "var(--ink, #1c1917)" : "#57534e", fontWeight: 600, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>{selected ? "✓ Included" : "+ Include"}</button>
+        ) : (
+          <button onClick={onToggle} style={{ flexShrink: 0, padding: "7px 13px", borderRadius: 999, border: selected ? "none" : `1px solid ${primary}40`, background: selected ? primary : `${primary}14`, color: selected ? "#fff" : primary, fontWeight: 700, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>{selected ? "✓ Added" : "+ Add"}</button>
+        ))}
+      </div>
+      {selected && (onDay || onQty) && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingLeft: 56 }}>
+          {onDay && DAY_TYPES.map((d) => { const on = !!days?.[d.key]; return (
+            <button key={d.key} onClick={() => onDay(d.key)} style={{ fontSize: 10.5, padding: "4px 10px", borderRadius: 999, cursor: "pointer", border: `1px solid ${on ? primary : "rgba(0,0,0,0.15)"}`, background: on ? `${primary}1f` : "#fff", color: on ? primary : "#57534e", fontWeight: on ? 700 : 500 }}>{on ? "✓ " : ""}{d.label}</button>
+          ); })}
+          {onQty && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+              <span style={{ fontSize: 11, color: "#57534e" }}>Qty</span>
+              <input type="number" min={1} max={stock != null && stock > 0 ? stock : undefined} value={qty ?? 1}
+                onChange={(e) => { let n = Math.max(1, Math.floor(Number(e.target.value) || 1)); if (stock != null && stock > 0) n = Math.min(n, stock); onQty?.(n); }}
+                style={{ width: 60, border: "1px solid rgba(0,0,0,0.15)", borderRadius: 8, padding: "5px 8px", fontSize: 13, textAlign: "center" }} />
+              {stock != null && stock > 0 && <span style={{ fontSize: 11, color: "#8a8a8a" }}>/ {stock} available</span>}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
