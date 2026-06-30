@@ -11,12 +11,20 @@ async function client() {
   return await createClient();
 }
 
+// Every inventory mutation must also refresh the /venue/inventory hub — its
+// per-section counts (and the seating seat total) read the same tables, so
+// revalidating only the editor page left the hub showing stale numbers.
+function revalidateInventory(type: InventoryType) {
+  revalidatePath(INVENTORY_PATHS[type]);
+  revalidatePath("/venue/inventory");
+}
+
 export async function bulkDelete(type: InventoryType, ids: string[]) {
   if (!ids.length) return;
   const supabase = await client();
   const { error } = await supabase.from(INVENTORY_TABLES[type]).delete().in("id", ids);
   if (error) throw new Error(error.message);
-  revalidatePath(INVENTORY_PATHS[type]);
+  revalidateInventory(type);
 }
 
 export async function bulkSetActive(type: InventoryType, ids: string[], active: boolean) {
@@ -24,7 +32,7 @@ export async function bulkSetActive(type: InventoryType, ids: string[], active: 
   const supabase = await client();
   const { error } = await supabase.from(INVENTORY_TABLES[type]).update({ active }).in("id", ids);
   if (error) throw new Error(error.message);
-  revalidatePath(INVENTORY_PATHS[type]);
+  revalidateInventory(type);
 }
 
 export async function bulkSetPrice(type: InventoryType, ids: string[], price: number) {
@@ -35,7 +43,7 @@ export async function bulkSetPrice(type: InventoryType, ids: string[], price: nu
     : "price_from";
   const { error } = await supabase.from(INVENTORY_TABLES[type]).update({ [col]: price }).in("id", ids);
   if (error) throw new Error(error.message);
-  revalidatePath(INVENTORY_PATHS[type]);
+  revalidateInventory(type);
 }
 
 export async function bulkSetCommission(type: InventoryType, ids: string[], value: number, commissionType: "fixed" | "percent") {
@@ -45,7 +53,7 @@ export async function bulkSetCommission(type: InventoryType, ids: string[], valu
     .update({ commission_value: value, commission_type: commissionType })
     .in("id", ids);
   if (error) throw new Error(error.message);
-  revalidatePath(INVENTORY_PATHS[type]);
+  revalidateInventory(type);
 }
 
 export async function bulkSetCostTreatment(type: InventoryType, ids: string[], treatment: "included" | "extra") {
@@ -55,7 +63,7 @@ export async function bulkSetCostTreatment(type: InventoryType, ids: string[], t
     .update({ cost_treatment: treatment })
     .in("id", ids);
   if (error) throw new Error(error.message);
-  revalidatePath(INVENTORY_PATHS[type]);
+  revalidateInventory(type);
 }
 
 export async function updateItem(type: InventoryType, id: string, patch: Record<string, unknown>) {
@@ -71,7 +79,7 @@ export async function updateItem(type: InventoryType, id: string, patch: Record<
   if (safe.commission_type === null || safe.commission_type === "") safe.commission_type = "fixed";
   const { error } = await supabase.from(INVENTORY_TABLES[type]).update(safe).eq("id", id);
   if (error) throw new Error(error.message);
-  revalidatePath(INVENTORY_PATHS[type]);
+  revalidateInventory(type);
 }
 
 export async function addItem(type: InventoryType, venueId: string, patch: Record<string, unknown>) {
@@ -86,7 +94,7 @@ export async function addItem(type: InventoryType, venueId: string, patch: Recor
   }
   const { error } = await supabase.from(INVENTORY_TABLES[type]).insert(row);
   if (error) throw new Error(error.message);
-  revalidatePath(INVENTORY_PATHS[type]);
+  revalidateInventory(type);
 }
 
 // Reverse a single Smart Import commit: delete every row that carries this batch id
@@ -107,6 +115,7 @@ export async function undoImport(venueId: string, batchId: string) {
     if (data) deleted += data.length;
   }
   for (const path of new Set(Object.values(INVENTORY_PATHS))) revalidatePath(path);
+  revalidatePath("/venue/inventory");
   return { deleted };
 }
 
@@ -117,6 +126,6 @@ export async function bulkInsert(type: InventoryType, venueId: string, rows: Arr
   const payload = rows.map((r, i) => ({ ...defaults, ...r, venue_id: venueId, sort_order: i }));
   const { error } = await supabase.from(INVENTORY_TABLES[type]).insert(payload);
   if (error) throw new Error(error.message);
-  revalidatePath(INVENTORY_PATHS[type]);
+  revalidateInventory(type);
   return { inserted: payload.length };
 }

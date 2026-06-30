@@ -17,7 +17,7 @@ export default async function VenueInventoryHub() {
     supabase.from("rental_items").select("id, cost_treatment", { count: "exact" }).eq("venue_id", venue.id),
     supabase.from("venue_areas").select("id, area_kind", { count: "exact" }).eq("venue_id", venue.id),
     supabase.from("accommodation_rooms").select("id, cost_treatment", { count: "exact" }).eq("venue_id", venue.id),
-    supabase.from("venue_tables").select("id", { count: "exact" }).eq("venue_id", venue.id),
+    supabase.from("venue_tables").select("id, seats, quantity", { count: "exact" }).eq("venue_id", venue.id),
   ]);
 
   const incExt = (rows: { cost_treatment?: string | null }[] | null) => {
@@ -31,12 +31,18 @@ export default async function VenueInventoryHub() {
   const areaRows = (area.data ?? []) as { area_kind?: string | null }[];
   const areaInc = areaRows.filter((a) => a.area_kind === "main").length;
 
+  // Seating: a row is a table layout with a quantity; couples plan on the SEATS.
+  // Surface the seat capacity (not just the layout count) so a save is visible.
+  const tableRows = (table.data ?? []) as { seats?: number | null; quantity?: number | null }[];
+  const totalTables = tableRows.reduce((s, t) => s + (Number(t.quantity) || 1), 0);
+  const totalSeats = tableRows.reduce((s, t) => s + (Number(t.seats) || 0) * (Number(t.quantity) || 1), 0);
+
   const cards = [
     { href: "/venue/catalogue", title: "Catalogue", desc: "Menus, packages and per-head items couples tick by day.", count: cat.count ?? 0, split: `${c.inc} included · ${c.ext} extra` },
     { href: "/venue/rentals", title: "Rentals & stock", desc: "Hire items — chairs, linen, décor, equipment.", count: rent.count ?? 0, split: `${r.inc} included · ${r.ext} extra` },
     { href: "/venue/areas", title: "Spaces & areas", desc: "Ceremony, reception and optional paid spaces.", count: area.count ?? 0, split: `${areaInc} included · ${(area.count ?? 0) - areaInc} extra` },
     { href: "/venue/accommodation", title: "Accommodation", desc: "On-site rooms couples assign their guests to.", count: room.count ?? 0, split: `${m.inc} included · ${m.ext} extra` },
-    { href: "/venue/seating", title: "Seating & tables", desc: "Table layouts couples build their seating plan on.", count: table.count ?? 0, split: `${table.count ?? 0} table${(table.count ?? 0) === 1 ? "" : "s"}` },
+    { href: "/venue/seating", title: "Seating & tables", desc: "Table layouts couples build their seating plan on.", count: totalSeats, split: `${totalTables} table${totalTables === 1 ? "" : "s"} · ${totalSeats} seat${totalSeats === 1 ? "" : "s"}` },
   ];
 
   return (

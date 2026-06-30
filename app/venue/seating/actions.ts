@@ -26,6 +26,7 @@ export async function addTable(formData: FormData) {
   });
   if (error) throw new Error(error.message);
   revalidatePath("/venue/seating");
+  revalidatePath("/venue/inventory"); // keep the hub's table/seat count fresh
 }
 
 export async function updateTable(id: string, formData: FormData) {
@@ -38,6 +39,7 @@ export async function updateTable(id: string, formData: FormData) {
   }).eq("id", id).eq("venue_id", venue.id);
   if (error) throw new Error(error.message);
   revalidatePath("/venue/seating");
+  revalidatePath("/venue/inventory"); // keep the hub's table/seat count fresh
 }
 
 export async function deleteTable(id: string) {
@@ -45,4 +47,5 @@ export async function deleteTable(id: string) {
   const { error } = await db().from("venue_tables").delete().eq("id", id).eq("venue_id", venue.id);
   if (error) throw new Error(error.message);
   revalidatePath("/venue/seating");
+  revalidatePath("/venue/inventory"); // keep the hub's table/seat count fresh
 }

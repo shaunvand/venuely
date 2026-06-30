@@ -29,6 +29,7 @@ export async function addAreaImages(areaId: string, urls: string[]) {
     if (error) throw new Error(error.message);
   }
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 export async function deleteAreaImage(mediaId: string) {
@@ -42,6 +43,7 @@ export async function deleteAreaImage(mediaId: string) {
   const { error } = await sb.from("media_assets").delete().eq("id", mediaId);
   if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 export async function addArea(venueId: string, formData: FormData) {
@@ -91,6 +93,7 @@ export async function addArea(venueId: string, formData: FormData) {
     if (priceError) throw new Error(priceError.message);
   }
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 export async function deleteArea(areaId: string) {
@@ -98,6 +101,7 @@ export async function deleteArea(areaId: string) {
   const { error } = await supabase.from("venue_areas").delete().eq("id", areaId);
   if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 export async function toggleAreaActive(areaId: string, active: boolean) {
@@ -105,6 +109,7 @@ export async function toggleAreaActive(areaId: string, active: boolean) {
   const { error } = await supabase.from("venue_areas").update({ active }).eq("id", areaId);
   if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 export async function updateArea(areaId: string, formData: FormData) {
@@ -123,6 +128,7 @@ export async function updateArea(areaId: string, formData: FormData) {
     .eq("id", areaId);
   if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 // Season-aware single-price upsert. mg/farewell always pass seasonId=null;
@@ -141,6 +147,7 @@ export async function updateAreaPrice(areaId: string, dayType: string, seasonId:
   const { error } = await supabase.from("area_pricing").insert({ area_id: areaId, day_type: dayType, price, season_id: sid });
   if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 // Bulk version of updateAreaPrice — commits every price field on the Areas page
@@ -162,6 +169,7 @@ export async function saveAllAreaPrices(
     if (error) throw new Error(error.message);
   }
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 export async function assignAreaGroup(areaId: string, groupId: string | null) {
@@ -170,6 +178,7 @@ export async function assignAreaGroup(areaId: string, groupId: string | null) {
   const { error } = await supabase.from("venue_areas").update({ group_id }).eq("id", areaId);
   if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 /* ── Sub-category groups (venue_area_groups) ───────────────────────────── */
@@ -188,6 +197,7 @@ export async function addAreaGroup(venueId: string, formData: FormData) {
   });
   if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 export async function updateAreaGroup(groupId: string, formData: FormData) {
@@ -203,6 +213,7 @@ export async function updateAreaGroup(groupId: string, formData: FormData) {
     .eq("id", groupId);
   if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 export async function deleteAreaGroup(groupId: string) {
@@ -213,6 +224,7 @@ export async function deleteAreaGroup(groupId: string) {
   const { error } = await supabase.from("venue_area_groups").delete().eq("id", groupId);
   if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 /* ── Venue seasons (venue_seasons) ─────────────────────────────────────── */
@@ -244,6 +256,7 @@ export async function addSeason(venueId: string, formData: FormData) {
   });
   if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 export async function updateSeason(seasonId: string, formData: FormData) {
@@ -262,6 +275,7 @@ export async function updateSeason(seasonId: string, formData: FormData) {
     .eq("id", seasonId);
   if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 export async function deleteSeason(seasonId: string) {
@@ -272,6 +286,7 @@ export async function deleteSeason(seasonId: string) {
   const { error } = await supabase.from("venue_seasons").delete().eq("id", seasonId);
   if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 // Quick-add 4 sensible SA seasons (venue can rename/adjust). Southern-hemisphere
@@ -288,6 +303,7 @@ export async function quickAddSASeasons(venueId: string) {
   const { error } = await supabase.from("venue_seasons").insert(presets.map((p) => ({ venue_id: venueId, ...p })));
   if (error) throw new Error(error.message);
   revalidatePath("/venue/areas");
+  revalidatePath("/venue/inventory"); // keep the hub's spaces count fresh
 }
 
 // Lightweight fetch of the venue's groups + seasons for the onboarding wizard
