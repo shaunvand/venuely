@@ -25,6 +25,8 @@ export function PaymentsManager({ slug, primary, accent, heading, cardRadius }: 
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [reminding, setReminding] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkAmt, setBulkAmt] = useState("");
 
   function loadAll() {
     return Promise.all([
@@ -49,6 +51,16 @@ export function PaymentsManager({ slug, primary, accent, heading, cardRadius }: 
     const targets = guests.filter((g) => g.rsvp_status === "attending");
     setGuests((gs) => gs.map((g) => g.rsvp_status === "attending" ? { ...g, amount_due: amt } : g));
     await Promise.all(targets.map((g) => fetch(`/api/wedding/${slug}/guests`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: g.id, amount_due: amt }) })));
+    await loadAll();
+  }
+  function toggleSel(id: string) { setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; }); }
+  function toggleSelAll() { setSelected((s) => s.size === guests.length ? new Set() : new Set(guests.map((g) => g.id))); }
+  async function applyToSelected() {
+    const amt = Number(bulkAmt || 0);
+    const ids = guests.filter((g) => selected.has(g.id)).map((g) => g.id);
+    if (!ids.length) return;
+    setGuests((gs) => gs.map((g) => selected.has(g.id) ? { ...g, amount_due: amt } : g));
+    await Promise.all(ids.map((id) => fetch(`/api/wedding/${slug}/guests`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, amount_due: amt }) })));
     await loadAll();
   }
   async function remindUnpaid() {
@@ -122,11 +134,21 @@ export function PaymentsManager({ slug, primary, accent, heading, cardRadius }: 
               {stat("Outstanding", rZA(fromGuests?.outstanding || 0), primary)}
             </div>
 
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
               <span style={{ fontSize: 13 }}>Default per guest:</span>
               <input type="number" value={settings.defaultGuestAmount ?? ""} onChange={(e) => setSettings({ ...settings, defaultGuestAmount: Number(e.target.value) })} onBlur={(e) => saveSettings({ ...settings, defaultGuestAmount: Number(e.target.value) })} placeholder="0" style={{ ...field, width: 100 }} />
               <button onClick={applyDefaultToAll} style={{ border: `1px solid ${primary}`, background: "#fff", color: primary, borderRadius: 999, padding: "7px 14px", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>Apply to attending</button>
               <button onClick={remindUnpaid} disabled={reminding || owing.length === 0} style={{ background: accent, color: "#fff", border: "none", borderRadius: 999, padding: "7px 14px", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>{reminding ? "Sending…" : `✉ Remind ${owing.length} unpaid`}</button>
+            </div>
+
+            {/* Select specific guests, then set one amount across all of them. */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12, padding: "8px 10px", background: `${accent}14`, borderRadius: 10 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600 }}>
+                <input type="checkbox" checked={guests.length > 0 && selected.size === guests.length} onChange={toggleSelAll} /> Select all
+              </label>
+              <span style={{ fontSize: 12.5, color: "#57534e" }}>{selected.size} selected · set each to</span>
+              <input type="number" value={bulkAmt} onChange={(e) => setBulkAmt(e.target.value)} placeholder="R" style={{ ...field, width: 90, padding: "5px 9px" }} />
+              <button onClick={applyToSelected} disabled={selected.size === 0} style={{ background: selected.size ? primary : "#ccc", color: "#fff", border: "none", borderRadius: 999, padding: "6px 14px", fontWeight: 700, cursor: selected.size ? "pointer" : "not-allowed", fontSize: 13 }}>Set for selected</button>
             </div>
 
             <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
@@ -134,17 +156,24 @@ export function PaymentsManager({ slug, primary, accent, heading, cardRadius }: 
                 const due = Number(g.amount_due || 0), paid = Number(g.amount_paid || 0);
                 const settled = due > 0 && paid >= due;
                 return (
-                  <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 10, flexWrap: "wrap" }}>
-                    <span style={{ flex: 1, minWidth: 120, fontSize: 13.5 }}>{g.full_name}{g.rsvp_status === "attending" ? "" : <span style={{ color: "#a0a0a0", fontSize: 11 }}> · {g.rsvp_status || "no reply"}</span>}</span>
-                    <label style={{ fontSize: 11.5, color: "#8a8a8a" }}>Due <input type="number" defaultValue={due || ""} onBlur={(e) => patchGuest(g.id, { amount_due: Number(e.target.value) })} style={{ ...field, width: 80, padding: "4px 8px" }} /></label>
-                    <label style={{ fontSize: 11.5, color: "#8a8a8a" }}>Paid <input type="number" defaultValue={paid || ""} onBlur={(e) => patchGuest(g.id, { amount_paid: Number(e.target.value) })} style={{ ...field, width: 80, padding: "4px 8px" }} /></label>
+                  <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", border: selected.has(g.id) ? `1px solid ${primary}` : "1px solid rgba(0,0,0,0.06)", borderRadius: 10, flexWrap: "wrap" }}>
+                    <input type="checkbox" checked={selected.has(g.id)} onChange={() => toggleSel(g.id)} aria-label={`Select ${g.full_name}`} />
+                    <span style={{ flex: 1, minWidth: 110, fontSize: 13.5 }}>{g.full_name}{g.rsvp_status === "attending" ? "" : <span style={{ color: "#a0a0a0", fontSize: 11 }}> · {g.rsvp_status || "no reply"}</span>}</span>
+                    <input type="email" defaultValue={g.email ?? ""} placeholder="email (for reminders)" onBlur={(e) => { if (e.target.value !== (g.email ?? "")) patchGuest(g.id, { email: e.target.value.trim() || null }); }} style={{ ...field, width: 160, padding: "4px 8px", fontSize: 12 }} />
+                    <label style={{ fontSize: 11.5, color: "#8a8a8a" }}>Due <input type="number" defaultValue={due || ""} onBlur={(e) => patchGuest(g.id, { amount_due: Number(e.target.value) })} style={{ ...field, width: 78, padding: "4px 8px" }} /></label>
+                    <label style={{ fontSize: 11.5, color: "#8a8a8a" }}>Paid <input type="number" defaultValue={paid || ""} onBlur={(e) => patchGuest(g.id, { amount_paid: Number(e.target.value) })} style={{ ...field, width: 78, padding: "4px 8px" }} /></label>
                     {settled ? <span style={{ fontSize: 11.5, color: "#1a7f4b", fontWeight: 700 }}>✓ Paid</span> : <button onClick={() => patchGuest(g.id, { amount_paid: due })} disabled={due === 0} style={{ border: "1px solid rgba(0,0,0,0.15)", background: "#fff", borderRadius: 8, padding: "4px 9px", cursor: "pointer", fontSize: 11.5 }}>Mark paid</button>}
                   </div>
                 );
               })}
             </div>
 
-            <p style={{ fontSize: 12, color: "#a0a0a0", margin: 0 }}>Set your banking details, edit the reminder email, choose a frequency and turn on auto-reminders in the <b>Reminders</b> section of the <b>Invites</b> tab.</p>
+            {/* Couple's own EFT details — included on the reminder so guests know where to pay. */}
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#8a8a8a", fontWeight: 700, marginBottom: 4 }}>Your banking details (shown to guests on reminders)</div>
+              <textarea defaultValue={settings.paymentInstructions ?? ""} onBlur={(e) => saveSettings({ ...settings, paymentInstructions: e.target.value })} rows={3} placeholder={"e.g. Acc name: Sam & Jo\nBank: FNB · Acc: 1234567890 · Branch: 250655\nReference: your name"} style={{ ...field, width: "100%", resize: "vertical", fontFamily: "inherit" }} />
+              {saved && <span style={{ fontSize: 11.5, color: "#1a7f4b" }}>Saved ✓</span>}
+            </div>
           </>
         )}
       </div>
