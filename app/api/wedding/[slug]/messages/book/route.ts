@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 import { portalAccess } from "@/lib/portal/access";
+import { sendEmail } from "@/lib/notifications";
+
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+const rZA = (n: number) => `R${Math.round(n).toLocaleString("en-ZA")}`;
 
 export const runtime = "nodejs";
 
@@ -42,16 +46,23 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
   const { error: threadErr } = await db.from("message_threads").update({ status: "booked" }).eq("id", thread.id);
   if (threadErr) return NextResponse.json({ error: threadErr.message }, { status: 500 });
 
+  const bookingValue = Number(b.bookingValue) || 0;
+  let supplierEmail: string | null = null;
+  let supplierName = "there";
+  let commissionAmount = 0;
+
   if (thread.intro_id) {
     const { data: intro } = await db.from("supplier_intros")
-      .select("id, commission_type, commission_value")
+      .select("id, commission_type, commission_value, supplier_email, supplier_name")
       .eq("id", thread.intro_id).maybeSingle();
     if (intro) {
-      const bv = Number(b.bookingValue) || 0;
+      commissionAmount = computeCommission(intro.commission_type, Number(intro.commission_value), bookingValue);
+      supplierEmail = (intro.supplier_email as string | null) || null;
+      supplierName = (intro.supplier_name as string | null) || supplierName;
       await db.from("supplier_intros").update({
         status: "booked",
-        booking_value: bv > 0 ? bv : null,
-        commission_amount: computeCommission(intro.commission_type, Number(intro.commission_value), bv),
+        booking_value: bookingValue > 0 ? bookingValue : null,
+        commission_amount: commissionAmount,
         booked_at: nowIso,
       }).eq("id", intro.id);
     }
@@ -65,6 +76,30 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
       body: "🎉 Marked as booked — contact details are now visible to both sides.",
     });
     await db.from("message_threads").update({ last_message_at: nowIso }).eq("id", thread.id);
+  }
+
+  // Notify the supplier they've been booked — with the couple's contact (so they
+  // can invoice the couple directly) and a heads-up that the venue will invoice
+  // them the commission. No-op if Resend isn't configured or no supplier email.
+  if (supplierEmail) {
+    const { data: w } = await db.from("weddings").select("couple_names, couple_email").eq("id", access.wedding.id).single();
+    const { data: v } = await db.from("venues").select("name").eq("id", thread.venue_id).single();
+    const couple = (w?.couple_names as string) || "the couple";
+    const coupleEmail = (w?.couple_email as string | null) || null;
+    const venueName = (v?.name as string) || "the venue";
+    const valueLine = bookingValue > 0 ? ` for an agreed value of <strong>${rZA(bookingValue)}</strong>` : "";
+    const commissionLine = commissionAmount > 0
+      ? `<p style="margin:16px 0 0">Please note: ${esc(venueName)} will invoice you a commission of <strong>${rZA(commissionAmount)}</strong> on this booking, per your agreed terms.</p>`
+      : "";
+    const html = `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#1c1917;line-height:1.6">
+      <p>Hi ${esc(supplierName)},</p>
+      <p>Good news — <strong>${esc(couple)}</strong> has booked you${valueLine} for their wedding at ${esc(venueName)}.</p>
+      <p>You can now contact the couple directly to confirm details and send them your invoice:</p>
+      <p style="margin:8px 0">${coupleEmail ? `✉️ <a href="mailto:${esc(coupleEmail)}">${esc(coupleEmail)}</a>` : "The couple will be in touch via the contact details they shared."}</p>
+      ${commissionLine}
+      <p style="margin:20px 0 0;color:#78716c;font-size:12px">Sent via Venuely on behalf of ${esc(venueName)}.</p>
+    </div>`;
+    await sendEmail(supplierEmail, `You've been booked by ${couple} — ${venueName}`, html, { replyTo: coupleEmail });
   }
 
   return NextResponse.json({ ok: true });
