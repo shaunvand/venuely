@@ -23,7 +23,7 @@ const STEPS: Step[] = [
   { sel: '[data-tour="nav-inventory"]', title: "Inventory", body: "Everything couples can choose — catalogue, rentals, spaces, accommodation and seating — lives here. Fill it fast with “+ Add item” or “Smart Import”." },
   { sel: '[data-tour="nav-calendar"]', title: "Calendar", body: "See every booking by date. Click a day to jump straight to that wedding." },
   { sel: '[data-tour="nav-suppliers"]', title: "Suppliers", body: "List your recommended suppliers. Couples message them inside the portal and you earn commission when they book." },
-  { sel: '[data-tour="nav-messages"]', title: "Enquiries & Messages", body: "New couple enquiries arrive under Enquiries; your ongoing conversations live in Messages." },
+  { sel: '[data-tour="nav-messages"]', title: "Messages", body: "Your conversations with couples live here — answer questions and keep everything in one place." },
   { sel: '[data-tour="group-Money"]', title: "Money", body: "Record payments and set up your payouts & fees here. Click the section to expand it." },
   { sel: '[data-tour="group-Setup"]', title: "Finish setting up", body: "Your Checklist, venue Settings and Team live here. Work through the Checklist and you’re ready to take bookings." },
 ];

@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
   experimental: {
     proxyClientMaxBodySize: "100mb",
     serverActions: { bodySizeLimit: "100mb" },
+    // Don't reuse dynamic pages from the client router cache — otherwise a save on
+    // one tab (e.g. seating) leaves another (the Inventory hub) showing stale counts
+    // until a hard reload. revalidatePath fixes the server cache; this fixes the
+    // browser-side cache so soft navigations always refetch fresh data.
+    staleTimes: { dynamic: 0 },
   },
 };
 
