@@ -300,6 +300,11 @@ export function CouplePortal({
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [billOpen, setBillOpen] = useState(false);
+  const [budgetOpen, setBudgetOpen] = useState(false);
+  const [budgetLines, setBudgetLines] = useState<Array<{ category: string | null; description: string | null; estimated: number | null; paid: number | null }>>([]);
+  useEffect(() => {
+    fetch(`/api/wedding/${slug}/list/budget`).then((r) => r.json()).then((j) => setBudgetLines(j.rows ?? [])).catch(() => {});
+  }, [slug]);
   const [, startTransition] = useTransition();
   const primary = theme.primary;
   const accent = theme.accent;
@@ -887,11 +892,32 @@ export function CouplePortal({
       {/* Running total + submit — non-classic picks up the template's surface + rule */}
       <div style={{ position: "sticky", bottom: 0, zIndex: 20, background: isClassic ? "#fff" : tokens.surfaceCard, borderTop: isClassic ? "1px solid rgba(0,0,0,0.1)" : tokens.divider, boxShadow: tokens.id === "editorial" ? "none" : "0 -4px 16px rgba(0,0,0,0.06)" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <button type="button" onClick={() => setBillOpen(true)} title="View your bill breakdown" style={{ background: "transparent", border: "none", textAlign: "left", cursor: "pointer", padding: 0 }}>
-            <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: tokens.eyebrowTracking, color: "#57534e" }}>Estimated total{busy ? " · updating…" : ""}</div>
-            <div style={{ ...heading, fontSize: 24, color: primary, display: "flex", alignItems: "center", gap: 7 }}>{rZA(totalDue)}<span style={{ fontSize: 13, opacity: 0.6 }}>▸</span></div>
-            <div style={{ fontSize: 11, color: "#8a8a8a", textDecoration: "underline" }}>{selectedCount} item{selectedCount === 1 ? "" : "s"} selected · view breakdown</div>
-          </button>
+          {(() => {
+            const budgetTotal = budgetLines.reduce((t, l) => t + Number(l.estimated || 0), 0);
+            const remaining = budgetTotal - totalDue;
+            const eyebrow: React.CSSProperties = { fontSize: 10.5, textTransform: "uppercase", letterSpacing: tokens.eyebrowTracking, color: "#57534e" };
+            return (
+              <div style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap" }}>
+                {budgetTotal > 0 && (
+                  <button type="button" onClick={() => setBudgetOpen(true)} title="View your budget receipt" style={{ background: "transparent", border: "none", textAlign: "left", cursor: "pointer", padding: 0 }}>
+                    <div style={eyebrow}>Budget</div>
+                    <div style={{ ...heading, fontSize: 22, color: "#1c1917", display: "flex", alignItems: "center", gap: 6 }}>{rZA(budgetTotal)}<span style={{ fontSize: 12, opacity: 0.5 }}>▸</span></div>
+                  </button>
+                )}
+                <button type="button" onClick={() => setBillOpen(true)} title="View your bill breakdown" style={{ background: "transparent", border: "none", textAlign: "left", cursor: "pointer", padding: 0 }}>
+                  <div style={eyebrow}>Invoice total{busy ? " · updating…" : ""}</div>
+                  <div style={{ ...heading, fontSize: 24, color: primary, display: "flex", alignItems: "center", gap: 7 }}>{rZA(totalDue)}<span style={{ fontSize: 13, opacity: 0.6 }}>▸</span></div>
+                  <div style={{ fontSize: 11, color: "#8a8a8a", textDecoration: "underline" }}>{selectedCount} item{selectedCount === 1 ? "" : "s"} selected · view breakdown</div>
+                </button>
+                {budgetTotal > 0 && (
+                  <div>
+                    <div style={eyebrow}>Remaining</div>
+                    <div style={{ ...heading, fontSize: 22, color: remaining >= 0 ? "#1f5d3e" : "#b42318" }}>{rZA(remaining)}</div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           {submitted ? (
             <span style={{ background: "#dcefe2", color: "#1f5d3e", padding: "10px 20px", borderRadius: tokens.buttonRadius, fontWeight: 600 }}>✓ Sent to {venue.name} for review</span>
           ) : (
@@ -1011,6 +1037,47 @@ export function CouplePortal({
           document.body
         );
       })()}
+
+      {/* Budget receipt — tap the Budget figure in the bottom bar. */}
+      {budgetOpen && typeof document !== "undefined" && createPortal(
+        <div role="dialog" aria-modal="true" onClick={() => setBudgetOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(28,25,23,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 18, padding: 24, width: "min(460px,100%)", maxHeight: "85vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1.4, color: "#a8a29e", fontWeight: 700 }}>Your budget</div>
+                <div style={{ ...heading, fontSize: 22 }}>Budget receipt</div>
+              </div>
+              <button onClick={() => setBudgetOpen(false)} aria-label="Close" style={{ background: "transparent", border: "none", fontSize: 22, color: "#a8a29e", cursor: "pointer" }}>×</button>
+            </div>
+            {budgetLines.length === 0 ? (
+              <p style={{ fontSize: 13, color: "#57534e" }}>No budget lines yet — add them in the Budget tab.</p>
+            ) : (() => {
+              const bt = budgetLines.reduce((t, l) => t + Number(l.estimated || 0), 0);
+              const paid = budgetLines.reduce((t, l) => t + Number(l.paid || 0), 0);
+              return (
+                <div style={{ display: "grid", gap: 4 }}>
+                  {budgetLines.map((l, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 13.5, padding: "6px 0", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+                      <span style={{ color: "#1c1917" }}>{l.description || l.category || "—"}{l.category && l.description ? ` · ${l.category}` : ""}</span>
+                      <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{rZA(Number(l.estimated || 0))}</span>
+                    </div>
+                  ))}
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 15 }}><span>Total budget</span><span>{rZA(bt)}</span></div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#57534e", marginTop: 4 }}><span>Venue invoice</span><span>{rZA(totalDue)}</span></div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, fontWeight: 600, marginTop: 4, color: bt - totalDue >= 0 ? "#1f5d3e" : "#b42318" }}><span>Remaining</span><span>{rZA(bt - totalDue)}</span></div>
+                    {paid > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#57534e", marginTop: 4 }}><span>Paid so far</span><span>{rZA(paid)}</span></div>}
+                  </div>
+                </div>
+              );
+            })()}
+            <div style={{ textAlign: "right", marginTop: 16 }}>
+              <button onClick={() => { setBudgetOpen(false); setTab("Budget"); }} style={{ ...btn, padding: "9px 22px", cursor: "pointer" }}>Open Budget</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       <AiPlanner slug={slug} primary={primary} accent={accent} />
     </div>
