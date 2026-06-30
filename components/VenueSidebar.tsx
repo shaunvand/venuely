@@ -68,6 +68,17 @@ export function VenueSidebar() {
 
       <VenueSidebarNav collapsed={collapsed} />
 
+      {!collapsed && (
+        <button
+          type="button"
+          onClick={() => { try { window.dispatchEvent(new Event("venuely:start-tour")); } catch {} }}
+          className="mt-4 w-full flex items-center justify-center gap-2 rounded-lg border border-dashed border-[color:var(--line)] py-2 text-xs font-semibold text-[color:var(--ink-2)] hover:bg-[color:var(--bone)] transition-colors"
+          title="Take a guided tour of your dashboard"
+        >
+          ✨ Take a tour
+        </button>
+      )}
+
       <form action="/auth/signout" method="post" className="pt-4 border-t border-[color:var(--line)] mt-4">
         <button
           className={`vy-btn vy-btn-ghost w-full ${collapsed ? "justify-center px-0" : "justify-start"}`}

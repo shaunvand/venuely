@@ -2,75 +2,32 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-// Onboarding step → the page that "completes" it. After the welcome popup closes
-// (DashboardWelcomeModal), a breathing numbered badge appears on each step's nav
-// entry; visiting that page clears its badge for good (persisted in localStorage).
-const TOTAL_STEPS = 5;
-const STEP_MATCH: { n: number; path: string }[] = [
-  { n: 1, path: "/venue/your-venue" },  // Couple Experience (top link)
-  { n: 2, path: "/venue/billing" },     // Payment setup (Money group → Payouts & fees)
-  { n: 3, path: "/venue/seating" },     // Seating & tables (Marketplace group)
-  { n: 4, path: "/venue/catalogue" },   // Marketplace (Marketplace group)
-  { n: 5, path: "/venue/weddings" },    // First Wedding (top link)
-];
-const STEP_FOR_TOP: Record<string, number> = { "/venue/your-venue": 1, "/venue/weddings": 5 };
-// Steps that live INSIDE a group → badged on the group's matching child item when
-// expanded, and the group header carries the lowest-unfinished of them when collapsed.
-const STEP_FOR_ITEM: Record<string, number> = { "/venue/billing": 2 };
-const STEPS_IN_GROUP: Record<string, number[]> = { Money: [2] };
+// First-run guidance is the spotlight tour (VenueTour), not per-tab badges — each
+// nav entry carries a `data-tour` anchor the tour highlights. Keep these in sync
+// with the selectors in components/VenueTour.tsx.
+const TOUR_ID: Record<string, string> = {
+  "/venue": "nav-overview",
+  "/venue/your-venue": "nav-couple",
+  "/venue/weddings": "nav-weddings",
+  "/venue/inventory": "nav-inventory",
+  "/venue/calendar": "nav-calendar",
+  "/venue/suppliers": "nav-suppliers",
+  "/venue/enquiries": "nav-enquiries",
+  "/venue/messages": "nav-messages",
+  "/venue/uploads": "nav-import",
+};
 
-// Catalogue/Rentals/Areas/Accommodation/Seating now live under the single
-// "Inventory" hub: those child pages highlight the Inventory nav link, and its
-// onboarding pulse carries steps 3 (seating) + 4 (catalogue).
+// Catalogue/Rentals/Areas/Accommodation/Seating live under the single "Inventory"
+// hub: those child pages keep the Inventory nav link highlighted.
 const INVENTORY_HUB = "/venue/inventory";
 const INVENTORY_CHILDREN = ["/venue/catalogue", "/venue/rentals", "/venue/areas", "/venue/accommodation", "/venue/seating"];
-const INVENTORY_STEPS = [3, 4];
 
 function topLinkActive(href: string, pathname: string): boolean {
   if (href === "/venue") return pathname === "/venue";
   if (href === INVENTORY_HUB) return pathname.startsWith(INVENTORY_HUB) || INVENTORY_CHILDREN.some((c) => pathname.startsWith(c));
   return pathname.startsWith(href);
-}
-
-type Hints = { active: boolean; done: number[] };
-
-function StepPulse({ n }: { n: number }) {
-  return (
-    <span className="vy-steppulse" aria-label={`Step ${n} — start here`} title={`Step ${n}`}>{n}</span>
-  );
-}
-
-// Shared hint state + auto-clear on navigation. Returns a predicate for "show n".
-function useStepHints(pathname: string) {
-  const [hints, setHints] = useState<Hints>({ active: false, done: [] });
-
-  useEffect(() => {
-    const load = () => {
-      try {
-        const raw = localStorage.getItem("vy-step-hints");
-        setHints(raw ? JSON.parse(raw) : { active: false, done: [] });
-      } catch { setHints({ active: false, done: [] }); }
-    };
-    load();
-    window.addEventListener("venuely:step-hints", load);
-    window.addEventListener("storage", load);
-    return () => { window.removeEventListener("venuely:step-hints", load); window.removeEventListener("storage", load); };
-  }, []);
-
-  // Visiting a step's page clears it permanently.
-  useEffect(() => {
-    if (!hints.active) return;
-    const hit = STEP_MATCH.find((s) => pathname.startsWith(s.path) && !hints.done.includes(s.n));
-    if (!hit) return;
-    const done = [...hints.done, hit.n];
-    const next: Hints = { active: done.length < TOTAL_STEPS, done };
-    try { localStorage.setItem("vy-step-hints", JSON.stringify(next)); } catch {}
-    setHints(next);
-  }, [pathname, hints]);
-
-  return (n: number) => hints.active && !hints.done.includes(n);
 }
 
 type IconName =
@@ -97,8 +54,6 @@ const TOP_LINKS: (Item & { icon: IconName })[] = [
 ];
 
 const GROUPS: Group[] = [
-  // Catalogue / Rentals / Areas / Accommodation / Seating now live under the
-  // single "Inventory" hub (top-level link above), not a separate group.
   { label: "Money", icon: "money", items: [{ href: "/venue/payments", label: "Payments", icon: "card" }, { href: "/venue/billing", label: "Payouts & fees", icon: "payout" }] },
   { label: "Setup", icon: "setup", items: [{ href: "/venue/setup", label: "Checklist", icon: "check" }, { href: "/venue/settings", label: "Settings", icon: "settings" }, { href: "/venue/team", label: "Team", icon: "team" }] },
 ];
@@ -139,49 +94,19 @@ function Icon({ name, className = "w-5 h-5" }: { name: IconName; className?: str
   return <svg viewBox="0 0 24 24" className={className} aria-hidden>{paths[name]}</svg>;
 }
 
-const STEP_PULSE_CSS = `
-@keyframes vyStepPulse {
-  0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(250,82,60,0.45); }
-  50%     { transform: scale(1.14); box-shadow: 0 0 0 5px rgba(250,82,60,0); }
-}
-.vy-steppulse {
-  display:inline-flex; align-items:center; justify-content:center;
-  width:18px; height:18px; margin-left:auto; flex-shrink:0;
-  border-radius:999px; background:var(--poppy,#FA523C); color:#fff;
-  font-size:11px; font-weight:800; line-height:1;
-  animation: vyStepPulse 1.5s ease-in-out infinite;
-}
-.vy-steppulse-dot {
-  position:absolute; top:5px; right:5px; width:9px; height:9px; border-radius:999px;
-  background:var(--poppy,#FA523C); animation: vyStepPulse 1.5s ease-in-out infinite;
-}
-`;
-
 export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) {
   const pathname = usePathname();
   const search = useSearchParams();
   const view = search.get("view");
-  const showStep = useStepHints(pathname);
-  // A group's header badge = the lowest still-unfinished step that lives in it.
-  const groupStep = (label: string): number | undefined =>
-    (STEPS_IN_GROUP[label] ?? []).filter((n) => showStep(n)).sort((a, b) => a - b)[0];
-  // Top-link badge: Inventory carries the lowest unfinished of its steps (3,4);
-  // other links carry their own single step. Returns only when it should show.
-  const topStep = (href: string): number | undefined => {
-    if (href === INVENTORY_HUB) return INVENTORY_STEPS.filter((n) => showStep(n)).sort((a, b) => a - b)[0];
-    const s = STEP_FOR_TOP[href];
-    return s && showStep(s) ? s : undefined;
-  };
 
   // Collapsed: a flat icon rail (top links + one icon per group → its first item).
   if (collapsed) {
-    const rail: { href: string; label: string; icon: IconName; step?: number }[] = [
-      ...TOP_LINKS.map((l) => ({ ...l, step: topStep(l.href) })),
-      ...GROUPS.map((g) => ({ href: g.items[0].href, label: g.label, icon: g.icon, step: groupStep(g.label) })),
+    const rail: { href: string; label: string; icon: IconName; tour: string }[] = [
+      ...TOP_LINKS.map((l) => ({ href: l.href, label: l.label, icon: l.icon, tour: TOUR_ID[l.href] ?? "" })),
+      ...GROUPS.map((g) => ({ href: g.items[0].href, label: g.label, icon: g.icon, tour: `group-${g.label}` })),
     ];
     return (
       <nav className="flex flex-col items-center gap-1 flex-1">
-        <style>{STEP_PULSE_CSS}</style>
         {rail.map((it) => {
           const base = it.href.split("?")[0];
           const active = topLinkActive(base, pathname);
@@ -191,11 +116,11 @@ export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) 
               href={it.href}
               title={it.label}
               aria-label={it.label}
+              data-tour={it.tour || undefined}
               className="relative w-11 h-11 flex items-center justify-center rounded-xl transition-colors hover:bg-[color:var(--bone)]"
               style={active ? { background: "var(--cream)", color: "var(--forest)" } : { color: "var(--ink-2)" }}
             >
               <Icon name={it.icon} />
-              {it.step && showStep(it.step) && <span className="vy-steppulse-dot" />}
             </Link>
           );
         })}
@@ -205,19 +130,17 @@ export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) 
 
   return (
     <nav className="flex flex-col flex-1">
-      <style>{STEP_PULSE_CSS}</style>
       {TOP_LINKS.map((l) => {
         const active = topLinkActive(l.href, pathname);
-        const step = topStep(l.href);
         return (
           <Link
             key={l.href}
             href={l.href}
+            data-tour={TOUR_ID[l.href] ?? undefined}
             className={`vy-side-link flex items-center gap-2.5 ${active ? "active" : ""}`}
           >
             <Icon name={l.icon} className="w-[18px] h-[18px] flex-shrink-0" />
             {l.label}
-            {step && <StepPulse n={step} />}
           </Link>
         );
       })}
@@ -226,34 +149,32 @@ export function VenueSidebarNav({ collapsed = false }: { collapsed?: boolean }) 
         const groupActive = g.items.some(
           (i) => pathname === i.href.split("?")[0] || pathname.startsWith(i.href.split("?")[0] + "/")
         );
-        return <NavGroup key={g.label} group={g} defaultOpen={groupActive} pathname={pathname} view={view} badge={groupStep(g.label) ?? null} showStep={showStep} />;
+        return <NavGroup key={g.label} group={g} defaultOpen={groupActive} pathname={pathname} view={view} />;
       })}
     </nav>
   );
 }
 
 function NavGroup({
-  group, defaultOpen, pathname, view, badge = null, showStep,
-}: { group: Group; defaultOpen: boolean; pathname: string; view: string | null; badge?: number | null; showStep: (n: number) => boolean }) {
+  group, defaultOpen, pathname, view,
+}: { group: Group; defaultOpen: boolean; pathname: string; view: string | null }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="mt-3">
       <button
         type="button"
+        data-tour={`group-${group.label}`}
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between px-1 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500 hover:text-stone-900 transition-colors"
       >
         <span className="flex items-center gap-2.5"><Icon name={group.icon} className="w-[18px] h-[18px]" />{group.label}</span>
-        {/* Header badge only when collapsed — once open, it moves to the matching
-            child item (e.g. clicking Money highlights Payouts & fees / payment setup). */}
-        {badge && !open ? <StepPulse n={badge} /> : <span className={`text-[10px] transition-transform ${open ? "rotate-90" : ""}`}>▶</span>}
+        <span className={`text-[10px] transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
       </button>
       {open && (
         <div className="flex flex-col">
           {group.items.map((i) => {
             const base = i.href.split("?")[0];
             const active = pathname === base || pathname.startsWith(base + "/");
-            const itemStep = STEP_FOR_ITEM[base];
             return (
               <div key={i.href}>
                 <Link
@@ -264,7 +185,6 @@ function NavGroup({
                 >
                   {i.icon && <Icon name={i.icon} className="w-[18px] h-[18px] flex-shrink-0" />}
                   {i.label}
-                  {itemStep && showStep(itemStep) && <StepPulse n={itemStep} />}
                 </Link>
                 {i.children && active && (
                   <div className="flex flex-col ml-3 border-l border-[color:var(--line)] pl-2">
