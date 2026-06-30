@@ -9,6 +9,7 @@ import {
   sendPortalInvite, rotatePortalAccess, revokeCoupleAccess, approveSubmission,
 } from "../actions";
 import { catalogueQuantity } from "@/lib/billing/catalogue-qty";
+import { ExportLineItems } from "@/components/ExportLineItems";
 import { statusColor } from "@/lib/wedding/status";
 import { computeWeddingsProgress, HEALTH_COLOR, HEALTH_LABEL } from "@/lib/venue/progress";
 import { SaveButton } from "@/components/SaveButton";
@@ -525,7 +526,21 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
 
       {/* Charges table */}
       <section>
-        <h2 className="text-lg font-semibold mb-3">Line items ({charges.length})</h2>
+        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+          <h2 className="text-lg font-semibold">Line items ({charges.length})</h2>
+          {charges.length > 0 && (
+            <ExportLineItems
+              filename={`${(wedding.couple_names || "wedding").replace(/[^\w-]+/g, "-")}-line-items.csv`}
+              rows={charges.map((c) => ({ kind: c.kind, label: c.label, qty: c.qty, unit_price: c.unit_price, amount: c.amount }))}
+              summary={[
+                ["Subtotal", totals.subtotal],
+                [`VAT (${(rules.vat_rate * 100).toFixed(0)}%)`, totals.vat_amount],
+                ...(totals.breakage > 0 ? [["Refundable deposit", totals.breakage] as [string, number]] : []),
+                ["Grand total", totals.grand_total],
+              ]}
+            />
+          )}
+        </div>
         {charges.length === 0 ? <p className="text-sm text-stone-500">No charges yet.</p> : (
           <div className="vy-card p-0 overflow-hidden">
             <table className="vy-table">
