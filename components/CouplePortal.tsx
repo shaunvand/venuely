@@ -108,10 +108,10 @@ const isGroup = (e: NavEntry): e is NavGroup => "group" in e;
 // collapsible journey sections so a first-time couple isn't faced with ~19 flat
 // tabs. Every planning tab lives inside the section that matches the couple's
 // mental model. See docs/couple-portal-ia-audit-2026-06.md.
+// Order: Overview · Our Venue · Suppliers · Our Guests · The Day · Budget ·
+// Messages · Vibes (per couple request).
 const COUPLE_NAV: NavEntry[] = [
   { key: "Overview", label: "Overview", icon: "home" },
-  { key: "Messages", label: "Messages", icon: "chat" },
-  { key: "Suppliers", label: "Suppliers", icon: "store" },
   {
     group: "Our Venue", icon: "venue", defaultOpen: true, children: [
       { key: "Our Venue", label: "Spaces & Rooms", icon: "venue" },
@@ -119,18 +119,25 @@ const COUPLE_NAV: NavEntry[] = [
       { key: "Catalogue & Rentals", label: "Extras & Rentals", icon: "box" },
     ],
   },
+  { key: "Suppliers", label: "Suppliers", icon: "store" },
   {
     group: "Our Guests", icon: "users", children: [
       { key: "Guests", label: "Guest List", icon: "users" },
       { key: "Seating", label: "Seating plan", icon: "seat" },
     ],
   },
+  {
+    group: "The Day", icon: "clock", children: [
+      { key: "Timeline", label: "Wedding day Timeline", icon: "clock" },
+      { key: "Checklist", label: "Checklist", icon: "check" },
+    ],
+  },
   // One "Budget" tab; Budget / Payments / Documents are gate-bubble sub-tabs on its page.
   { key: "Budget", label: "Budget", icon: "wallet" },
+  { key: "Messages", label: "Messages", icon: "chat" },
   {
-    // Suppliers is now its own top-level tab (by Messages); this section is the
-    // styling / "vibe" group.
-    group: "Style", icon: "sparkle", children: [
+    // The styling / "vibe" group (Suppliers is its own tab above).
+    group: "Vibes", icon: "sparkle", children: [
       { key: "Inspiration", label: "Inspiration", icon: "sparkle" },
       { key: "Invites", label: "Invites", icon: "mail" },
       { key: "Flowers", label: "Flowers", icon: "flower" },
@@ -138,12 +145,6 @@ const COUPLE_NAV: NavEntry[] = [
       { key: "Décor", label: "Décor", icon: "decor" },
       { key: "Music", label: "Music", icon: "music" },
       { key: "Contacts", label: "Contacts", icon: "phone" },
-    ],
-  },
-  {
-    group: "The Day", icon: "clock", children: [
-      { key: "Timeline", label: "Wedding day Timeline", icon: "clock" },
-      { key: "Checklist", label: "Checklist", icon: "check" },
     ],
   },
 ];
@@ -486,7 +487,7 @@ export function CouplePortal({
     "Money": { done: totalDue > 0 },
     // Every section is available the moment the couple arrives — no "after spaces"
     // / "nearer the day" dimming (it read as locked).
-    "Style": {},
+    "Vibes": {},
     "The Day": {},
   };
 
@@ -507,9 +508,9 @@ export function CouplePortal({
             { sel: '[data-tour="start-here"]', title: "Always start here", body: "On Overview, this card always tells you the single most important thing to do next.", before: () => { setTab("Overview"); if (isMobile) setNavOpen(false); } },
             { sel: '[data-tour="section-Our Venue"]', title: "1 · Our Venue", body: "Choose your ceremony & reception spaces, accommodation, and any paid extras.", before: () => { if (isMobile) setNavOpen(true); } },
             { sel: '[data-tour="section-Our Guests"]', title: "2 · Our Guests", body: "Build your guest list — seating unlocks once you've added a guest.", before: () => { if (isMobile) setNavOpen(true); } },
-            { sel: '[data-tour="section-Money"]', title: "3 · Budget", body: "Track your budget, view invoices & payments, and store your documents — all under Budget, with quick tabs at the top.", before: () => { if (isMobile) setNavOpen(true); } },
-            { sel: '[data-tour="section-Style"]', title: "4 · Style", body: "Build your inspiration board, invites, flowers, décor, music and more. (Suppliers now has its own tab up top.)", before: () => { if (isMobile) setNavOpen(true); } },
-            { sel: '[data-tour="section-The Day"]', title: "5 · The Day", body: "Plan your hour-by-hour timeline and tick off your checklist as the day nears.", before: () => { if (isMobile) setNavOpen(true); } },
+            { sel: '[data-tour="section-The Day"]', title: "3 · The Day", body: "Plan your hour-by-hour timeline and tick off your checklist as the day nears.", before: () => { if (isMobile) setNavOpen(true); } },
+            { sel: '[data-tour="section-Money"]', title: "4 · Budget", body: "Track your budget, view invoices & payments, and store your documents — all under Budget, with quick tabs at the top.", before: () => { if (isMobile) setNavOpen(true); } },
+            { sel: '[data-tour="section-Vibes"]', title: "5 · Vibes", body: "Build your inspiration board, invites, flowers, décor, music and more. (Suppliers has its own tab up top.)", before: () => { if (isMobile) setNavOpen(true); } },
             { title: "You're all set! 💍", body: "Reopen this tour any time via “Take the tour” at the bottom of the menu.", before: () => { if (isMobile) setNavOpen(false); } },
           ]}
         />
