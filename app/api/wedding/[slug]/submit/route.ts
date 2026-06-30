@@ -95,8 +95,11 @@ function renderEmail(body: SubmitBody, couple: string, date: string | null): str
   const countSel = (v: unknown) => v && typeof v === "object"
     ? Object.values(v as Record<string, unknown>).filter((e) => e === true || (e && typeof e === "object" && ((e as Record<string, unknown>).sel ?? (e as Record<string, unknown>).selected))).length
     : 0;
+  // Match the portal's own room-count logic: only assignments that hold entries.
+  const roomCount = Object.values((state.roomAssignments as Record<string, unknown>) ?? {})
+    .filter((a) => Array.isArray(a) ? a.length > 0 : !!a).length;
   const itemCount = countSel(state.catalogueSelections) + countSel(state.rentalSelections)
-    + Object.keys((state.roomAssignments as Record<string, unknown>) ?? {}).length
+    + roomCount
     + (Array.isArray(state.customRequests) ? (state.customRequests as unknown[]).length : 0);
 
   // Format the totals as a clean money table (was a raw JSON dump).

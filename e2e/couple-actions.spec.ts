@@ -74,7 +74,9 @@ test.describe.serial("Couple portal — write actions", () => {
   test("message a recommended supplier", async ({ page }) => {
     const errors = watchErrors(page);
     await unlock(page);
-    await goLeaf(page, "Suppliers & Style", "Suppliers");
+    // Suppliers is now its own top-level tab.
+    await page.getByRole("button", { name: /^Suppliers$/ }).first().click();
+    await page.waitForTimeout(500);
 
     // The seeded vendor card carries a "💬 Message supplier" button.
     const msgBtn = page.getByRole("button", { name: /Message supplier/i }).first();
@@ -102,7 +104,11 @@ test.describe.serial("Couple portal — write actions", () => {
   test("upload a payment document", async ({ page }) => {
     const errors = watchErrors(page);
     await unlock(page);
-    await goLeaf(page, "Money", "Documents");
+    // Documents is now an in-page gate-bubble under the Budget tab.
+    await page.getByRole("button", { name: /^Budget$/ }).first().click();
+    await page.waitForTimeout(400);
+    await page.getByRole("button", { name: /^Documents$/ }).first().click();
+    await page.waitForTimeout(400);
 
     // The visible "Upload a document" button proxies a hidden file input.
     await expect(page.getByText(/Upload a document/i).first()).toBeVisible({ timeout: 12_000 });

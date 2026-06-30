@@ -490,7 +490,6 @@ export function CouplePortal({
   const sectionMeta: Record<string, { dim?: boolean; hint?: string; done?: boolean }> = {
     "Our Venue": { done: spacesConfirmed },
     "Our Guests": { done: guestsOnList > 0 },
-    "Money": { done: totalDue > 0 },
     // Every section is available the moment the couple arrives — no "after spaces"
     // / "nearer the day" dimming (it read as locked).
     "Vibes": {},
@@ -1070,7 +1069,8 @@ function TopNavBar({ tokens, primary, accent, tab, onTab, msgUnread = 0 }: { tok
 
   const renderTabs = entries.map((it) => {
     if (it.kind === "leaf") {
-      const active = it.leaf.key === tab;
+      // Budget stays active for its Payments/Documents sub-tabs (top-nav variant).
+      const active = it.leaf.key === tab || (it.leaf.key === "Budget" && (tab === "Payments" || tab === "Documents"));
       return (
         <button key={it.leaf.key} aria-current={active ? "page" : undefined} onClick={() => onTab(it.leaf.key)} style={tabStyle(active, it.num)}>
           {variant === "editorial" && <span style={{ fontSize: 9.5, color: active ? primary : "#a8a29e" }}>{String(it.num + 1).padStart(2, "0")}</span>}
