@@ -482,8 +482,10 @@ export function CouplePortal({
     "Our Venue": { done: spacesConfirmed },
     "Our Guests": { done: guestsOnList > 0 },
     "Money": { done: totalDue > 0 },
-    "Suppliers & Style": { dim: !spacesConfirmed, hint: "after spaces", done: (((state as Record<string, unknown>).suppliers as unknown[] | undefined)?.length ?? 0) > 0 },
-    "The Day": { dim: daysToGo != null && daysToGo > 180, hint: "nearer the day" },
+    // Every section is available the moment the couple arrives — no "after spaces"
+    // / "nearer the day" dimming (it read as locked).
+    "Suppliers & Style": { done: (((state as Record<string, unknown>).suppliers as unknown[] | undefined)?.length ?? 0) > 0 },
+    "The Day": {},
   };
 
   return (
