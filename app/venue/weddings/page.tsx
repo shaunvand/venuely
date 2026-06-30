@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
-import { createWedding, setPortalPassword, markCouplePaid, deleteWedding } from "./actions";
+import { createWedding, setPortalPassword, markCouplePaid, deleteWedding, updateWeddingStatus } from "./actions";
 import { WeddingRowActions } from "@/components/WeddingRowActions";
 import { WeddingsTable, type WeddingRow } from "@/components/WeddingsTable";
 import { SaveButton } from "@/components/SaveButton";
@@ -143,7 +143,7 @@ export default async function VenueWeddings({
       {!rows.length ? (
         <div className="vy-empty">No weddings yet — add one above to generate the couple&apos;s portal URL.</div>
       ) : (
-        <WeddingsTable rows={rows} />
+        <WeddingsTable rows={rows} onSetStatus={updateWeddingStatus} />
       )}
     </div>
   );

@@ -133,6 +133,18 @@ export async function deleteWedding(weddingId: string, _slug: string) {
   revalidatePath("/venue/weddings");
 }
 
+export const WEDDING_STATUSES = ["inquiry", "provisional", "booked", "completed", "cancelled"] as const;
+
+// Inline status change from the weddings list (RLS confines it to the caller's venue).
+export async function updateWeddingStatus(weddingId: string, status: string) {
+  if (!(WEDDING_STATUSES as readonly string[]).includes(status)) throw new Error("invalid status");
+  const supabase = await createClient();
+  const { error } = await supabase.from("weddings").update({ status }).eq("id", weddingId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/venue/weddings");
+  revalidatePath("/venue/calendar");
+}
+
 export async function updateWeddingBasics(weddingId: string, slug: string, formData: FormData) {
   const supabase = await createClient();
   const guestStr = formData.get("guest_count") as string;

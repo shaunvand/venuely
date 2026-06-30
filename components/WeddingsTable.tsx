@@ -1,8 +1,36 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { statusColor } from "@/lib/wedding/status";
 import { HEALTH_COLOR, HEALTH_LABEL, type WeddingHealth } from "@/lib/venue/progress";
+
+const STATUS_OPTIONS = ["inquiry", "provisional", "booked", "completed", "cancelled"];
+
+// Status badge that's also a dropdown — change a wedding's status inline.
+function StatusCell({ id, status, onSetStatus }: { id: string; status: string; onSetStatus: (id: string, status: string) => Promise<void> }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const c = statusColor(status);
+  const opts = STATUS_OPTIONS.includes(status) ? STATUS_OPTIONS : [status, ...STATUS_OPTIONS];
+  return (
+    <select
+      value={status}
+      disabled={pending}
+      aria-label="Change wedding status"
+      title="Click to change status"
+      onChange={(e) => { const v = e.target.value; if (v !== status) start(async () => { await onSetStatus(id, v); router.refresh(); }); }}
+      className="text-[11px] font-medium uppercase tracking-wider pl-2.5 pr-6 py-1 rounded-full whitespace-nowrap border-0 cursor-pointer appearance-none"
+      style={{
+        background: `${c.bg} url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' fill='none' stroke='${encodeURIComponent(c.text)}' stroke-width='1.6' stroke-linecap='round'/></svg>") right 8px center/9px no-repeat`,
+        color: c.text,
+        opacity: pending ? 0.6 : 1,
+      }}
+    >
+      {opts.map((s) => <option key={s} value={s} style={{ background: "#fff", color: "#1c1917", textTransform: "capitalize" }}>{s.replace(/_/g, " ")}</option>)}
+    </select>
+  );
+}
 
 export type WeddingRow = {
   id: string;
@@ -23,7 +51,7 @@ const PAGE_SIZE = 10;
 
 // "All weddings" card from the dashboard mock: count badge, search, status
 // filter, table with copyable portal URLs and pagination.
-export function WeddingsTable({ rows }: { rows: WeddingRow[] }) {
+export function WeddingsTable({ rows, onSetStatus }: { rows: WeddingRow[]; onSetStatus: (id: string, status: string) => Promise<void> }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
@@ -104,9 +132,7 @@ export function WeddingsTable({ rows }: { rows: WeddingRow[] }) {
               <td className="whitespace-nowrap">{r.date ? (r.endDate ? `${r.date} → ${r.endDate}` : r.date) : "—"}</td>
               <td>{r.guests ?? "—"}</td>
               <td>
-                <span className="text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-full whitespace-nowrap" style={{ background: statusColor(r.status).bg, color: statusColor(r.status).text }}>
-                  {r.status.replace(/_/g, " ")}
-                </span>
+                <StatusCell id={r.id} status={r.status} onSetStatus={onSetStatus} />
               </td>
               <td>
                 <div
