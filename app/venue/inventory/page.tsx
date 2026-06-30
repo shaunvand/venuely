@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { getCurrentVenue } from "@/lib/venue/current";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { SmartImportPanel } from "@/components/SmartImportPanel";
-import { RefreshOnMount } from "@/components/RefreshOnMount";
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +11,17 @@ export const dynamic = "force-dynamic";
 export default async function VenueInventoryHub() {
   const venue = await getCurrentVenue();
   const supabase = await createClient();
+  // venue_tables is RLS-on with no policies (service-role only), so the user
+  // client reads 0 rows — the seating page uses the admin client for the same
+  // reason. Read tables with admin here so the hub's count isn't always 0.
+  const tablesDb = createAdminClient() ?? supabase;
 
   const [cat, rent, area, room, table] = await Promise.all([
     supabase.from("catalogue_items").select("id, cost_treatment", { count: "exact" }).eq("venue_id", venue.id),
     supabase.from("rental_items").select("id, cost_treatment", { count: "exact" }).eq("venue_id", venue.id),
     supabase.from("venue_areas").select("id, area_kind", { count: "exact" }).eq("venue_id", venue.id),
     supabase.from("accommodation_rooms").select("id, cost_treatment", { count: "exact" }).eq("venue_id", venue.id),
-    supabase.from("venue_tables").select("id, seats, quantity", { count: "exact" }).eq("venue_id", venue.id),
+    tablesDb.from("venue_tables").select("id, seats, quantity", { count: "exact" }).eq("venue_id", venue.id),
   ]);
 
   const incExt = (rows: { cost_treatment?: string | null }[] | null) => {
@@ -48,9 +51,6 @@ export default async function VenueInventoryHub() {
 
   return (
     <div className="space-y-8">
-      {/* Counts read live tables that change on other tabs — refetch on every
-          visit so a save elsewhere is always reflected here. */}
-      <RefreshOnMount />
       <header>
         <div className="vy-eyebrow">Your venue</div>
         <h1 className="vy-h1 mt-1">Inventory</h1>
