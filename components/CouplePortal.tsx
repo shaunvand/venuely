@@ -149,6 +149,12 @@ const COUPLE_NAV: NavEntry[] = [
   },
 ];
 
+// All collapsible section names — used to enforce accordion behaviour (opening or
+// navigating into one section collapses the others).
+const GROUP_NAMES = COUPLE_NAV.filter(isGroup).map((e) => e.group);
+const openOnly = (g: string | null): Record<string, boolean> =>
+  Object.fromEntries(GROUP_NAMES.map((n) => [n, n === g]));
+
 // Thin line icons (Venuely style) for the couple sidebar. Plain function (not a
 // component) so it can be called inline without remount/lint issues.
 function navIcon(name: string) {
@@ -544,7 +550,7 @@ export function CouplePortal({
             if (!isGroup(entry)) {
               // The Budget leaf stays highlighted for its Payments/Documents sub-tabs.
               const active = entry.key === tab || (entry.key === "Budget" && (tab === "Payments" || tab === "Documents"));
-              return <button key={entry.key} data-tour={entry.key === "Budget" ? "section-Money" : undefined} aria-current={active ? "page" : undefined} onClick={() => { setTab(entry.key); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "var(--on-poppy,#fff)" : "#44403c" }}>{navIcon(entry.icon)}<span style={{ flex: 1 }}>{entry.label}</span>{entry.key === "Messages" && msgUnread > 0 && <span style={{ background: active ? "var(--on-poppy,#fff)" : "var(--poppy,#FA523C)", color: active ? "var(--poppy,#FA523C)" : "var(--on-poppy,#fff)", borderRadius: 999, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", lineHeight: 1.5 }}>{msgUnread}</span>}</button>;
+              return <button key={entry.key} data-tour={entry.key === "Budget" ? "section-Money" : undefined} aria-current={active ? "page" : undefined} onClick={() => { setTab(entry.key); setOpenGroups(openOnly(null)); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "var(--on-poppy,#fff)" : "#44403c" }}>{navIcon(entry.icon)}<span style={{ flex: 1 }}>{entry.label}</span>{entry.key === "Messages" && msgUnread > 0 && <span style={{ background: active ? "var(--on-poppy,#fff)" : "var(--poppy,#FA523C)", color: active ? "var(--poppy,#FA523C)" : "var(--on-poppy,#fff)", borderRadius: 999, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", lineHeight: 1.5 }}>{msgUnread}</span>}</button>;
             }
             const childActive = entry.children.some((c) => c.key === tab);
             const explicit = openGroups[entry.group];
@@ -552,7 +558,7 @@ export function CouplePortal({
             const meta = sectionMeta[entry.group] ?? {};
             return (
               <div key={entry.group}>
-                <button data-tour={`section-${entry.group}`} aria-expanded={open} aria-controls={`section-panel-${entry.group.replace(/\W+/g, "-")}`} onClick={() => setOpenGroups((o) => ({ ...o, [entry.group]: !open }))} style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: childActive ? 700 : 600, background: "transparent", color: childActive ? "var(--poppy,#FA523C)" : "#44403c", opacity: meta.dim && !childActive && !open ? 0.55 : 1 }}>
+                <button data-tour={`section-${entry.group}`} aria-expanded={open} aria-controls={`section-panel-${entry.group.replace(/\W+/g, "-")}`} onClick={() => setOpenGroups(open ? openOnly(null) : openOnly(entry.group))} style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: childActive ? 700 : 600, background: "transparent", color: childActive ? "var(--poppy,#FA523C)" : "#44403c", opacity: meta.dim && !childActive && !open ? 0.55 : 1 }}>
                   {navIcon(entry.icon)}
                   <span style={{ flex: 1 }}>{entry.group}</span>
                   {meta.done && <span title="In progress" style={{ width: 15, height: 15, borderRadius: 999, background: "var(--poppy,#FA523C)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12l5 5 9-10" /></svg></span>}
@@ -567,7 +573,7 @@ export function CouplePortal({
                       const locked = c.key === "Seating" && guestsOnList === 0;
                       // Locked Seating stays clickable (not `disabled`, which would
                       // swallow the click) and routes the couple to Guests instead.
-                      return <button key={c.key} aria-disabled={locked} aria-current={active ? "page" : undefined} onClick={() => { if (locked) { setTab("Guests"); setNavOpen(false); return; } setTab(c.key); setNavOpen(false); }} title={locked ? "Add a guest first to unlock seating" : undefined} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "var(--on-poppy,#fff)" : "#57534e", opacity: locked ? 0.45 : 1 }}>{navIcon(c.icon)}<span style={{ flex: 1 }}>{c.label}</span>{locked && <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}</button>;
+                      return <button key={c.key} aria-disabled={locked} aria-current={active ? "page" : undefined} onClick={() => { if (locked) { setTab("Guests"); setOpenGroups(openOnly("Our Guests")); setNavOpen(false); return; } setTab(c.key); setOpenGroups(openOnly(entry.group)); setNavOpen(false); }} title={locked ? "Add a guest first to unlock seating" : undefined} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "var(--on-poppy,#fff)" : "#57534e", opacity: locked ? 0.45 : 1 }}>{navIcon(c.icon)}<span style={{ flex: 1 }}>{c.label}</span>{locked && <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>}</button>;
                     })}
                   </div>
                 )}
