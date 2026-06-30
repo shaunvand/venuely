@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentVenue } from "@/lib/venue/current";
 import { createClient } from "@/lib/supabase/server";
 import { SmartImportPanel } from "@/components/SmartImportPanel";
+import { RefreshOnMount } from "@/components/RefreshOnMount";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,9 @@ export default async function VenueInventoryHub() {
 
   return (
     <div className="space-y-8">
+      {/* Counts read live tables that change on other tabs — refetch on every
+          visit so a save elsewhere is always reflected here. */}
+      <RefreshOnMount />
       <header>
         <div className="vy-eyebrow">Your venue</div>
         <h1 className="vy-h1 mt-1">Inventory</h1>
