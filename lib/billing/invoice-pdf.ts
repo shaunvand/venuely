@@ -106,10 +106,16 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<{ base64:
     page.drawText(s, { x, y, size, font, color });
   const right = (s: string, xRight: number, y: number, size: number, font: PDFFont = reg, color: RGB = INK) =>
     page.drawText(s, { x: xRight - font.widthOfTextAtSize(s, size), y, size, font, color });
+  // Fit the logo inside a box (max width AND height), preserving aspect ratio —
+  // a wide/landscape logo previously kept full height and an unbounded width, so
+  // it ran off the page edge (cropped) or collided with the right-hand "INVOICE".
+  const LOGO_MAX_W = 170; // mirrors the HTML/email preview's max-width
   const drawLogo = (p: PDFPage, x: number, y: number, h: number) => {
     if (!logo) return 0;
-    const w = (logo.width / logo.height) * h;
-    p.drawImage(logo, { x, y: y - h, width: w, height: h });
+    let w = (logo.width / logo.height) * h;
+    let hh = h;
+    if (w > LOGO_MAX_W) { hh = hh * (LOGO_MAX_W / w); w = LOGO_MAX_W; }
+    p.drawImage(logo, { x, y: y - hh, width: w, height: hh });
     return w;
   };
 
