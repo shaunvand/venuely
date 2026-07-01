@@ -60,6 +60,9 @@ export type RenderInvoiceEmailOpts = {
   /** venues.branding_logo_url — used when the invoice theme carries no logo. */
   logoFallbackUrl?: string | null;
   venueName: string;
+  /** Venue's tax identity — shown under the venue name when present. */
+  vatNumber?: string | null;
+  companyReg?: string | null;
   coupleNames: string;
   /** Pre-formatted, e.g. "14 Dec 2025". */
   weddingDateLabel?: string | null;
@@ -259,6 +262,8 @@ export function renderInvoiceEmailHtml(opts: RenderInvoiceEmailOpts): string {
           ${bankRow("SWIFT", opts.bank.swift)}
           ${bankRow("IBAN", opts.bank.iban)}
           ${bankRow("Reference", opts.invoiceRef)}
+          ${opts.vatNumber ? bankRow("VAT number", opts.vatNumber) : ""}
+          ${opts.companyReg ? bankRow("Company reg", opts.companyReg) : ""}
         </table>
       </td></tr></table>
     </td></tr>`;

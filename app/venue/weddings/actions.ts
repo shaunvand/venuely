@@ -422,8 +422,22 @@ type VenueBank = {
   bank_account_number: string | null; bank_branch_code: string | null;
   bank_swift: string | null; bank_iban: string | null; invoice_theme: { accent?: string; logoUrl?: string } | null;
   invoice_template: string | null; branding_logo_url: string | null;
-  platform_fee_rate: number | null;
+  platform_fee_rate: number | null; vat_number: string | null; company_reg: string | null;
 };
+
+// Assign a friendly sequential invoice reference once per wedding: INV-<NNN>-<initials>.
+async function assignInvoiceRef(
+  admin: ReturnType<typeof adminClient>, weddingId: string, venueId: string, coupleNames: string, existing: string | null,
+): Promise<string> {
+  if (existing) return existing;
+  const initials = (coupleNames || "").split(/[\s&]+/).filter(Boolean).map((w) => (w[0] || "").toUpperCase()).join("").slice(0, 3) || "XX";
+  const { data: v } = await admin.from("venues").select("invoice_seq").eq("id", venueId).single();
+  const next = Number((v as { invoice_seq?: number } | null)?.invoice_seq ?? 0) + 1;
+  await admin.from("venues").update({ invoice_seq: next }).eq("id", venueId);
+  const ref = `INV-${String(next).padStart(3, "0")}-${initials}`;
+  await admin.from("weddings").update({ invoice_ref: ref }).eq("id", weddingId);
+  return ref;
+}
 
 function bankRows(b: {
   account_name?: string | null; bank?: string | null; account_number?: string | null;
@@ -458,7 +472,7 @@ export async function approveSubmission(submissionId: string, weddingId: string,
   // RLS read confirms the venue admin owns this wedding + gives us the venue bank.
   const { data: wed } = await supabase
     .from("weddings")
-    .select("id, slug, venue_id, couple_names, wedding_date, couple_email, venue:venues(name, contact_email, bank_name, bank_account_name, bank_account_number, bank_branch_code, bank_swift, bank_iban, invoice_template, invoice_theme, branding_logo_url, platform_fee_rate)")
+    .select("id, slug, venue_id, couple_names, wedding_date, couple_email, invoice_ref, venue:venues(name, contact_email, bank_name, bank_account_name, bank_account_number, bank_branch_code, bank_swift, bank_iban, invoice_template, invoice_theme, branding_logo_url, platform_fee_rate, vat_number, company_reg)")
     .eq("id", weddingId)
     .single();
   if (!wed) throw new Error("Wedding not found");
@@ -484,7 +498,8 @@ export async function approveSubmission(submissionId: string, weddingId: string,
   const accent = resolveInvoiceTheme(venue?.invoice_theme).accent;
   const couple = (wed as { couple_names: string }).couple_names;
   const weddingDate = (wed as { wedding_date: string | null }).wedding_date;
-  const ref = `INV-${String(weddingId).slice(0, 8).toUpperCase()}`;
+  const existingRef = (wed as { invoice_ref: string | null }).invoice_ref;
+  const ref = await assignInvoiceRef(admin, weddingId, (wed as { venue_id: string }).venue_id, couple, existingRef);
 
   // 1) Couple invoice — paid to the venue by EFT, rendered with the venue's
   // chosen invoice template + theme (the design previewed on the billing page).
@@ -521,6 +536,8 @@ export async function approveSubmission(submissionId: string, weddingId: string,
       theme: venue?.invoice_theme,
       logoFallbackUrl: venue?.branding_logo_url,
       venueName: venue?.name ?? "Your venue",
+      vatNumber: venue?.vat_number ?? null,
+      companyReg: venue?.company_reg ?? null,
       coupleNames: couple,
       weddingDateLabel: weddingDate ? formatDateZA(weddingDate) : null,
       invoiceRef: ref,
@@ -542,10 +559,11 @@ export async function approveSubmission(submissionId: string, weddingId: string,
   if (venueEmail && commission > 0) {
     const { data: ps } = await admin.from("platform_settings").select("*").eq("id", 1).single();
     const p = (ps ?? {}) as Record<string, string | null>;
-    const cref = `VY-${String(weddingId).slice(0, 8).toUpperCase()}`;
+    const cref = `${ref}-FEE`;
+    const idLine = [p.vat_number ? `VAT ${p.vat_number}` : "", p.company_reg ? `Reg ${p.company_reg}` : ""].filter(Boolean).join(" · ");
     const html = `
       <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;border:1px solid #eee;border-radius:12px;overflow:hidden">
-        <div style="background:#1c1917;color:#fff;padding:20px 24px"><div style="font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:.8">${p.invoice_from || "Venuely"}</div><div style="font-size:24px;font-weight:700">Commission invoice</div></div>
+        <div style="background:#1c1917;color:#fff;padding:20px 24px"><div style="font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:.8">${p.invoice_from || "Venuely"}</div><div style="font-size:24px;font-weight:700">Commission invoice</div>${idLine ? `<div style="font-size:11px;opacity:.7;margin-top:4px">${idLine}</div>` : ""}</div>
         <div style="height:3px;background:${accent};font-size:0;line-height:3px">&nbsp;</div>
         <div style="padding:24px">
           <p style="margin:0 0 16px;color:#57534e">Commission on the confirmed booking for <strong>${couple}</strong> (invoiced ${rZA(grandTotal)}). This is deducted as your Venuely platform fee.</p>

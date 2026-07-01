@@ -114,6 +114,18 @@ export default async function VenueSettings({
           </div>
         </section>
 
+        <section className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">VAT number</label>
+            <input name="vat_number" defaultValue={(venue as { vat_number?: string | null }).vat_number ?? ""} placeholder="e.g. 4900285224" className="w-full border rounded px-3 py-2" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Company registration</label>
+            <input name="company_reg" defaultValue={(venue as { company_reg?: string | null }).company_reg ?? ""} placeholder="e.g. 2016/077215/07" className="w-full border rounded px-3 py-2" />
+          </div>
+        </section>
+        <p className="text-xs text-stone-500 -mt-2">VAT &amp; registration numbers appear on the invoices couples receive (leave blank if not registered).</p>
+
         <section className="space-y-1">
           <label className="text-sm font-medium">Website</label>
           <input

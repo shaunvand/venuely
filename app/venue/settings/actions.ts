@@ -39,6 +39,8 @@ export async function updateVenue(formData: FormData) {
   const description       = strOrNull(formData.get("description"));
   const directions        = strOrNull(formData.get("directions"));
   const website           = strOrNull(formData.get("website"));
+  const vatNumber         = strOrNull(formData.get("vat_number"));
+  const companyReg        = strOrNull(formData.get("company_reg"));
 
   // Manual override wins; otherwise use auto from Places.
   const region = regionManual ?? regionAuto;
@@ -60,6 +62,8 @@ export async function updateVenue(formData: FormData) {
       description,
       directions,
       website,
+      vat_number: vatNumber,
+      company_reg: companyReg,
     })
     .eq("id", venueId);
   if (error) throw new Error(`Could not save venue: ${error.message}`);
