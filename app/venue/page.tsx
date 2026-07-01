@@ -324,6 +324,11 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
   const commissionVendors = (vendorRows ?? []).filter((r) => r.active !== false).reduce((s, r) => s + commissionOf(r as Priced), 0);
   const commissionTotal = commissionRentals + commissionRooms + commissionVendors;
 
+  // Booked-supplier commission the venue still needs to invoice (not yet sent).
+  const { data: introDueRows } = await supabase.from("supplier_intros")
+    .select("commission_amount").eq("venue_id", venue.id).eq("status", "booked").is("commission_invoiced_at", null);
+  const supplierCommissionDue = (introDueRows ?? []).reduce((s, r) => s + (Number((r as { commission_amount?: number }).commission_amount) || 0), 0);
+
   // Revenue bars — invoiced + collected per month, last 6 months including current.
   const monthBuckets: { label: string; key: string; invoiced: number; collected: number }[] = [];
   const now = new Date();
@@ -426,6 +431,15 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
       <DashboardWelcomeModal isWelcome={isWelcomeVisit} />
       {/* WelcomeLoader hand-off (WelcomeCover, in the layout) still bridges the
           wizard → dashboard so there's no skeleton flash. */}
+
+      {supplierCommissionDue > 0 && (
+        <Link href="/venue/weddings" className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 hover:shadow-md transition-shadow" style={{ background: "#FFF4E6", border: "1px solid #F5C878" }}>
+          <div className="text-sm" style={{ color: "#8a5a00" }}>
+            <span style={{ fontWeight: 700 }}>R{Math.round(supplierCommissionDue).toLocaleString()}</span> of supplier commission to invoice — open each wedding and tap “Send invoice”.
+          </div>
+          <span className="text-sm font-medium whitespace-nowrap" style={{ color: "var(--poppy)" }}>Review →</span>
+        </Link>
+      )}
 
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>

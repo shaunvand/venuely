@@ -124,7 +124,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
   const [progressMap, { data: introRows }] = await Promise.all([
     computeWeddingsProgress(supabase, [{ id: wedding.id, area_selections: wedding.area_selections }]),
     supabase.from("supplier_intros")
-      .select("id, supplier_name, supplier_type, supplier_email, supplier_phone, commission_type, commission_value, status, booking_value, commission_amount, intro_sent_at, booked_at")
+      .select("id, supplier_name, supplier_type, supplier_email, supplier_phone, commission_type, commission_value, status, booking_value, commission_amount, intro_sent_at, booked_at, commission_invoiced_at")
       .eq("wedding_id", wedding.id)
       .eq("venue_id", venue.id)
       .order("created_at", { ascending: false }),

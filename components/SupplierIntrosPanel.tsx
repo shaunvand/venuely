@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { markSupplierIntroBooked, markSupplierIntroDeclined } from "@/app/venue/weddings/[slug]/actions";
+import { markSupplierIntroBooked, markSupplierIntroDeclined, sendSupplierCommissionInvoice } from "@/app/venue/weddings/[slug]/actions";
 
 export type SupplierIntro = {
   id: string;
@@ -16,6 +16,7 @@ export type SupplierIntro = {
   commission_amount: number | null;
   intro_sent_at: string | null;
   booked_at: string | null;
+  commission_invoiced_at: string | null;
 };
 
 const rZA = (n: number | null | undefined) =>
@@ -42,7 +43,7 @@ export function SupplierIntrosPanel({ intros, weddingId, slug }: {
   const [err, setErr] = useState<string | null>(null);
 
   const totalDue = intros
-    .filter((i) => i.status === "booked")
+    .filter((i) => i.status === "booked" && !i.commission_invoiced_at)
     .reduce((s, i) => s + (Number(i.commission_amount) || 0), 0);
 
   function confirmBooking(intro: SupplierIntro) {
@@ -74,6 +75,17 @@ export function SupplierIntrosPanel({ intros, weddingId, slug }: {
         await markSupplierIntroDeclined(id, weddingId, slug);
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Could not update");
+      }
+    });
+  }
+
+  function runInvoice(id: string) {
+    setErr(null);
+    startTransition(async () => {
+      try {
+        await sendSupplierCommissionInvoice(id, slug);
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : "Could not send invoice");
       }
     });
   }
@@ -136,6 +148,19 @@ export function SupplierIntrosPanel({ intros, weddingId, slug }: {
                   <button onClick={() => runDeclined(i.id)} disabled={pending} className="vy-btn vy-btn-secondary text-xs">
                     Decline / lost
                   </button>
+                </div>
+              )}
+
+              {i.status === "booked" && Number(i.commission_amount) > 0 && (
+                <div className="flex gap-2 mt-2.5 flex-wrap items-center">
+                  {i.commission_invoiced_at ? (
+                    <span className="text-xs font-medium" style={{ color: "#1a7f4b" }}>✓ Commission invoice sent</span>
+                  ) : (
+                    <button onClick={() => runInvoice(i.id)} disabled={pending || !i.supplier_email} className="vy-btn vy-btn-primary text-xs" title={!i.supplier_email ? "No supplier email on file" : undefined}>
+                      {pending ? "Sending…" : `Send invoice (${rZA(i.commission_amount)})`}
+                    </button>
+                  )}
+                  {!i.supplier_email && !i.commission_invoiced_at && <span className="text-[11px]" style={{ color: "#b42318" }}>No supplier email on file</span>}
                 </div>
               )}
             </li>
