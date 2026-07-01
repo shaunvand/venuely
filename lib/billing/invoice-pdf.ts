@@ -93,7 +93,7 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<{ base64:
   const serif = tpl.headingFont.includes("Fraunces"); // classic/elegant → serif heading
 
   const pdf = await PDFDocument.create();
-  const page = pdf.addPage([595.28, 841.89]); // A4
+  let page = pdf.addPage([595.28, 841.89]); // A4
   const { width, height } = page.getSize();
   const reg = await pdf.embedFont(StandardFonts.Helvetica);
   const sansB = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -188,7 +188,9 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<{ base64:
 
   const rows = input.lineItems.length ? input.lineItems : [{ label: "Wedding package", amount: input.total }];
   rows.forEach((li, i) => {
-    if (y < 200) { y = height - 70; page.drawText("", { x: M, y, size: 1, font: reg }); }
+    // Start a fresh page when we run low — was resetting y to the top of the SAME
+    // page, drawing rows over the header.
+    if (y < 90) { page = pdf.addPage([595.28, 841.89]); y = height - 60; }
     if (tpl.tableStyle === "striped" && i % 2 === 1) {
       page.drawRectangle({ x: M, y: y - 6, width: width - 2 * M, height: 20, color: rgb(0.97, 0.95, 0.93) });
     }

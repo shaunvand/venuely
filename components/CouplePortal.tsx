@@ -392,7 +392,11 @@ export function CouplePortal({
   }
   function setRentQty(id: string, n: number) {
     const cur = { ...(state.rentalSelections ?? {}) };
-    cur[id] = { ...(cur[id] ?? {}), sel: true, qty: Math.max(1, n) };
+    // Cap at the venue's available stock (the inline input clamps too, but the
+    // bill's +/- buttons come through here as well).
+    const stock = rentals.find((r) => r.id === id)?.stock;
+    const capped = stock != null && stock > 0 ? Math.min(Math.max(1, n), stock) : Math.max(1, n);
+    cur[id] = { ...(cur[id] ?? {}), sel: true, qty: capped };
     persist({ ...state, rentalSelections: cur });
   }
   function toggleRoom(id: string) {

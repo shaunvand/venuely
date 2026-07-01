@@ -286,11 +286,11 @@ export async function sendPortalInvite(
       <div style="font-family:system-ui,-apple-system,sans-serif;max-width:560px;margin:0 auto;background:#FFF6F0;border-radius:16px;padding:36px">
         <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#FA523C;font-weight:600">Venuely</div>
         <h1 style="font-family:Georgia,serif;font-size:26px;color:#1c1917;margin:8px 0 4px">Your wedding portal is ready</h1>
-        <p style="color:#57534e;margin:0 0 24px">Hi ${(wed as { couple_names: string }).couple_names}, ${venueName} has set up your personal planning portal.</p>
-        <a href="${url}" style="display:inline-block;background:#FA523C;color:#fff;text-decoration:none;padding:14px 28px;border-radius:999px;font-weight:600;margin:0 0 24px">Open your portal →</a>
+        <p style="color:#57534e;margin:0 0 24px">Hi ${esc((wed as { couple_names: string }).couple_names)}, ${esc(venueName)} has set up your personal planning portal.</p>
+        <a href="${esc(url)}" style="display:inline-block;background:#FA523C;color:#fff;text-decoration:none;padding:14px 28px;border-radius:999px;font-weight:600;margin:0 0 24px">Open your portal →</a>
         ${codeBlock}
         <p style="color:#8a9a86;font-size:13px;margin:24px 0 0;border-top:1px solid #FFC6AD;padding-top:16px">
-          Or paste this link into your browser:<br><span style="color:#57534e;word-break:break-all">${url}</span>
+          Or paste this link into your browser:<br><span style="color:#57534e;word-break:break-all">${esc(url)}</span>
         </p>
       </div>`;
     try {
@@ -364,13 +364,13 @@ export async function revokeCoupleAccess(weddingId: string, userId: string, slug
 // platform fee are recomputed server-side from the wedding's live charges and
 // the venue's authoritative platform_fee_rate. This prevents a tampered client
 // form from understating (or inflating) the fee owed.
-export async function markInvoiced(weddingId: string, slug: string, _total?: number, _feeRate?: number) {
+export async function markInvoiced(weddingId: string, slug: string, _total?: number, _feeRate?: number, stateOverride?: unknown) {
   const supabase = await createClient();
 
   const { data: wed } = await supabase.from("weddings").select("venue_id").eq("id", weddingId).single();
   if (!wed?.venue_id) throw new Error("Wedding not found");
 
-  const { grandTotal, feeRate, feeActive, totals } = await buildWeddingCharges(supabase, wed.venue_id as string, weddingId);
+  const { grandTotal, feeRate, feeActive, totals } = await buildWeddingCharges(supabase, wed.venue_id as string, weddingId, stateOverride);
   // invoice_total snapshots what the couple pays (the gross grand_total), but the
   // platform fee is venue.platform_fee_rate × platform_fee_base (= grand_total −
   // venue commission). Venuely never taxes the venue's commission; the venue keeps
@@ -416,6 +416,10 @@ function adminClient() {
 }
 
 const rZA = (n: number) => `R${Math.round(Number(n) || 0).toLocaleString("en-ZA")}`;
+// Escape interpolated values in email HTML (couple names, venue name, URLs).
+function esc(s: unknown): string {
+  return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+}
 
 type VenueBank = {
   name: string; contact_email: string | null; bank_name: string | null; bank_account_name: string | null;
@@ -431,10 +435,10 @@ async function assignInvoiceRef(
 ): Promise<string> {
   if (existing) return existing;
   const initials = (coupleNames || "").split(/[\s&]+/).filter(Boolean).map((w) => (w[0] || "").toUpperCase()).join("").slice(0, 3) || "XX";
-  const { data: v } = await admin.from("venues").select("invoice_seq").eq("id", venueId).single();
-  const next = Number((v as { invoice_seq?: number } | null)?.invoice_seq ?? 0) + 1;
-  await admin.from("venues").update({ invoice_seq: next }).eq("id", venueId);
-  const ref = `INV-${String(next).padStart(3, "0")}-${initials}`;
+  // Atomic increment (RPC) so concurrent approvals can't mint duplicate refs.
+  const { data: next } = await admin.rpc("next_invoice_seq", { p_venue: venueId });
+  const seq = Number(next ?? 1);
+  const ref = `INV-${String(seq).padStart(3, "0")}-${initials}`;
   await admin.from("weddings").update({ invoice_ref: ref }).eq("id", weddingId);
   return ref;
 }
@@ -480,7 +484,12 @@ export async function approveSubmission(submissionId: string, weddingId: string,
 
   // Compute + persist invoice_total + platform_fee_owed (venue.platform_fee_rate;
   // 0 when the venue's platform_fee_active is off — see markInvoiced).
-  await markInvoiced(weddingId, slug);
+  // Invoice the FROZEN submission state, not the couple's live selections (which
+  // they could edit between submitting and the venue approving).
+  const { data: sub } = await adminClient().from("submissions").select("state").eq("id", submissionId).eq("wedding_id", weddingId).maybeSingle();
+  const frozenState = (sub?.state ?? null) as unknown;
+
+  await markInvoiced(weddingId, slug, undefined, undefined, frozenState);
   const { data: fresh } = await supabase.from("weddings").select("invoice_total, platform_fee_owed").eq("id", weddingId).single();
   const grandTotal = Number(fresh?.invoice_total ?? 0);
   const commission = Number(fresh?.platform_fee_owed ?? 0);
@@ -514,7 +523,7 @@ export async function approveSubmission(submissionId: string, weddingId: string,
     let balance: InvoiceScheduleRow | null = null;
     let paidToDate: number | null = null;
     try {
-      const { totals } = await buildWeddingCharges(supabase, (wed as { venue_id: string }).venue_id, weddingId);
+      const { totals } = await buildWeddingCharges(supabase, (wed as { venue_id: string }).venue_id, weddingId, frozenState);
       items = totals.charges.map((c) => ({ description: c.label, qty: c.qty > 1 ? c.qty : null, amount: c.amount }));
       subtotal = totals.subtotal;
       const balanceDue = weddingDate
@@ -566,7 +575,7 @@ export async function approveSubmission(submissionId: string, weddingId: string,
         <div style="background:#1c1917;color:#fff;padding:20px 24px"><div style="font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:.8">${p.invoice_from || "Venuely"}</div><div style="font-size:24px;font-weight:700">Commission invoice</div>${idLine ? `<div style="font-size:11px;opacity:.7;margin-top:4px">${idLine}</div>` : ""}</div>
         <div style="height:3px;background:${accent};font-size:0;line-height:3px">&nbsp;</div>
         <div style="padding:24px">
-          <p style="margin:0 0 16px;color:#57534e">Commission on the confirmed booking for <strong>${couple}</strong> (invoiced ${rZA(grandTotal)}). This is deducted as your Venuely platform fee.</p>
+          <p style="margin:0 0 16px;color:#57534e">Commission on the confirmed booking for <strong>${esc(couple)}</strong> (invoiced ${rZA(grandTotal)}). This is deducted as your Venuely platform fee.</p>
           <div style="display:flex;justify-content:space-between;background:#FFF6F0;border-radius:8px;padding:14px 16px;margin-bottom:16px">
             <span style="font-weight:600">Commission due (${feePct}%)</span><span style="font-weight:700">${rZA(commission)}</span>
           </div>

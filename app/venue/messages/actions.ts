@@ -37,14 +37,8 @@ export async function sendVenueMessage(threadId: string, text: string) {
   });
   if (insertErr) throw new Error(insertErr.message);
 
-  const { error: updateErr } = await supabase
-    .from("message_threads")
-    .update({
-      couple_unread: (Number(thread.couple_unread) || 0) + 1,
-      last_message_at: new Date().toISOString(),
-    })
-    .eq("id", threadId)
-    .eq("venue_id", venue.id);
+  // Atomic increment (RPC) so concurrent venue messages don't lose unread counts.
+  const { error: updateErr } = await supabase.rpc("bump_couple_unread", { p_thread: threadId });
   if (updateErr) throw new Error(updateErr.message);
 
   // Notify the supplier by email too (best-effort), threaded into the same

@@ -58,6 +58,9 @@ export async function buildWeddingCharges(
   supabase: SupabaseClient,
   venueId: string,
   weddingId: string,
+  // When invoicing an approved submission, pass its frozen state so post-submit
+  // edits to the couple's selections don't change what gets billed.
+  stateOverride?: unknown,
 ): Promise<BuiltWeddingCharges> {
   const { data: wedding } = await supabase
     .from("weddings")
@@ -74,7 +77,7 @@ export async function buildWeddingCharges(
   const feeRate = Number((venue as { platform_fee_rate?: number } | null)?.platform_fee_rate ?? 0.005);
   const feeActive = (venue as { platform_fee_active?: boolean } | null)?.platform_fee_active ?? true;
 
-  const state = (wedding.wedding_state ?? {}) as WeddingState;
+  const state = (stateOverride ?? wedding.wedding_state ?? {}) as WeddingState;
   const rules = await loadRules(supabase, venueId);
 
   const [rentalsRes, cataRes, accomRes, vendorsRes, areasRes, areaPricingRes, seasonsRes, paymentsRes, chargesRes] = await Promise.all([

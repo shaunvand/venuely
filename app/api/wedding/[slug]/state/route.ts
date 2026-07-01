@@ -48,7 +48,17 @@ export async function PUT(request: NextRequest, ctx: { params: Promise<{ slug: s
       .eq("id", access.wedding.id)
       .single();
     const current = (existing?.wedding_state ?? {}) as Record<string, unknown>;
-    nextState = { ...current, ...(body as { patch: Record<string, unknown> }).patch };
+    const patch = (body as { patch: Record<string, unknown> }).patch;
+    // Deep-merge one level: a patch to a nested map (e.g. catalogueSelections)
+    // merges into the existing map instead of replacing it, so concurrent patches
+    // to different items don't clobber each other.
+    const isPlainObj = (x: unknown) => !!x && typeof x === "object" && !Array.isArray(x);
+    nextState = { ...current };
+    for (const [k, v] of Object.entries(patch)) {
+      nextState[k] = isPlainObj(v) && isPlainObj(current[k])
+        ? { ...(current[k] as Record<string, unknown>), ...(v as Record<string, unknown>) }
+        : v;
+    }
   } else {
     nextState = body as Record<string, unknown>;
   }

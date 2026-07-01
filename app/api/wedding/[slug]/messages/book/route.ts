@@ -38,9 +38,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
 
   const db = admin();
   const { data: thread } = await db.from("message_threads")
-    .select("id, venue_id, intro_id, status")
+    .select("id, venue_id, intro_id, status, supplier_type")
     .eq("id", b.threadId).eq("wedding_id", access.wedding.id).maybeSingle();
   if (!thread) return NextResponse.json({ error: "thread not found" }, { status: 404 });
+  // Only supplier threads can be "booked" — never a direct venue thread.
+  if (thread.supplier_type === "venue" || !thread.intro_id) {
+    return NextResponse.json({ error: "This conversation can't be booked" }, { status: 400 });
+  }
 
   const nowIso = new Date().toISOString();
   const { error: threadErr } = await db.from("message_threads").update({ status: "booked" }).eq("id", thread.id);
@@ -51,11 +55,15 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
   let supplierName = "there";
   let commissionAmount = 0;
 
-  if (thread.intro_id) {
+  {
     const { data: intro } = await db.from("supplier_intros")
       .select("id, commission_type, commission_value, supplier_email, supplier_name")
       .eq("id", thread.intro_id).maybeSingle();
     if (intro) {
+      // Percent commission needs a booking value — reject a silent 0.
+      if (intro.commission_type !== "fixed" && bookingValue <= 0) {
+        return NextResponse.json({ error: "Enter the agreed booking value for this supplier." }, { status: 400 });
+      }
       commissionAmount = computeCommission(intro.commission_type, Number(intro.commission_value), bookingValue);
       supplierEmail = (intro.supplier_email as string | null) || null;
       supplierName = (intro.supplier_name as string | null) || supplierName;

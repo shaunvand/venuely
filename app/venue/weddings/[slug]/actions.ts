@@ -117,8 +117,10 @@ export async function sendSupplierCommissionInvoice(introId: string, slug: strin
         ${!b.bank_account_number ? `<p style="color:#b42318;font-size:12px;margin-top:10px">Add your banking details in Billing so they appear here.</p>` : ""}
       </div>
     </div>`;
-  await sendEmail(intro.supplier_email, `Commission invoice from ${b.name || "your venue"}`, html, { replyTo: b.contact_email ?? null });
+  const res = await sendEmail(intro.supplier_email, `Commission invoice from ${b.name || "your venue"}`, html, { replyTo: b.contact_email ?? null });
+  if (!res.sent) throw new Error(res.reason === "no_api_key" ? "Email isn't configured yet — can't send the invoice." : "Could not send the invoice email — try again.");
 
+  // Only stamp as invoiced once the email actually went out.
   await supabase.from("supplier_intros").update({ commission_invoiced_at: new Date().toISOString() }).eq("id", introId).eq("venue_id", venue.id);
   revalidatePath(`/venue/weddings/${slug}`);
   revalidatePath("/venue");
