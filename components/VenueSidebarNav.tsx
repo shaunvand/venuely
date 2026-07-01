@@ -50,7 +50,8 @@ const TOP_LINKS: (Item & { icon: IconName })[] = [
   { href: "/venue/suppliers", label: "Suppliers", icon: "vendors" },
   // Enquiries tab hidden for now (page/route kept — re-add this link to restore it).
   { href: "/venue/messages", label: "Messages", icon: "messages" },
-  { href: "/venue/uploads", label: "Smart Import", icon: "import" },
+  // Smart Import is embedded on the Inventory hub + Suppliers pages — standalone
+  // tab hidden (route kept).
 ];
 
 const GROUPS: Group[] = [

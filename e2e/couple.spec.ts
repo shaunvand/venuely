@@ -28,7 +28,7 @@ async function unlock(page: Page) {
 const SECTIONS: Record<string, string[]> = {
   "Our Venue": ["Spaces & Rooms", "Accommodation", "Extras & Rentals"],
   "Our Guests": ["Guest List", "Seating plan"],
-  "Vibes": ["Inspiration", "Invites", "Flowers", "The Dress", "Décor", "Music", "Contacts"],
+  "Vibes": ["Inspiration", "Invites", "Flowers", "The Dress", "Décor", "Music"],
   "The Day": ["Wedding day Timeline", "Checklist"],
 };
 

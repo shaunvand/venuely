@@ -139,7 +139,6 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
     // venue clicks Mark invoiced, so unpaid charges aren't mistaken for "paid up".
     supabase.from("wedding_charges").select("wedding_id, amount, wedding:weddings!inner(venue_id)").eq("wedding.venue_id", venue.id),
   ]);
-  const { data: enquiryRows } = await supabase.from("enquiries").select("id, status, wedding_id").eq("venue_id", venue.id);
 
   type WeddingRow = {
     id: string;
@@ -174,11 +173,6 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
     spotlightRooms = new Set((sg ?? []).map((g) => g.room_id).filter(Boolean)).size;
   }
 
-  // Enquiry → booking conversion: an enquiry counts as converted once it's
-  // marked booked or linked to a wedding.
-  const enquiriesTotal = (enquiryRows ?? []).length;
-  const enquiriesConverted = (enquiryRows ?? []).filter((e) => e.status === "booked" || e.wedding_id).length;
-  const conversionPct = enquiriesTotal ? Math.round((enquiriesConverted / enquiriesTotal) * 100) : null;
 
   // Marketplace snapshot — listing counts per type + how many distinct product
   // categories the venue has populated across catalogue + rentals.
@@ -414,7 +408,7 @@ export default async function VenueOverview({ searchParams }: { searchParams: Pr
     { label: "Outstanding", value: fmtRand(outstanding), sub: overdue.length ? `${overdue.length} overdue` : "All paid up", href: "/venue/payments", accent: overdue.length ? "var(--poppy)" : "var(--sage)" },
     { label: "Sleeps on-site", value: counts.rooms ? `${includedSleeps}` : "—", sub: counts.rooms ? `${includedSleeps} included · +${extraSleeps} extra · ${counts.rooms} room${counts.rooms === 1 ? "" : "s"}` : "Add your first", href: "/venue/accommodation", accent: "var(--sage)" },
     { label: "Catalogue + rentals", value: (counts.catalogue + counts.rentals).toString(), sub: `${counts.catalogue} included · ${counts.rentals} extras`, href: "/venue/catalogue", accent: "var(--sage)" },
-    { label: "Enquiry conversion", value: conversionPct == null ? "—" : `${conversionPct}%`, sub: enquiriesTotal ? `${enquiriesConverted} of ${enquiriesTotal} enquiries booked` : "No enquiries yet", href: "/venue/enquiries", accent: "var(--poppy)" },
+    // Enquiry-conversion stat removed — it linked into the hidden Enquiries route.
   ];
 
   // Clamp: collected can legitimately exceed invoiced (deposits taken before the

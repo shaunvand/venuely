@@ -144,7 +144,7 @@ const COUPLE_NAV: NavEntry[] = [
       { key: "Dress", label: "The Dress", icon: "dress" },
       { key: "Décor", label: "Décor", icon: "decor" },
       { key: "Music", label: "Music", icon: "music" },
-      { key: "Contacts", label: "Contacts", icon: "phone" },
+      // Contacts removed — it duplicated the Suppliers tab (same vendor data).
     ],
   },
 ];
@@ -501,6 +501,9 @@ export function CouplePortal({
 
   const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 14 };
   const itemProps = { primary, accent, heading, cardRadius: tokens.cardRadius, cardBorder: tokens.cardBorder };
+  // Only a genuine multi-day wedding needs the M&G / Wedding / Farewell day-part
+  // toggles; single-day weddings just use the wedding day (hides the confusion).
+  const multiDay = !!(weddingEndDate && weddingEndDate !== weddingDate);
 
   // Progressive disclosure — soft-dim sections that aren't the couple's focus yet
   // (still clickable, just de-emphasised) + a ✓ pip on sections with real progress,
@@ -529,15 +532,11 @@ export function CouplePortal({
           primary={primary}
           onClose={closeTour}
           steps={[
-            { title: "Welcome to your wedding hub 🎉", body: `Everything for your day with ${venue.name} lives here. Here's a 30-second tour.`, before: () => { setTab("Overview"); if (isMobile) setNavOpen(false); } },
-            { sel: '[data-tour="nav"]', title: "Your plan, in 5 simple sections", body: "Tasks are grouped so nothing feels overwhelming. Open a section to see what's inside.", before: () => { if (isMobile) setNavOpen(true); } },
-            { sel: '[data-tour="start-here"]', title: "Always start here", body: "On Overview, this card always tells you the single most important thing to do next.", before: () => { setTab("Overview"); if (isMobile) setNavOpen(false); } },
-            { sel: '[data-tour="section-Our Venue"]', title: "1 · Our Venue", body: "Choose your ceremony & reception spaces, accommodation, and any paid extras.", before: () => { if (isMobile) setNavOpen(true); } },
-            { sel: '[data-tour="section-Our Guests"]', title: "2 · Our Guests", body: "Build your guest list — seating unlocks once you've added a guest.", before: () => { if (isMobile) setNavOpen(true); } },
-            { sel: '[data-tour="section-The Day"]', title: "3 · The Day", body: "Plan your hour-by-hour timeline and tick off your checklist as the day nears.", before: () => { if (isMobile) setNavOpen(true); } },
-            { sel: '[data-tour="section-Money"]', title: "4 · Budget", body: "Track your budget, view invoices & payments, and store your documents — all under Budget, with quick tabs at the top.", before: () => { if (isMobile) setNavOpen(true); } },
-            { sel: '[data-tour="section-Vibes"]', title: "5 · Vibes", body: "Build your inspiration board, invites, flowers, décor, music and more. (Suppliers has its own tab up top.)", before: () => { if (isMobile) setNavOpen(true); } },
-            { title: "You're all set! 💍", body: "Reopen this tour any time via “Take the tour” at the bottom of the menu.", before: () => { if (isMobile) setNavOpen(false); } },
+            { title: "Welcome to your wedding hub 🎉", body: `Everything for your day with ${venue.name} lives here — here's the 20-second version.`, before: () => { setTab("Overview"); if (isMobile) setNavOpen(false); } },
+            { sel: '[data-tour="start-here"]', title: "Always start here", body: "This card on Overview always tells you the single most important thing to do next.", before: () => { setTab("Overview"); if (isMobile) setNavOpen(false); } },
+            { sel: '[data-tour="section-Our Venue"]', title: "Choose what you want", body: "Under Our Venue, pick your spaces, rooms and any paid extras — your running total shows at the bottom.", before: () => { if (isMobile) setNavOpen(true); } },
+            { sel: '[data-tour="section-Money"]', title: "Track your money", body: "Budget holds your budget, invoices, payments and documents — with quick tabs at the top.", before: () => { if (isMobile) setNavOpen(true); } },
+            { title: "You're all set! 💍", body: "Message your venue anytime, and reopen this tour via “Take the tour” at the bottom of the menu.", before: () => { if (isMobile) setNavOpen(false); } },
           ]}
         />
       )}
@@ -775,9 +774,9 @@ export function CouplePortal({
                 <div key={catName} style={{ marginBottom: 22 }}>
                   <div style={{ ...eyebrow, color: primary, marginBottom: 8 }}>{catName}</div>
                   <div style={{ display: "grid", gap: 8 }}>{items.map((m) => m.kind === "cat" ? (
-                    <PortalLineItem key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} paidItem={!m.item.included} selected={catIsSelected(m.item)} onToggle={() => toggleCat(m.item)} days={catSel[m.item.id]} onDay={(d) => toggleCatDay(m.item, d)} matched={isVibeMatch(m.item.name)} {...itemProps} />
+                    <PortalLineItem key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} paidItem={!m.item.included} selected={catIsSelected(m.item)} onToggle={() => toggleCat(m.item)} days={catSel[m.item.id]} onDay={multiDay ? (d) => toggleCatDay(m.item, d) : undefined} matched={isVibeMatch(m.item.name)} {...itemProps} />
                   ) : (
-                    <PortalLineItem key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} paidItem={!m.item.included} selected={!!rentSel[m.item.id]?.sel} onToggle={() => toggleRent(m.item.id)} days={rentSel[m.item.id]} onDay={(d) => toggleRentDay(m.item.id, d)} qty={rentSel[m.item.id]?.qty} onQty={(n) => setRentQty(m.item.id, n)} stock={(m.item as RentItem).stock} matched={isVibeMatch(m.item.name)} {...itemProps} />
+                    <PortalLineItem key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} paidItem={!m.item.included} selected={!!rentSel[m.item.id]?.sel} onToggle={() => toggleRent(m.item.id)} days={rentSel[m.item.id]} onDay={multiDay ? (d) => toggleRentDay(m.item.id, d) : undefined} qty={rentSel[m.item.id]?.qty} onQty={(n) => setRentQty(m.item.id, n)} stock={(m.item as RentItem).stock} matched={isVibeMatch(m.item.name)} {...itemProps} />
                   ))}</div>
                 </div>
               ))}
