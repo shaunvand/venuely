@@ -96,7 +96,7 @@ type Venue = { name: string; region: string | null; address: string | null; desc
 // NB: "Reminders" intentionally omitted — RemindersManager is rendered inside the
 // Invites tab, there's no standalone Reminders render block, so keeping it as a
 // valid Tab key risked a blank screen if it were ever restored/selected.
-const TABS = ["Overview", "Our Venue", "Messages", "Catalogue & Rentals", "Inspiration", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Invites", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Payments", "Documents"] as const;
+const TABS = ["Overview", "Our Venue", "Messages", "Catalogue & Rentals", "Inspiration", "Styling", "Flowers", "Dress", "Décor", "Accommodation", "Suppliers", "Guests", "Invites", "Seating", "Timeline", "Checklist", "Contacts", "Music", "Budget", "Payments", "Documents"] as const;
 type Tab = (typeof TABS)[number];
 
 type NavLeaf = { key: Tab; label: string; icon: string };
@@ -140,10 +140,9 @@ const COUPLE_NAV: NavEntry[] = [
     group: "Vibes", icon: "sparkle", children: [
       { key: "Inspiration", label: "Inspiration", icon: "sparkle" },
       { key: "Invites", label: "Invites", icon: "mail" },
-      { key: "Flowers", label: "Flowers", icon: "flower" },
-      { key: "Dress", label: "The Dress", icon: "dress" },
-      { key: "Décor", label: "Décor", icon: "decor" },
-      { key: "Music", label: "Music", icon: "music" },
+      // Flowers / The Dress / Décor / Music folded into one "Styling" page with
+      // in-page bubble sub-tabs — four sidebar leaves became one.
+      { key: "Styling", label: "Styling", icon: "flower" },
       // Contacts removed — it duplicated the Suppliers tab (same vendor data).
     ],
   },
@@ -154,6 +153,15 @@ const COUPLE_NAV: NavEntry[] = [
 const GROUP_NAMES = COUPLE_NAV.filter(isGroup).map((e) => e.group);
 const openOnly = (g: string | null): Record<string, boolean> =>
   Object.fromEntries(GROUP_NAMES.map((n) => [n, n === g]));
+
+// Tabs that live *inside* a single nav leaf as in-page bubble sub-tabs — the leaf
+// stays highlighted for all of them. Budget → Payments/Documents; Styling →
+// Flowers/Dress/Décor/Music.
+const LEAF_SUBTABS: Partial<Record<Tab, readonly Tab[]>> = {
+  Budget: ["Payments", "Documents"],
+  Styling: ["Flowers", "Dress", "Décor", "Music"],
+};
+const leafMatch = (key: Tab, t: Tab) => key === t || (LEAF_SUBTABS[key]?.includes(t) ?? false);
 
 // Thin line icons (Venuely style) for the couple sidebar. Plain function (not a
 // component) so it can be called inline without remount/lint issues.
@@ -567,11 +575,12 @@ export function CouplePortal({
         <nav data-tour="nav" style={{ display: "grid", gap: 2, flex: 1 }}>
           {COUPLE_NAV.map((entry) => {
             if (!isGroup(entry)) {
-              // The Budget leaf stays highlighted for its Payments/Documents sub-tabs.
-              const active = entry.key === tab || (entry.key === "Budget" && (tab === "Payments" || tab === "Documents"));
+              // A leaf stays highlighted for any of its in-page bubble sub-tabs
+              // (Budget → Payments/Documents; Styling → Flowers/Dress/Décor/Music).
+              const active = leafMatch(entry.key, tab);
               return <button key={entry.key} data-tour={entry.key === "Budget" ? "section-Money" : undefined} aria-current={active ? "page" : undefined} onClick={() => { setTab(entry.key); setOpenGroups(openOnly(null)); setNavOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", border: "none", cursor: "pointer", borderRadius: 10, padding: "9px 12px", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? "var(--on-poppy,#fff)" : "#44403c" }}>{navIcon(entry.icon)}<span style={{ flex: 1 }}>{entry.label}</span>{entry.key === "Messages" && msgUnread > 0 && <span style={{ background: active ? "var(--on-poppy,#fff)" : "var(--poppy,#FA523C)", color: active ? "var(--poppy,#FA523C)" : "var(--on-poppy,#fff)", borderRadius: 999, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", lineHeight: 1.5 }}>{msgUnread}</span>}</button>;
             }
-            const childActive = entry.children.some((c) => c.key === tab);
+            const childActive = entry.children.some((c) => leafMatch(c.key, tab));
             const explicit = openGroups[entry.group];
             const open = (explicit === undefined ? !!entry.defaultOpen : explicit) || childActive;
             const meta = sectionMeta[entry.group] ?? {};
@@ -587,7 +596,7 @@ export function CouplePortal({
                 {open && (
                   <div id={`section-panel-${entry.group.replace(/\W+/g, "-")}`} style={{ display: "grid", gap: 2, marginLeft: 12, paddingLeft: 10, borderLeft: "1px solid rgba(0,0,0,0.08)" }}>
                     {entry.children.map((c) => {
-                      const active = c.key === tab;
+                      const active = leafMatch(c.key, tab);
                       // Seating needs guests first — dim + lock until ≥1 guest added.
                       const locked = c.key === "Seating" && guestsOnList === 0;
                       // Locked Seating stays clickable (not `disabled`, which would
@@ -856,21 +865,32 @@ export function CouplePortal({
         {tab === "Contacts" && (
           <ListManager slug={slug} kind="contacts" title="Contacts" sub="Your vendors, coordinator and emergency contacts" fields={CONTACT_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
-        {tab === "Music" && (
-          <ListManager slug={slug} kind="songs" title="Music & song requests" sub="Key moments + your playlist for the DJ" fields={SONG_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
-        )}
         {tab === "Checklist" && (
           <ChecklistBoard slug={slug} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
         )}
-        {tab === "Flowers" && (
-          <ListManager slug={slug} kind="flowers" title="Flowers" sub="Your flower wishlist to share with the florist" fields={FLOWER_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
-        )}
-        {tab === "Dress" && (
-          <ListManager slug={slug} kind="dress" title="The dress" sub="Track dresses, shops and the features you love" fields={DRESS_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
-        )}
-        {tab === "Décor" && (
-          <ListManager slug={slug} kind="decor" title="Décor" sub="Centrepieces, ceremony arch and styling notes" fields={DECOR_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />
-        )}
+        {(tab === "Styling" || tab === "Flowers" || tab === "Dress" || tab === "Décor" || tab === "Music") && (() => {
+          // One "Styling" page — Flowers / The Dress / Décor / Music as in-page
+          // bubble sub-tabs (mirrors the Budget page). Styling defaults to Flowers.
+          const sub: Tab = tab === "Styling" ? "Flowers" : tab;
+          return (
+            <div style={{ display: "grid", gap: 22 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {(["Flowers", "Dress", "Décor", "Music"] as const).map((k) => {
+                  const on = sub === k;
+                  return (
+                    <button key={k} onClick={() => setTab(k)} aria-current={on ? "page" : undefined} style={{ padding: "9px 20px", borderRadius: 999, border: on ? "none" : "1px solid rgba(0,0,0,0.12)", background: on ? primary : "#fff", color: on ? onPrimary : "#57534e", fontWeight: on ? 700 : 600, fontSize: 13.5, cursor: "pointer" }}>
+                      {k === "Dress" ? "The Dress" : k}
+                    </button>
+                  );
+                })}
+              </div>
+              {sub === "Flowers" && <ListManager slug={slug} kind="flowers" title="Flowers" sub="Your flower wishlist to share with the florist" fields={FLOWER_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />}
+              {sub === "Dress" && <ListManager slug={slug} kind="dress" title="The dress" sub="Track dresses, shops and the features you love" fields={DRESS_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />}
+              {sub === "Décor" && <ListManager slug={slug} kind="decor" title="Décor" sub="Centrepieces, ceremony arch and styling notes" fields={DECOR_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />}
+              {sub === "Music" && <ListManager slug={slug} kind="songs" title="Music & song requests" sub="Key moments + your playlist for the DJ" fields={SONG_FIELDS} primary={primary} accent={accent} heading={heading} cardRadius={tokens.cardRadius} />}
+            </div>
+          );
+        })()}
         {(tab === "Budget" || tab === "Payments" || tab === "Documents") && (
           <div style={{ display: "grid", gap: 22 }}>
             {/* Gate bubbles — one "Budget" tab, three sub-pages. */}
@@ -1144,8 +1164,8 @@ function TopNavBar({ tokens, primary, accent, tab, onTab, msgUnread = 0 }: { tok
 
   const renderTabs = entries.map((it) => {
     if (it.kind === "leaf") {
-      // Budget stays active for its Payments/Documents sub-tabs (top-nav variant).
-      const active = it.leaf.key === tab || (it.leaf.key === "Budget" && (tab === "Payments" || tab === "Documents"));
+      // A leaf stays active for its in-page bubble sub-tabs (top-nav variant).
+      const active = leafMatch(it.leaf.key, tab);
       return (
         <button key={it.leaf.key} aria-current={active ? "page" : undefined} onClick={() => onTab(it.leaf.key)} style={tabStyle(active, it.num)}>
           {variant === "editorial" && <span style={{ fontSize: 9.5, color: active ? primary : "#a8a29e" }}>{String(it.num + 1).padStart(2, "0")}</span>}
@@ -1155,7 +1175,7 @@ function TopNavBar({ tokens, primary, accent, tab, onTab, msgUnread = 0 }: { tok
       );
     }
     const g = it.group;
-    const childActive = g.children.some((c) => c.key === tab);
+    const childActive = g.children.some((c) => leafMatch(c.key, tab));
     const isOpen = openGroup === g.group;
     return (
       <div key={g.group} style={{ position: "relative", display: "inline-flex" }}>
@@ -1186,7 +1206,7 @@ function TopNavBar({ tokens, primary, accent, tab, onTab, msgUnread = 0 }: { tok
       {openG && openRect && typeof document !== "undefined" && createPortal((
         <div ref={dropRef} role="menu" style={{ position: "fixed", top: openRect.bottom + 4, left: menuLeft, zIndex: 9990, background: "#fff", border: "1px solid var(--line, #ece7e1)", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.16)", padding: 6, minWidth: 184 }}>
           {openG.children.map((c) => {
-            const active = c.key === tab;
+            const active = leafMatch(c.key, tab);
             return <button key={c.key} role="menuitem" aria-current={active ? "page" : undefined} onClick={() => { onTab(c.key); closeMenu(); }} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", border: "none", cursor: "pointer", borderRadius: 8, padding: "8px 10px", fontSize: 13, whiteSpace: "nowrap", fontWeight: active ? 700 : 500, background: active ? "var(--poppy,#FA523C)" : "transparent", color: active ? onPrimary : "#44403c" }}>{navIcon(c.icon)}<span>{c.label}</span></button>;
           })}
         </div>

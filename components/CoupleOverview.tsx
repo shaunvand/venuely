@@ -87,7 +87,6 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
     : card;
   const eyebrowS: React.CSSProperties = t ? { ...eyebrow, letterSpacing: t.eyebrowTracking } : eyebrow;
   const btnRadius: string | number = t ? t.buttonRadius : 999;
-  const innerRadius: string | number = t ? t.cardRadius : 12;
   const railRadius: string | number = t ? t.cardRadius : 18;
   // Romantic ✦ flourish before card titles (null for everything else).
   const flo = t?.flourish ? <span style={{ color: PRIMARY, fontSize: 12, marginRight: 7, verticalAlign: "middle" }}>{t.flourish}</span> : null;
@@ -303,7 +302,6 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
         <div data-tour="start-here" style={{ borderRadius: railRadius, padding: 18, border: `1px solid ${PRIMARY}33`, background: `${PRIMARY}0f` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <span style={{ ...eyebrowS, color: PRIMARY }}>Start here</span>
-            <span style={{ fontSize: 11.5, color: INK2 }}>· {stagesDone === stages.length ? "all stages done" : `Step ${currentStage} of ${stages.length}`}</span>
           </div>
           {topTasks.length > 0 ? (
             <>
@@ -460,31 +458,6 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
           <div style={{ ...serifS, fontSize: 64, lineHeight: 1, margin: "6px 0" }}>{daysToGo ?? "—"}</div>
           <div style={{ fontSize: 12, letterSpacing: 2, textTransform: "uppercase", opacity: 0.9 }}>days to go</div>
           <div style={{ ...serifS, fontStyle: t && !t.headingItalic ? "normal" : "italic", fontSize: 15, marginTop: 16, opacity: 0.95 }}>We can&apos;t wait to celebrate with you!</div>
-        </div>
-
-        {/* Next Up — derived upcoming tasks */}
-        <div style={{ ...cardS, padding: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <div>
-              <div style={{ ...serifS, fontSize: 18, color: INK }}>{flo}Next Up</div>
-              <div style={{ fontSize: 11.5, color: INK2 }}>Your upcoming tasks</div>
-            </div>
-            <button onClick={() => onNavigate("Checklist")} style={{ background: "none", border: "none", color: PRIMARY, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>View all</button>
-          </div>
-          <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
-            {topTasks.length ? topTasks.map((task) => (
-              <button key={task.title} onClick={() => onNavigate(task.tab)} style={{ display: "flex", alignItems: "center", gap: 11, textAlign: "left", background: "#fff", border: `1px solid ${LINE}`, borderRadius: innerRadius, padding: "11px 12px", cursor: "pointer" }}>
-                <span style={{ width: 36, height: 36, borderRadius: 999, background: "#fbf1e7", color: INK, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{lineIcon(task.icon, 17)}</span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: INK }}>{task.title}</span>
-                  <span style={{ display: "block", fontSize: 11.5, color: INK2 }}>{task.detail}</span>
-                </span>
-                <span style={{ color: INK2 }}>›</span>
-              </button>
-            )) : (
-              <div style={{ fontSize: 12.5, color: INK2, padding: "6px 2px" }}>You&apos;re all caught up 🎉</div>
-            )}
-          </div>
         </div>
 
         {/* Wedding summary — at a glance */}
