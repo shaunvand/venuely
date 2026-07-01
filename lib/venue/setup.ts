@@ -41,6 +41,11 @@ export async function computeSetupSteps(supabase: SupabaseClient, venue: VenueRo
   // use this to decide whether to keep nudging Smart Import.
   const hasImported = (catalogueCount ?? 0) > 0 || (rentalsCount ?? 0) > 0 || (roomsCount ?? 0) > 0;
 
+  // Inventory = spaces + catalogue + rentals + accommodation, all under the one
+  // Inventory hub (Smart Import fills them together) — one step, not four.
+  const inventoryCount = (areasCount ?? 0) + (catalogueCount ?? 0) + (rentalsCount ?? 0) + (roomsCount ?? 0);
+  const inventoryDone = inventoryCount > 0;
+
   const steps: SetupStep[] = [
     {
       key: "venue",
@@ -52,73 +57,46 @@ export async function computeSetupSteps(supabase: SupabaseClient, venue: VenueRo
       hint: venue.address ?? venue.region ?? undefined,
     },
     {
-      key: "areas",
-      title: "Add your spaces (areas)",
-      description: "The main areas couples can use across their day — ceremony lawn, reception hall, gardens. Price each per day type (M&G / Wedding / Farewell).",
-      href: "/venue/areas",
-      cta: (areasCount ?? 0) > 0 ? "Manage spaces" : "Add spaces",
-      done: (areasCount ?? 0) > 0,
-      count: areasCount,
-    },
-    {
-      key: "catalogue",
-      title: "Add your catalogue items",
-      description: "Everything included with the booking — décor, tableware, furniture. Couples tick which days they need each item.",
-      href: "/venue/catalogue",
-      cta: "Open catalogue",
-      done: (catalogueCount ?? 0) > 0,
-      count: catalogueCount,
-    },
-    {
-      key: "rentals",
-      title: "Add rentals (paid extras)",
-      description: "Items with a price per day and a stock limit. Couples select quantity + days — totals tally automatically.",
-      href: "/venue/rentals",
-      cta: "Open rentals",
-      done: (rentalsCount ?? 0) > 0,
-      count: rentalsCount,
-    },
-    {
-      key: "accommodation",
-      title: "Add accommodation rooms",
-      description: "Cottages, suites, tents — anything on-site. Couples can assign guests to rooms.",
-      href: "/venue/accommodation",
-      cta: "Open accommodation",
-      done: (roomsCount ?? 0) > 0,
-      count: roomsCount,
-    },
-    {
-      key: "photos",
-      title: "Upload venue photos",
-      description: "Gallery used on every couple portal's Our Venue tab. Categorise by location (Outside, Bar, Accommodation…).",
-      href: "/venue/your-venue",
-      cta: "Open Your Venue",
-      done: (photosCount ?? 0) > 0,
-      count: photosCount,
+      key: "inventory",
+      title: "Set up your inventory",
+      description: "Everything couples can choose — spaces, catalogue, rentals and accommodation. Smart Import fills it all in one go.",
+      href: "/venue/inventory",
+      cta: inventoryDone ? "Manage inventory" : "Set up inventory",
+      done: inventoryDone,
+      count: inventoryCount,
     },
     {
       key: "weddings",
-      title: "Create your first wedding",
-      description: "Add a booked couple. Their portal URL is auto-generated as e.g. AlexAndSamWedding.",
+      title: "Add your first wedding",
+      description: "Add a booked couple — their private portal URL is generated automatically.",
       href: "/venue/weddings",
       cta: "Add wedding",
       done: (weddingsCount ?? 0) > 0,
       count: weddingsCount,
     },
     {
+      key: "photos",
+      title: "Upload venue photos",
+      description: "Your gallery on every couple portal's Our Venue tab. Categorise by location.",
+      href: "/venue/your-venue",
+      cta: "Open Your Venue",
+      done: (photosCount ?? 0) > 0,
+      count: photosCount,
+    },
+    {
       key: "suppliers",
       title: "Recommend suppliers",
-      description: "Photographers, florists, caterers you trust. Couples browse your list instead of guessing.",
+      description: "Photographers, florists, caterers you trust — couples browse your list instead of guessing.",
       href: "/venue/suppliers",
-      cta: "Recommended venue suppliers →",
+      cta: "Add suppliers",
       done: (suppliersCount ?? 0) > 0,
       count: suppliersCount,
-      hint: "Add your preferred partner vendors — couples see them in their portal.",
+      hint: "Couples see these in their portal.",
     },
     {
       key: "payments",
       title: "Track payments + invoices",
-      description: "Deposits + final balances per wedding. Mark paid, see overdue, attach invoices.",
+      description: "Deposits + final balances per wedding. Mark paid, see overdue, send invoices.",
       href: "/venue/payments",
       cta: "Open payments",
       done: (paymentsCount ?? 0) > 0,

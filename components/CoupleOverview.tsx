@@ -331,11 +331,7 @@ export function CoupleOverview({ slug, venue, coupleNames, daysToGo, dateLabel, 
           )}
         </div>
 
-        {/* AI planner banner */}
-        <div style={{ ...cardS, padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", background: `linear-gradient(135deg, ${PRIMARY}, ${SAGE})`, border: "none", color: "#fff" }}>
-          <div><div style={{ ...serifS, fontSize: 18 }}>✨ Plan with AI</div><div style={{ fontSize: 12.5, opacity: 0.95 }}>Tell me your vibe and I&apos;ll set up your selections.</div></div>
-          <button onClick={() => window.dispatchEvent(new Event("venuely:open-planner"))} style={{ background: "#fff", color: PRIMARY, border: "none", borderRadius: btnRadius, padding: "9px 18px", fontWeight: 700, cursor: "pointer", fontSize: 13.5 }}>Start planning</button>
-        </div>
+        {/* AI planner banner removed — the floating "Plan with AI" launcher is the single entry point. */}
 
         {/* Wedding progress — overall % + the six category chips */}
         <div style={{ ...cardS, padding: "18px 20px" }}>

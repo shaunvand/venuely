@@ -724,14 +724,7 @@ export function CouplePortal({
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M12 5v14M5 12h14" /></svg>
                   Add custom item
                 </button>
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new Event("venuely:open-planner"))}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 700, padding: "8px 16px", borderRadius: 999, background: primary, border: "none", color: "#fff", cursor: "pointer" }}
-                >
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z" /><path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9z" /></svg>
-                  Plan with AI
-                </button>
+                {/* "Plan with AI" removed here — the floating launcher is the single entry point. */}
               </div>
               </div>
               <FilterChips chip={filterChip} value={rentFilter} onChange={setRentFilter} options={cats} />
