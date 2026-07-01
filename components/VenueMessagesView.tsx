@@ -190,17 +190,21 @@ export function VenueMessagesView({ threads }: { threads: VenueThread[] }) {
                   );
                 }
                 const mine = m.sender === "venue";
+                // Direct couple→venue messages render in urgent orange.
+                const urgent = selected.supplierType === "venue" && m.sender === "couple";
                 return (
                   <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: m.sender === "couple" ? "var(--poppy-deep)" : m.sender === "supplier" ? "#1a7f4b" : "var(--ink-2)" }}>
-                      {SENDER_LABEL[m.sender]} · {fmtWhen(m.createdAt)}
+                    <span className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: urgent ? "#c2410c" : m.sender === "couple" ? "var(--poppy-deep)" : m.sender === "supplier" ? "#1a7f4b" : "var(--ink-2)" }}>
+                      {urgent ? "Couple · direct message" : SENDER_LABEL[m.sender]} · {fmtWhen(m.createdAt)}
                     </span>
                     <div className="max-w-[82%]">
                       <div
                         className="rounded-2xl px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words"
                         style={mine
                           ? { background: "var(--poppy)", color: "#fff", borderBottomRightRadius: 6 }
-                          : { background: "#fff", border: "1px solid var(--line)", color: "var(--ink)", borderBottomLeftRadius: 6 }}
+                          : urgent
+                            ? { background: "#F97316", color: "#fff", borderBottomLeftRadius: 6, boxShadow: "0 1px 6px rgba(249,115,22,0.4)" }
+                            : { background: "#fff", border: "1px solid var(--line)", color: "var(--ink)", borderBottomLeftRadius: 6 }}
                       >
                         {m.body}
                       </div>

@@ -64,7 +64,7 @@ export function CoupleMessages({ slug, initialThreads = [], startVendor = null, 
   const [activeId, setActiveId] = useState<string | null>(null);
   // A conversation that doesn't exist server-side yet (couple tapped "Message
   // supplier" on a vendor with no thread) — first send creates intro + thread.
-  const [pendingNew, setPendingNew] = useState<{ vendorId?: string; name: string; type?: string } | null>(null);
+  const [pendingNew, setPendingNew] = useState<{ vendorId?: string; name: string; type?: string; venue?: boolean } | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [bookOpen, setBookOpen] = useState(false);
@@ -140,6 +140,18 @@ export function CoupleMessages({ slug, initialThreads = [], startVendor = null, 
     return () => window.removeEventListener("venuely:message-supplier", onEvt);
   }, [openFor]);
 
+  // Direct "Message the venue" — opens the one venue thread (or starts it).
+  const openVenue = useCallback((venueName: string) => {
+    const match = threadsRef.current.find((t) => t.supplierType === "venue");
+    if (match) openThread(match.id);
+    else { setPendingNew({ name: venueName, venue: true }); setActiveId(null); setMobilePane("chat"); }
+  }, [openThread]);
+  useEffect(() => {
+    const onEvt = (e: Event) => { const d = (e as CustomEvent).detail as { venueName?: string } | undefined; openVenue(d?.venueName || "Your venue"); };
+    window.addEventListener("venuely:message-venue", onEvt);
+    return () => window.removeEventListener("venuely:message-venue", onEvt);
+  }, [openVenue]);
+
   const activeThread = pendingNew ? null : threads.find((t) => t.id === activeId) ?? null;
 
   // Keep the conversation pinned to the latest message.
@@ -170,7 +182,7 @@ export function CoupleMessages({ slug, initialThreads = [], startVendor = null, 
         const res = await fetch(`/api/wedding/${slug}/messages`, {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            ...(pendingNew.vendorId ? { vendorId: pendingNew.vendorId } : { supplier: { name: pendingNew.name, type: pendingNew.type } }),
+            ...(pendingNew.venue ? { venue: true } : pendingNew.vendorId ? { vendorId: pendingNew.vendorId } : { supplier: { name: pendingNew.name, type: pendingNew.type } }),
             text,
           }),
         });

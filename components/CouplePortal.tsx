@@ -592,7 +592,7 @@ export function CouplePortal({
         <div style={{ marginTop: 10, background: "var(--bone,#FFF6F0)", borderRadius: 12, padding: 12 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700 }}>Need help?</div>
           <div style={{ fontSize: 11.5, color: "#78716c", margin: "2px 0 8px" }}>Your venue coordinator is here to help.</div>
-          {venue.email && <a href={`mailto:${venue.email}`} style={{ display: "block", textAlign: "center", border: "1px solid var(--poppy,#FA523C)", color: "var(--poppy,#FA523C)", borderRadius: 999, padding: "6px", fontSize: 12.5, fontWeight: 600, textDecoration: "none" }}>Message Venue</a>}
+          <button onClick={() => { setTab("Messages"); setOpenGroups(openOnly(null)); setNavOpen(false); setTimeout(() => window.dispatchEvent(new CustomEvent("venuely:message-venue", { detail: { venueName: venue.name } })), 70); }} style={{ width: "100%", textAlign: "center", border: "1px solid var(--poppy,#FA523C)", background: "transparent", color: "var(--poppy,#FA523C)", borderRadius: 999, padding: "6px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Message Venue</button>
         </div>
       </aside>
       )}

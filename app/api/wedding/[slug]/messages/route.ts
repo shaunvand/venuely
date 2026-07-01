@@ -95,6 +95,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     threadId?: string | null;
     vendorId?: string | null;
     supplier?: { name?: string; type?: string | null; email?: string | null; phone?: string | null } | null;
+    venue?: boolean; // direct couple→venue message (not a supplier)
     text?: string;
   };
   try { b = await req.json(); } catch { return NextResponse.json({ error: "invalid json" }, { status: 400 }); }
@@ -107,10 +108,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
 
   type ThreadRow = {
     id: string; venue_id: string; status: string; reply_token: string;
-    supplier_name: string; supplier_email: string | null;
+    supplier_name: string; supplier_type: string | null; supplier_email: string | null;
     email_subject: string | null; last_email_message_id: string | null;
   };
-  const THREAD_COLS = "id, venue_id, status, reply_token, supplier_name, supplier_email, email_subject, last_email_message_id";
+  const THREAD_COLS = "id, venue_id, status, reply_token, supplier_name, supplier_type, supplier_email, email_subject, last_email_message_id";
   let thread: ThreadRow | null = null;
 
   if (b.threadId) {
@@ -118,6 +119,21 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
       .eq("id", b.threadId).eq("wedding_id", weddingId).maybeSingle();
     if (!data) return NextResponse.json({ error: "thread not found" }, { status: 404 });
     thread = data as ThreadRow;
+  } else if (b.venue) {
+    // Direct couple→venue thread (one per wedding), marked supplier_type="venue".
+    const { data: existing } = await db.from("message_threads").select(THREAD_COLS)
+      .eq("wedding_id", weddingId).eq("supplier_type", "venue").maybeSingle();
+    if (existing) thread = existing as ThreadRow;
+    else {
+      const { data: v } = await db.from("venues").select("name").eq("id", venueId).single();
+      const { data: created, error: createErr } = await db.from("message_threads").insert({
+        venue_id: venueId, wedding_id: weddingId, intro_id: null, vendor_id: null,
+        supplier_name: (v?.name as string) || "Your venue", supplier_type: "venue",
+        supplier_email: null, supplier_phone: null,
+      }).select(THREAD_COLS).single();
+      if (createErr || !created) return NextResponse.json({ error: createErr?.message || "could not start thread" }, { status: 500 });
+      thread = created as ThreadRow;
+    }
   } else {
     const vendorId = b.vendorId || null;
 
@@ -198,9 +214,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     }
   }
 
-  // Redact unless booked; keep the original (venue-only) only when something was hidden.
-  const booked = thread.status === "booked";
-  const red = booked ? { body: text, flagged: false, reason: null } : redactContacts(text);
+  // Redact unless booked (supplier threads only). Venue-direct threads are never
+  // redacted — the couple is messaging their own venue.
+  const noRedact = thread.status === "booked" || thread.supplier_type === "venue";
+  const red = noRedact ? { body: text, flagged: false, reason: null } : redactContacts(text);
 
   const { data: msg, error: msgErr } = await db.from("thread_messages").insert({
     thread_id: thread.id,
