@@ -44,7 +44,7 @@ test("FULL transaction: couple selects + submits → venue approves & invoices",
 
   // The couple portal re-renders frequently, so strict-actionable clicks flake.
   // dispatchEvent fires the handler directly on the resolved element.
-  const addBtn = cp.getByRole("button", { name: /Add to my wedding/i }).first();
+  const addBtn = cp.getByRole("button", { name: /^\+ Add$|Add to my wedding/i }).first();
   await expect(addBtn).toBeVisible({ timeout: 15_000 });
   await addBtn.dispatchEvent("click");
   await expect(cp.getByRole("button", { name: /✓ Added/i }).first()).toBeVisible({ timeout: 12_000 });
