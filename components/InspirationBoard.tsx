@@ -25,6 +25,17 @@ export function InspirationBoard({ slug, initialPalette, primary, accent, headin
   const [pinning, setPinning] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<{ id: string; style?: string; categories?: string[]; palette?: string[]; venueMatches?: string[]; suggestions?: string[] } | null>(null);
+  const [matching, setMatching] = useState(false);
+  const [vibe, setVibe] = useState<{ style: string | null; matches: string[] } | null>(null);
+  async function matchVibe() {
+    setMatching(true); setVibe(null);
+    try {
+      const r = await fetch(`/api/wedding/${slug}/inspiration/match-vibe`, { method: "POST" });
+      const j = await r.json();
+      if (j.ok) { setVibe({ style: j.style ?? null, matches: j.matches ?? [] }); window.dispatchEvent(new CustomEvent("venuely:vibe-matched", { detail: { matches: j.matches ?? [] } })); }
+      else setVibe({ style: null, matches: [] });
+    } catch { setVibe({ style: null, matches: [] }); } finally { setMatching(false); }
+  }
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { fetch(`/api/wedding/${slug}/files/inspiration`).then((r) => r.json()).then((j) => { setPins(j.rows ?? []); setLoading(false); }).catch(() => setLoading(false)); }, [slug]);
@@ -84,6 +95,27 @@ export function InspirationBoard({ slug, initialPalette, primary, accent, headin
       <div>
         <h2 style={{ ...heading, fontSize: 26, margin: 0 }}>Inspiration board</h2>
         <div style={{ color: "#57534e", fontSize: 13, marginTop: 2 }}>Search a look you love, pin your favourites, and shape your wedding&apos;s style — your venue sees this board to bring your vision to life.</div>
+      </div>
+
+      {/* Whole-vibe AI match — reads all pins, highlights matching venue items. */}
+      <div style={{ ...card, padding: 14, background: `${accent}12` }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: primary, fontWeight: 700 }}>✨ Match my vibe</div>
+            <div style={{ fontSize: 12.5, color: "#57534e", marginTop: 2 }}>AI reads all your pins and highlights the venue&apos;s items that fit your style.</div>
+          </div>
+          <button onClick={matchVibe} disabled={matching || pins.length === 0} style={{ background: pins.length ? primary : "#ccc", color: "#fff", border: "none", borderRadius: 999, padding: "9px 18px", fontWeight: 700, fontSize: 13, cursor: matching || pins.length === 0 ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>{matching ? "Matching…" : "Match my vibe"}</button>
+        </div>
+        {vibe && (
+          <div style={{ marginTop: 12 }}>
+            {vibe.matches.length > 0 ? (
+              <>
+                <div style={{ fontSize: 12.5, color: "#44403c", marginBottom: 6 }}>{vibe.style ? <>Your vibe reads as <b>{vibe.style}</b>. </> : null}These of your venue&apos;s items match — they&apos;re now highlighted in <b>Extras &amp; Rentals</b>:</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{vibe.matches.map((m) => <span key={m} style={{ fontSize: 12, background: "#fff", border: `1px solid ${primary}`, color: primary, borderRadius: 8, padding: "3px 10px", fontWeight: 600 }}>✨ {m}</span>)}</div>
+              </>
+            ) : <div style={{ fontSize: 12.5, color: "#8a8a8a" }}>No strong matches found in your venue&apos;s current items — try pinning a few more images.</div>}
+          </div>
+        )}
       </div>
 
       {/* Palette */}

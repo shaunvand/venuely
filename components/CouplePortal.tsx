@@ -305,6 +305,18 @@ export function CouplePortal({
   useEffect(() => {
     fetch(`/api/wedding/${slug}/list/budget`).then((r) => r.json()).then((j) => setBudgetLines(j.rows ?? [])).catch(() => {});
   }, [slug]);
+  // AI vibe matches (from the Inspiration board) → highlight matching items.
+  const [vibeMatches, setVibeMatches] = useState<string[]>(() => {
+    const v = (initialState as Record<string, unknown>)?.vibeMatches;
+    return Array.isArray(v) ? (v as unknown[]).map(String) : [];
+  });
+  useEffect(() => {
+    const onEvt = (e: Event) => { const d = (e as CustomEvent).detail as { matches?: string[] } | undefined; if (Array.isArray(d?.matches)) setVibeMatches(d!.matches!.map(String)); };
+    window.addEventListener("venuely:vibe-matched", onEvt);
+    return () => window.removeEventListener("venuely:vibe-matched", onEvt);
+  }, []);
+  const vibeSet = new Set(vibeMatches.map((m) => m.trim().toLowerCase()));
+  const isVibeMatch = (name: string) => vibeSet.has((name || "").trim().toLowerCase());
   const [, startTransition] = useTransition();
   const primary = theme.primary;
   const accent = theme.accent;
@@ -759,9 +771,9 @@ export function CouplePortal({
                 <div key={catName} style={{ marginBottom: 22 }}>
                   <div style={{ ...eyebrow, color: primary, marginBottom: 8 }}>{catName}</div>
                   <div style={{ display: "grid", gap: 8 }}>{items.map((m) => m.kind === "cat" ? (
-                    <PortalLineItem key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} paidItem={!m.item.included} selected={catIsSelected(m.item)} onToggle={() => toggleCat(m.item)} days={catSel[m.item.id]} onDay={(d) => toggleCatDay(m.item, d)} {...itemProps} />
+                    <PortalLineItem key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} paidItem={!m.item.included} selected={catIsSelected(m.item)} onToggle={() => toggleCat(m.item)} days={catSel[m.item.id]} onDay={(d) => toggleCatDay(m.item, d)} matched={isVibeMatch(m.item.name)} {...itemProps} />
                   ) : (
-                    <PortalLineItem key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} paidItem={!m.item.included} selected={!!rentSel[m.item.id]?.sel} onToggle={() => toggleRent(m.item.id)} days={rentSel[m.item.id]} onDay={(d) => toggleRentDay(m.item.id, d)} qty={rentSel[m.item.id]?.qty} onQty={(n) => setRentQty(m.item.id, n)} stock={(m.item as RentItem).stock} {...itemProps} />
+                    <PortalLineItem key={m.item.id} name={m.item.name} description={m.item.description} img={m.item.img} price={m.item.included ? 0 : m.item.price} badge={m.item.included ? "Included" : undefined} paidItem={!m.item.included} selected={!!rentSel[m.item.id]?.sel} onToggle={() => toggleRent(m.item.id)} days={rentSel[m.item.id]} onDay={(d) => toggleRentDay(m.item.id, d)} qty={rentSel[m.item.id]?.qty} onQty={(n) => setRentQty(m.item.id, n)} stock={(m.item as RentItem).stock} matched={isVibeMatch(m.item.name)} {...itemProps} />
                   ))}</div>
                 </div>
               ))}
@@ -1415,17 +1427,18 @@ function PortalItemCard({ name, description, img, price, badge, paidItem, select
 // Compact LINE-ITEM row (vs the cube card) for Extras & Rentals — name + price on
 // one line, a typeable quantity capped at the venue's available stock, and the
 // day toggles when selected.
-function PortalLineItem({ name, description, img, price, badge, paidItem, selected, onToggle, days, onDay, qty, onQty, stock, primary, accent, heading, cardBorder }: {
+function PortalLineItem({ name, description, img, price, badge, paidItem, selected, onToggle, days, onDay, qty, onQty, stock, matched, primary, accent, heading, cardBorder }: {
   name: string; description: string; img: string | null; price?: number; badge?: string; paidItem?: boolean;
   selected?: boolean; onToggle?: () => void;
   days?: DaySel; onDay?: (d: "mg" | "wed" | "fb") => void;
-  qty?: number; onQty?: (n: number) => void; stock?: number | null;
+  qty?: number; onQty?: (n: number) => void; stock?: number | null; matched?: boolean;
   primary: string; accent: string; heading: React.CSSProperties; cardRadius: string; cardBorder?: string;
 }) {
   const included = badge === "Included";
   const paid = paidItem ?? (!included && price != null && price > 0);
   return (
-    <div style={{ background: "#fff", border: selected ? `1.5px solid ${primary}` : (cardBorder ?? "1px solid rgba(0,0,0,0.08)"), borderRadius: 12, padding: "9px 12px", display: "grid", gap: 8 }}>
+    <div style={{ background: "#fff", border: matched ? "1.5px solid #F59E0B" : selected ? `1.5px solid ${primary}` : (cardBorder ?? "1px solid rgba(0,0,0,0.08)"), borderRadius: 12, padding: "9px 12px", display: "grid", gap: 8, boxShadow: matched ? "0 0 0 3px rgba(245,158,11,0.12)" : undefined }}>
+      {matched && <div style={{ fontSize: 10.5, fontWeight: 700, color: "#b45309" }}>✨ Matches your inspiration</div>}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
