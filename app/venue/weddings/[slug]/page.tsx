@@ -465,7 +465,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
           <div className="flex gap-2 flex-wrap items-center">
             {!wedding.invoiced_at ? (
               <form action={markInvoiced.bind(null, wedding.id, wedding.slug, totals.grand_total, platformFeeRate)}>
-                <button className="vy-btn vy-btn-primary">Mark invoiced</button>
+                <button className="vy-btn vy-btn-primary" title="Records the invoice only — the couple is NOT emailed. Approve their portal submission above to email them their invoice.">Record invoiced</button>
               </form>
             ) : !wedding.couple_paid_at ? (
               <form action={markCouplePaid.bind(null, wedding.id, wedding.slug)}>
@@ -478,6 +478,9 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
               </form>
             )}
           </div>
+          {!wedding.invoiced_at && (
+            <p className="text-[11px] text-stone-500 mt-1 w-full">“Record invoiced” logs the invoice without emailing. To email the couple their invoice, approve their submission.</p>
+          )}
         </div>
 
         <div className="grid grid-cols-4 gap-3 text-sm border-t border-stone-200 pt-3">
