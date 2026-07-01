@@ -304,8 +304,23 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
         <Link href={`/p/${wedding.slug}`} target="_blank" className="vy-btn vy-btn-secondary">Open Couples Portal →</Link>
       </div>
 
+      {/* Quick jump — this page is a top-to-bottom workflow; these anchors let the
+          venue skip straight to a section instead of scroll-hunting. Plain <a>
+          anchors so it works with no JS. */}
+      <nav aria-label="Jump to section" className="sticky top-0 z-20 -mx-1 flex gap-1.5 overflow-x-auto px-1 py-2 backdrop-blur" style={{ background: "rgba(255,255,255,0.85)" }}>
+        {[
+          { href: "#w-portal", label: "Portal" },
+          { href: "#w-details", label: "Details" },
+          { href: "#w-money", label: "Money" },
+          { href: "#w-suppliers", label: "Suppliers" },
+          { href: "#w-docs", label: "Documents" },
+        ].map((s) => (
+          <a key={s.href} href={s.href} className="whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors hover:bg-[color:var(--cream)]" style={{ borderColor: "var(--line)", color: "var(--ink-2)" }}>{s.label}</a>
+        ))}
+      </nav>
+
       {/* ── Share the couple portal — ONE place: the link, the invite, access ── */}
-      <section className="space-y-3">
+      <section id="w-portal" className="space-y-3 scroll-mt-20">
         <header>
           <div className="vy-eyebrow">Share with the couple</div>
           <h2 className="vy-h2 mt-1">Their private portal</h2>
@@ -372,7 +387,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
         </section>
       )}
 
-      <form action={updateWeddingBasics.bind(null, wedding.id, wedding.slug)} className="vy-card grid gap-3 md:grid-cols-6">
+      <form id="w-details" action={updateWeddingBasics.bind(null, wedding.id, wedding.slug)} className="vy-card grid gap-3 md:grid-cols-6 scroll-mt-20">
         <div className="md:col-span-3 space-y-1"><label className="vy-label">Couple names</label><input name="couple_names" required defaultValue={wedding.couple_names} className="vy-input" /></div>
         <div className="space-y-1"><label className="vy-label">Guests</label><input name="guest_count" type="number" min="0" defaultValue={wedding.guest_count ?? ""} className="vy-input" /></div>
         <div className="md:col-span-2 space-y-1"><label className="vy-label">Total budget (R)</label><input name="total_budget" type="number" step="0.01" defaultValue={wedding.total_budget ?? ""} className="vy-input" /></div>
@@ -528,7 +543,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
       </div>
 
       {/* Charges table */}
-      <section>
+      <section id="w-money" className="scroll-mt-20">
         <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
           <h2 className="text-lg font-semibold">Line items ({charges.length})</h2>
           {charges.length > 0 && (
@@ -627,7 +642,7 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
       </section>
 
       {/* Supplier intros & commission ledger */}
-      <section className="vy-card space-y-3">
+      <section id="w-suppliers" className="vy-card space-y-3 scroll-mt-20">
         <div className="flex items-baseline justify-between flex-wrap gap-2">
           <div>
             <div className="vy-eyebrow">Supplier intros &amp; commission</div>
@@ -698,7 +713,9 @@ export default async function WeddingDetail({ params }: { params: Promise<{ slug
         );
       })()}
 
-      <WeddingDocuments weddingId={wedding.id} docs={docsRes.data ?? []} />
+      <div id="w-docs" className="scroll-mt-20">
+        <WeddingDocuments weddingId={wedding.id} docs={docsRes.data ?? []} />
+      </div>
     </div>
   );
 }
